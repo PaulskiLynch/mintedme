@@ -1,9 +1,12 @@
 import { PrismaClient } from '@/generated/prisma/client'
-import { PrismaNeonHttp } from '@prisma/adapter-neon'
-import type { HTTPQueryOptions } from '@neondatabase/serverless'
+import { PrismaNeon } from '@prisma/adapter-neon'
+import { neonConfig } from '@neondatabase/serverless'
+import ws from 'ws'
+
+neonConfig.webSocketConstructor = ws
 
 const createClient = () => {
-  const adapter = new PrismaNeonHttp(process.env.DATABASE_URL!, {} as HTTPQueryOptions<boolean, boolean>)
+  const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! })
   return new PrismaClient({ adapter })
 }
 
