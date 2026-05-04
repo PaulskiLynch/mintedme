@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
+import { maxEditions } from '@/lib/supply'
 import ItemActions from './ItemActions'
 
 export const dynamic = 'force-dynamic'
@@ -37,6 +38,16 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
     : null
 
   const topOffer     = edition.offers[0]?.amount?.toString() ?? null
+
+  // Supply calculation
+  const [userCount, mintedCount] = await Promise.all([
+    prisma.user.count(),
+    prisma.itemEdition.count({ where: { itemId: item.id } }),
+  ])
+  const allowedEditions = Math.min(item.totalSupply, maxEditions(item.class, userCount))
+  const supplyLocked    = !edition.currentOwnerId && mintedCount >= allowedEditions
+  const supplyInfo      = `${mintedCount} minted · ${allowedEditions} unlocked · ${item.totalSupply.toLocaleString()} max supply`
+
   const activeAuction = edition.isInAuction
     ? await prisma.auction.findFirst({ where: { editionId: id, status: 'active' }, select: { id: true, currentBid: true, startingBid: true, endsAt: true } })
     : null
@@ -132,6 +143,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
 
             <ItemActions
               editionId={edition.id}
+              itemId={item.id}
               itemName={item.name}
               isOwner={isOwner}
               isListed={edition.isListed}
@@ -142,6 +154,8 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
               userBalance={userData?.balance?.toString() ?? null}
               currentOwnerId={edition.currentOwnerId}
               referencePrice={item.referencePrice?.toString() ?? null}
+              supplyLocked={supplyLocked}
+              supplyInfo={supplyInfo}
             />
 
             {/* Active offers (owner view) */}

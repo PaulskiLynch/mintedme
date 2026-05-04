@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 
 interface Props {
   editionId:      string
+  itemId:         string
   itemName:       string
   isOwner:        boolean
   isListed:       boolean
@@ -15,9 +16,11 @@ interface Props {
   userBalance:    string | null
   currentOwnerId: string | null
   referencePrice: string | null
+  supplyLocked:   boolean
+  supplyInfo:     string
 }
 
-export default function ItemActions({ editionId, itemName, isOwner, isListed, listedPrice, isInAuction, isFrozen, userId, userBalance, currentOwnerId, referencePrice }: Props) {
+export default function ItemActions({ editionId, itemId, itemName, isOwner, isListed, listedPrice, isInAuction, isFrozen, userId, userBalance, currentOwnerId, referencePrice, supplyLocked, supplyInfo }: Props) {
   const router = useRouter()
   const [busy, setBusy]           = useState(false)
   const [error, setError]         = useState('')
@@ -33,13 +36,20 @@ export default function ItemActions({ editionId, itemName, isOwner, isListed, li
   async function handleBuy() {
     if (!userId) { router.push('/login'); return }
     setBusy(true); setError('')
+    // Primary sale: pass itemId so API finds/mints the next available edition
+    const body = currentOwnerId ? { editionId } : { itemId }
     const res = await fetch('/api/buy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ editionId }),
+      body: JSON.stringify(body),
     })
     const json = await res.json()
-    if (res.ok) { router.refresh() } else { setError(json.error || 'Purchase failed') }
+    if (res.ok) {
+      // Navigate to the edition that was bought (may be freshly minted)
+      router.push(`/item/${json.editionId}`)
+    } else {
+      setError(json.error || 'Purchase failed')
+    }
     setBusy(false)
   }
 
@@ -100,15 +110,20 @@ export default function ItemActions({ editionId, itemName, isOwner, isListed, li
     return (
       <div>
         {error && <div className="form-error" style={{ marginBottom: 12 }}>{error}</div>}
-        {referencePrice ? (
+        <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>{supplyInfo}</div>
+        {supplyLocked ? (
+          <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '14px 16px', fontSize: 13, color: 'var(--muted)', textAlign: 'center' }}>
+            Supply locked — unlocks as more users join
+          </div>
+        ) : referencePrice ? (
           <button className="btn btn-gold btn-full btn-lg" onClick={handleBuy} disabled={busy || !userId || balance < refPrice}>
             {busy ? 'Buying...' : `Buy now — $${refPrice.toLocaleString()}`}
           </button>
         ) : (
           <div style={{ color: 'var(--muted)', fontSize: 13 }}>Not available for sale.</div>
         )}
-        {!userId && <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginTop: 8 }}>Sign in to buy</div>}
-        {userId && refPrice > 0 && balance < refPrice && (
+        {!userId && !supplyLocked && <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginTop: 8 }}>Sign in to buy</div>}
+        {userId && refPrice > 0 && balance < refPrice && !supplyLocked && (
           <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 8 }}>Insufficient balance (you have ${balance.toLocaleString()})</div>
         )}
       </div>
