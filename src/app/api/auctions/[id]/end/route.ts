@@ -22,10 +22,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (!isExpired && !isSeller) throw new Error('Auction has not ended yet')
 
       if (!auction.currentWinnerId || !auction.currentBid) {
-        // No bids — just cancel and restore
+        // No bids — cancel, restore, charge 2% listing fee on starting bid
+        const listingBase = Number(auction.startingBid ?? auction.edition.item.referencePrice ?? 0)
+        const listingFee  = Math.floor(listingBase * 0.02)
+
         await tx.auction.update({ where: { id }, data: { status: 'cancelled' } })
         await tx.itemEdition.update({ where: { id: auction.editionId }, data: { isInAuction: false } })
-        return { ok: true, result: 'no_bids' }
+
+        if (listingFee > 0) {
+          await tx.user.update({ where: { id: auction.sellerId }, data: { balance: { decrement: listingFee } } })
+          await tx.transaction.create({
+            data: { fromUserId: auction.sellerId, editionId: auction.editionId, amount: listingFee, type: 'fee', description: `Auction listing fee (no sale): ${auction.edition.item.name}` },
+          })
+        }
+        return { ok: true, result: 'no_bids', listingFee }
       }
 
       const winnerId = auction.currentWinnerId
@@ -36,10 +46,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (!winner) throw new Error('Winner not found')
       if (Number(winner.balance) < price) throw new Error('Winner has insufficient balance')
 
-      const creatorId  = auction.edition.item.creatorId
-      const creatorPct = creatorId && creatorId !== sellerId ? 0.2 : 0
-      const creatorCut = Math.floor(price * creatorPct)
-      const sellerGets = price - creatorCut
+      // 5% platform fee on sale, then 20% creator royalty on remainder
+      const platformFee = Math.floor(price * 0.05)
+      const afterFee    = price - platformFee
+      const creatorId   = auction.edition.item.creatorId
+      const creatorPct  = creatorId && creatorId !== sellerId ? 0.2 : 0
+      const creatorCut  = Math.floor(afterFee * creatorPct)
+      const sellerGets  = afterFee - creatorCut
 
       await tx.user.update({ where: { id: winnerId }, data: { balance: { decrement: price } } })
       await tx.user.update({ where: { id: sellerId }, data: { balance: { increment: sellerGets } } })
@@ -47,6 +60,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         await tx.user.update({ where: { id: creatorId }, data: { balance: { increment: creatorCut } } })
         await tx.transaction.create({ data: { toUserId: creatorId, editionId: auction.editionId, amount: creatorCut, type: 'creator_earning' } })
       }
+      await tx.transaction.create({
+        data: { fromUserId: winnerId, editionId: auction.editionId, amount: platformFee, type: 'fee', description: `Auction platform fee: ${auction.edition.item.name}` },
+      })
 
       await tx.itemEdition.update({
         where: { id: auction.editionId },
@@ -67,7 +83,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         data: { userId: sellerId, type: 'item_sold', message: `Your ${auction.edition.item.name} sold at auction for $${price.toLocaleString()}`, actionUrl: `/item/${auction.editionId}` },
       })
 
-      return { ok: true, result: 'sold', winnerId, price }
+      return { ok: true, result: 'sold', winnerId, price, platformFee, sellerGets }
     })
     return NextResponse.json(result)
   } catch (err: unknown) {
