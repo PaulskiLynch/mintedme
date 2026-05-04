@@ -15,7 +15,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="app-shell">
-      <Sidebar username={user.username} balance={user.balance.toString()} unreadCount={unread} />
+      <Sidebar username={user.username} balance={user.balance.toString()} isAdmin={session.user.isAdmin ?? false} unreadCount={unread} />
       <main className="main-content">{children}</main>
     </div>
   )

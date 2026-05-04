@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 interface Props {
   username: string
   balance: string
+  isAdmin?: boolean
   unreadCount?: number
 }
 
@@ -16,7 +17,7 @@ const NAV = [
   { href: '/studio',      label: 'Studio',       icon: '✦' },
 ]
 
-export default function Sidebar({ username, balance, unreadCount = 0 }: Props) {
+export default function Sidebar({ username, balance, isAdmin = false, unreadCount = 0 }: Props) {
   const path = usePathname()
 
   return (
@@ -59,6 +60,12 @@ export default function Sidebar({ username, balance, unreadCount = 0 }: Props) {
           <span style={{ fontSize: 16 }}>⚙</span>
           Settings
         </Link>
+        {isAdmin && (
+          <Link href="/admin" className="nav-link" style={{ color: 'var(--gold)' }}>
+            <span style={{ fontSize: 16 }}>★</span>
+            Admin
+          </Link>
+        )}
       </div>
     </aside>
   )
