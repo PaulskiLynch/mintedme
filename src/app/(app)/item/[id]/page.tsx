@@ -36,7 +36,10 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
     ? await prisma.user.findUnique({ where: { id: session.user.id }, select: { balance: true } })
     : null
 
-  const topOffer = edition.offers[0]?.amount?.toString() ?? null
+  const topOffer     = edition.offers[0]?.amount?.toString() ?? null
+  const activeAuction = edition.isInAuction
+    ? await prisma.auction.findFirst({ where: { editionId: id, status: 'active' }, select: { id: true, currentBid: true, startingBid: true, endsAt: true } })
+    : null
 
   return (
     <div>
@@ -114,6 +117,12 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                 ? <>Owned by <Link href={`/mint/${edition.currentOwner.username}`}>@{edition.currentOwner.username}</Link></>
                 : 'Available — no owner yet'}
             </div>
+
+            {activeAuction && (
+              <Link href={`/auction/${activeAuction.id}`} className="btn btn-gold btn-full btn-lg" style={{ textDecoration: 'none', display: 'block', textAlign: 'center', marginBottom: 12 }}>
+                Live auction — ${Number(activeAuction.currentBid ?? activeAuction.startingBid).toLocaleString()} →
+              </Link>
+            )}
 
             {item.hasOwnershipCost && item.ownershipCostPct && (
               <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16 }}>

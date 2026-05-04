@@ -21,11 +21,14 @@ export default function ItemActions({ editionId, itemName, isOwner, isListed, li
   const router = useRouter()
   const [busy, setBusy]           = useState(false)
   const [error, setError]         = useState('')
-  const [showOffer, setShowOffer] = useState(false)
-  const [showList, setShowList]   = useState(false)
-  const [offerAmt, setOfferAmt]   = useState('')
-  const [listPrice, setListPrice] = useState(listedPrice ?? referencePrice ?? '')
-  const [message, setMessage]     = useState('')
+  const [showOffer, setShowOffer]       = useState(false)
+  const [showList, setShowList]         = useState(false)
+  const [showAuction, setShowAuction]   = useState(false)
+  const [offerAmt, setOfferAmt]         = useState('')
+  const [listPrice, setListPrice]       = useState(listedPrice ?? referencePrice ?? '')
+  const [message, setMessage]           = useState('')
+  const [startBid, setStartBid]         = useState(referencePrice ?? '')
+  const [durationHours, setDurationHours] = useState('24')
 
   async function handleBuy() {
     if (!userId) { router.push('/login'); return }
@@ -67,6 +70,18 @@ export default function ItemActions({ editionId, itemName, isOwner, isListed, li
     setBusy(false)
   }
 
+  async function handleStartAuction(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true); setError('')
+    const res = await fetch('/api/auctions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ editionId, startingBid: Number(startBid), durationHours: Number(durationHours) }),
+    })
+    const json = await res.json()
+    if (res.ok) { router.push(`/auction/${json.auctionId}`) } else { setError(json.error || 'Failed'); setBusy(false) }
+  }
+
   async function handleDelist() {
     setBusy(true); setError('')
     await fetch(`/api/editions/${editionId}/list`, { method: 'DELETE' })
@@ -86,14 +101,21 @@ export default function ItemActions({ editionId, itemName, isOwner, isListed, li
 
       {isOwner ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {isListed ? (
+          {isInAuction ? (
+            <div style={{ fontSize: 13, color: 'var(--gold)', fontWeight: 700 }}>Live auction in progress</div>
+          ) : isListed ? (
             <button className="btn btn-danger btn-full" onClick={handleDelist} disabled={busy}>
               {busy ? '...' : 'Remove listing'}
             </button>
           ) : (
-            <button className="btn btn-gold btn-full" onClick={() => setShowList(true)} disabled={busy}>
-              List for sale
-            </button>
+            <>
+              <button className="btn btn-gold btn-full" onClick={() => setShowList(true)} disabled={busy}>
+                List for sale
+              </button>
+              <button className="btn btn-outline btn-full" onClick={() => setShowAuction(true)} disabled={busy}>
+                Start auction
+              </button>
+            </>
           )}
         </div>
       ) : (
@@ -140,6 +162,38 @@ export default function ItemActions({ editionId, itemName, isOwner, isListed, li
               <div style={{ display: 'flex', gap: 8 }}>
                 <button className="btn btn-gold" type="submit" disabled={busy || !offerAmt}>{busy ? 'Sending...' : 'Send offer'}</button>
                 <button className="btn btn-ghost" type="button" onClick={() => setShowOffer(false)}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Auction modal */}
+      {showAuction && (
+        <div className="overlay" onClick={e => { if (e.target === e.currentTarget) setShowAuction(false) }}>
+          <div className="modal">
+            <div className="modal-title">Start Auction</div>
+            <div className="modal-sub">{itemName}</div>
+            <form onSubmit={handleStartAuction}>
+              <div className="form-group">
+                <label className="form-label">Starting bid (USD)</label>
+                <input className="form-input" type="number" min="1" value={startBid} onChange={e => setStartBid(e.target.value)} required autoFocus />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Duration</label>
+                <select className="form-input" value={durationHours} onChange={e => setDurationHours(e.target.value)}>
+                  <option value="1">1 hour</option>
+                  <option value="6">6 hours</option>
+                  <option value="12">12 hours</option>
+                  <option value="24">24 hours</option>
+                  <option value="48">48 hours</option>
+                  <option value="72">72 hours</option>
+                </select>
+              </div>
+              {error && <div className="form-error">{error}</div>}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-gold" type="submit" disabled={busy || !startBid}>{busy ? 'Starting...' : 'Start auction'}</button>
+                <button className="btn btn-ghost" type="button" onClick={() => setShowAuction(false)}>Cancel</button>
               </div>
             </form>
           </div>
