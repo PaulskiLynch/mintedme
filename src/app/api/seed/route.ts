@@ -52,33 +52,37 @@ export async function POST(req: NextRequest) {
   const key = req.headers.get('x-seed-key')
   if (key !== process.env.SEED_KEY) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const existing = await prisma.item.count()
-  if (existing > 0) return NextResponse.json({ error: 'Already seeded' }, { status: 400 })
+  try {
+    const existing = await prisma.item.count()
+    if (existing > 0) return NextResponse.json({ error: 'Already seeded' }, { status: 400 })
 
-  for (const item of ITEMS) {
-    const created = await prisma.item.create({
-      data: {
-        name:             item.name,
-        description:      item.description,
-        category:         item.category,
-        class:            item.class,
-        imageUrl:         item.imageUrl,
-        totalSupply:      item.totalSupply,
-        referencePrice:   item.referencePrice,
-        hasOwnershipCost: item.hasOwnershipCost ?? false,
-        ownershipCostPct: item.ownershipCostPct ?? null,
-        isOfficial:       true,
-        isApproved:       true,
-      },
-    })
-    // Create first 3 editions (or 1 for unique)
-    const edCount = Math.min(item.totalSupply, item.class === 'grail' ? 10 : item.class === 'elite' ? 5 : 3)
-    for (let i = 1; i <= edCount; i++) {
-      await prisma.itemEdition.create({
-        data: { itemId: created.id, editionNumber: i },
+    for (const item of ITEMS) {
+      const created = await prisma.item.create({
+        data: {
+          name:             item.name,
+          description:      item.description,
+          category:         item.category,
+          class:            item.class,
+          imageUrl:         item.imageUrl,
+          totalSupply:      item.totalSupply,
+          referencePrice:   item.referencePrice,
+          hasOwnershipCost: item.hasOwnershipCost ?? false,
+          ownershipCostPct: item.ownershipCostPct ?? null,
+          isOfficial:       true,
+          isApproved:       true,
+        },
       })
+      const edCount = Math.min(item.totalSupply, item.class === 'grail' ? 10 : item.class === 'elite' ? 5 : 3)
+      for (let i = 1; i <= edCount; i++) {
+        await prisma.itemEdition.create({
+          data: { itemId: created.id, editionNumber: i },
+        })
+      }
     }
-  }
 
-  return NextResponse.json({ ok: true, seeded: ITEMS.length })
+    return NextResponse.json({ ok: true, seeded: ITEMS.length })
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
 }
