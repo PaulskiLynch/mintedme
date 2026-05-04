@@ -90,10 +90,30 @@ export default function ItemActions({ editionId, itemName, isOwner, isListed, li
   }
 
   if (isFrozen) return <div style={{ color: 'var(--red)', fontWeight: 700, fontSize: 13 }}>This item is frozen.</div>
-  if (!currentOwnerId) return <div style={{ color: 'var(--muted)', fontSize: 13 }}>This edition has no owner yet.</div>
 
-  const balance = Number(userBalance ?? 0)
-  const price   = Number(listedPrice ?? 0)
+  const balance  = Number(userBalance ?? 0)
+  const price    = Number(listedPrice ?? 0)
+  const refPrice = Number(referencePrice ?? 0)
+
+  // Primary sale — no owner yet, buy at reference price
+  if (!currentOwnerId) {
+    return (
+      <div>
+        {error && <div className="form-error" style={{ marginBottom: 12 }}>{error}</div>}
+        {referencePrice ? (
+          <button className="btn btn-gold btn-full btn-lg" onClick={handleBuy} disabled={busy || !userId || balance < refPrice}>
+            {busy ? 'Buying...' : `Buy now — $${refPrice.toLocaleString()}`}
+          </button>
+        ) : (
+          <div style={{ color: 'var(--muted)', fontSize: 13 }}>Not available for sale.</div>
+        )}
+        {!userId && <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginTop: 8 }}>Sign in to buy</div>}
+        {userId && refPrice > 0 && balance < refPrice && (
+          <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 8 }}>Insufficient balance (you have ${balance.toLocaleString()})</div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div>
