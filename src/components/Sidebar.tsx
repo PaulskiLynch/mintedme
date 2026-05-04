@@ -13,6 +13,7 @@ interface Props {
 const NAV = [
   { href: '/feed',        label: 'Feed',        icon: '◎' },
   { href: '/marketplace', label: 'Marketplace',  icon: '◈' },
+  { href: '/auctions',    label: 'Auctions',     icon: '⏱' },
   { href: '/mint',        label: 'My Mint',      icon: '◆' },
   { href: '/studio',      label: 'Studio',       icon: '✦' },
 ]
