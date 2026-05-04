@@ -1,10 +1,10 @@
 export function maxEditions(itemClass: string, userCount: number): number {
   switch (itemClass) {
     case 'unique':    return 1
-    case 'grail':     return Math.min(10,    Math.max(1, Math.floor(userCount / 100)))
-    case 'elite':     return Math.min(100,   Math.max(1, Math.floor(userCount / 10)))
-    case 'premium':   return Math.min(1000,  Math.max(1, userCount))
-    case 'essential': return Math.min(10000, Math.max(5, userCount * 5))
+    case 'grail':     return Math.min(10,    2 + Math.floor(userCount / 50))
+    case 'elite':     return Math.min(100,   5 + Math.floor(userCount / 5))
+    case 'premium':   return Math.min(1000,  20 + userCount * 10)
+    case 'essential': return Math.min(10000, 100 + userCount * 50)
     default:          return 1
   }
 }

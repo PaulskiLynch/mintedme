@@ -45,7 +45,9 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
     prisma.itemEdition.count({ where: { itemId: item.id } }),
   ])
   const allowedEditions = Math.min(item.totalSupply, maxEditions(item.class, userCount))
-  const supplyLocked    = !edition.currentOwnerId && mintedCount >= allowedEditions
+  // Locked only when ALL editions are owned AND we can't mint more
+  const unownedExists   = !edition.currentOwnerId  // this edition itself is available
+  const supplyLocked    = !unownedExists && mintedCount >= allowedEditions
   const supplyInfo      = `${mintedCount} minted · ${allowedEditions} unlocked · ${item.totalSupply.toLocaleString()} max supply`
 
   const activeAuction = edition.isInAuction
