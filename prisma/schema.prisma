@@ -1,0 +1,283 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String
+  username      String   @unique
+  avatarUrl     String?
+  tagline       String?
+  balance       Decimal  @default(1000000.00) @db.Decimal(12, 2)
+  mintValue     Decimal  @default(0) @db.Decimal(12, 2)
+  netWorth      Decimal  @default(0) @db.Decimal(12, 2)
+  prestigeScore Decimal  @default(0) @db.Decimal(10, 2)
+  isEstablished Boolean  @default(false)
+  isAdmin       Boolean  @default(false)
+  isFrozen      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  ownedEditions      ItemEdition[]      @relation("CurrentOwner")
+  offersAsBuyer      Offer[]            @relation("OfferBuyer")
+  transactionsFrom   Transaction[]      @relation("TransactionFrom")
+  transactionsTo     Transaction[]      @relation("TransactionTo")
+  feedEventsActed    FeedEvent[]        @relation("FeedActor")
+  feedEventsTargeted FeedEvent[]        @relation("FeedTarget")
+  notifications      Notification[]
+  watchedItems       WatchedItem[]
+  createdItems       Item[]             @relation("ItemCreator")
+  submissions        CreatorSubmission[]
+  ownerships         Ownership[]
+  auctionsAsSeller   Auction[]          @relation("AuctionSeller")
+  auctionWins        Auction[]          @relation("AuctionWinner")
+  bids               Bid[]
+  reports            Report[]
+
+  @@map("users")
+}
+
+model Item {
+  id               String   @id @default(uuid())
+  name             String
+  description      String?
+  category         String   // cars, yachts, watches, art, fashion, jets, mansions, collectibles, businesses
+  class            String   // essential, premium, elite, grail, unique
+  imageUrl         String
+  totalSupply      Int
+  referencePrice   Decimal? @db.Decimal(12, 2)
+  minPriceBand     Decimal? @db.Decimal(12, 2)
+  maxPriceBand     Decimal? @db.Decimal(12, 2)
+  hasOwnershipCost Boolean  @default(false)
+  ownershipCostPct Decimal? @db.Decimal(5, 4)
+  creatorId        String?
+  isOfficial       Boolean  @default(true)
+  isApproved       Boolean  @default(true)
+  isFrozen         Boolean  @default(false)
+  reportCount      Int      @default(0)
+  createdAt        DateTime @default(now())
+
+  creator  User?         @relation("ItemCreator", fields: [creatorId], references: [id])
+  editions ItemEdition[]
+
+  @@map("items")
+}
+
+model ItemEdition {
+  id             String    @id @default(uuid())
+  itemId         String
+  editionNumber  Int
+  currentOwnerId String?
+  lastSalePrice  Decimal?  @db.Decimal(12, 2)
+  lastSaleDate   DateTime?
+  highestOffer   Decimal?  @db.Decimal(12, 2)
+  isListed       Boolean   @default(false)
+  listedPrice    Decimal?  @db.Decimal(12, 2)
+  isInAuction    Boolean   @default(false)
+  isFrozen       Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+
+  item         Item           @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  currentOwner User?          @relation("CurrentOwner", fields: [currentOwnerId], references: [id])
+  offers       Offer[]
+  ownerships   Ownership[]
+  feedEvents   FeedEvent[]
+  watchedBy    WatchedItem[]
+  transactions Transaction[]
+  auctions     Auction[]
+  priceHistory PriceHistory[]
+  reports      Report[]
+
+  @@unique([itemId, editionNumber])
+  @@map("item_editions")
+}
+
+model Ownership {
+  id            String    @id @default(uuid())
+  editionId     String
+  ownerId       String
+  purchasePrice Decimal?  @db.Decimal(12, 2)
+  purchaseDate  DateTime  @default(now())
+  transferType  String    // buy, auction_win, offer_accept, admin
+  endedAt       DateTime?
+
+  edition ItemEdition @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  owner   User        @relation(fields: [ownerId], references: [id])
+
+  @@map("ownerships")
+}
+
+model Offer {
+  id              String   @id @default(uuid())
+  editionId       String
+  buyerId         String
+  amount          Decimal  @db.Decimal(12, 2)
+  status          String   @default("pending") // pending, accepted, declined, expired, countered
+  expiresAt       DateTime
+  isFundsReserved Boolean  @default(true)
+  counterOfferId  String?  @unique
+  message         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  edition      ItemEdition  @relation(fields: [editionId], references: [id])
+  buyer        User         @relation("OfferBuyer", fields: [buyerId], references: [id])
+  counterOffer Offer?       @relation("CounterChain", fields: [counterOfferId], references: [id])
+  parentOffer  Offer?       @relation("CounterChain")
+  transaction  Transaction?
+
+  @@map("offers")
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  fromUserId  String?
+  toUserId    String?
+  editionId   String?
+  offerId     String?  @unique
+  auctionId   String?
+  amount      Decimal  @db.Decimal(12, 2)
+  type        String   // purchase, sale, auction_win, creator_earning, ownership_cost, starting_bonus
+  description String?
+  createdAt   DateTime @default(now())
+
+  fromUser User?        @relation("TransactionFrom", fields: [fromUserId], references: [id])
+  toUser   User?        @relation("TransactionTo", fields: [toUserId], references: [id])
+  edition  ItemEdition? @relation(fields: [editionId], references: [id])
+  offer    Offer?       @relation(fields: [offerId], references: [id])
+
+  @@map("transactions")
+}
+
+model Auction {
+  id              String   @id @default(uuid())
+  editionId       String
+  sellerId        String
+  startingBid     Decimal  @db.Decimal(12, 2)
+  currentBid      Decimal? @db.Decimal(12, 2)
+  currentWinnerId String?
+  status          String   @default("active") // active, ended, cancelled
+  endsAt          DateTime
+  createdAt       DateTime @default(now())
+
+  edition       ItemEdition @relation(fields: [editionId], references: [id])
+  seller        User        @relation("AuctionSeller", fields: [sellerId], references: [id])
+  currentWinner User?       @relation("AuctionWinner", fields: [currentWinnerId], references: [id])
+  bids          Bid[]
+
+  @@map("auctions")
+}
+
+model Bid {
+  id        String   @id @default(uuid())
+  auctionId String
+  userId    String
+  amount    Decimal  @db.Decimal(12, 2)
+  isWinning Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  auction Auction @relation(fields: [auctionId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@map("bids")
+}
+
+model FeedEvent {
+  id           String   @id @default(uuid())
+  eventType    String   // buy, sell, offer, accept, create_item, auction_start, auction_end
+  userId       String?
+  targetUserId String?
+  editionId    String?
+  amount       Decimal? @db.Decimal(12, 2)
+  metadata     Json?
+  isVisible    Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  user       User?        @relation("FeedActor", fields: [userId], references: [id])
+  targetUser User?        @relation("FeedTarget", fields: [targetUserId], references: [id])
+  edition    ItemEdition? @relation(fields: [editionId], references: [id])
+
+  @@map("feed_events")
+}
+
+model Notification {
+  id              String   @id @default(uuid())
+  userId          String
+  type            String
+  message         String
+  relatedEntityId String?
+  isRead          Boolean  @default(false)
+  actionUrl       String?
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model WatchedItem {
+  userId    String
+  editionId String
+  createdAt DateTime @default(now())
+
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  edition ItemEdition @relation(fields: [editionId], references: [id], onDelete: Cascade)
+
+  @@id([userId, editionId])
+  @@map("watched_items")
+}
+
+model CreatorSubmission {
+  id                   String    @id @default(uuid())
+  creatorId            String
+  itemName             String
+  category             String
+  imageUrl             String
+  description          String?
+  requestedPrice       Decimal?  @db.Decimal(12, 2)
+  requestedEditionSize Int?
+  status               String    @default("pending") // pending, approved, rejected
+  adminNotes           String?
+  reviewedBy           String?
+  createdAt            DateTime  @default(now())
+  reviewedAt           DateTime?
+
+  creator User @relation(fields: [creatorId], references: [id])
+
+  @@map("creator_submissions")
+}
+
+model Report {
+  id          String    @id @default(uuid())
+  reporterId  String
+  editionId   String?
+  reason      String
+  description String?
+  status      String    @default("pending")
+  reviewedBy  String?
+  createdAt   DateTime  @default(now())
+  reviewedAt  DateTime?
+
+  reporter User         @relation(fields: [reporterId], references: [id])
+  edition  ItemEdition? @relation(fields: [editionId], references: [id])
+
+  @@map("reports")
+}
+
+model PriceHistory {
+  id              String   @id @default(uuid())
+  editionId       String
+  price           Decimal  @db.Decimal(12, 2)
+  transactionType String   // sale, offer, auction
+  recordedAt      DateTime @default(now())
+
+  edition ItemEdition @relation(fields: [editionId], references: [id], onDelete: Cascade)
+
+  @@map("price_history")
+}
