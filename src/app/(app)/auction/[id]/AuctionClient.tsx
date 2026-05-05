@@ -88,7 +88,8 @@ export default function AuctionClient({
   const [messages,  setMessages]  = useState<ChatMessage[]>(initialMessages)
   const [chatInput, setChatInput] = useState('')
   const [chatBusy,  setChatBusy]  = useState(false)
-  const chatEndRef = useRef<HTMLDivElement>(null)
+  const chatEndRef       = useRef<HTMLDivElement>(null)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
 
   const balance  = Number(userBalance ?? 0)
   const curBid   = Number(liveBid ?? startingBid)
@@ -122,9 +123,12 @@ export default function AuctionClient({
     return () => clearInterval(t)
   }, [auctionId])
 
-  // Auto-scroll chat to bottom on new messages
+  // Scroll the chat box itself — never the page
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const el = chatContainerRef.current
+    if (!el) return
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    if (nearBottom) el.scrollTop = el.scrollHeight
   }, [messages])
 
   const settle = useCallback(async () => {
@@ -345,7 +349,7 @@ export default function AuctionClient({
         </div>
 
         {/* Messages */}
-        <div style={{ height: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+        <div ref={chatContainerRef} style={{ height: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
           {messages.length === 0 ? (
             <div style={{ color: 'var(--muted)', fontSize: 13, padding: '20px 0' }}>No messages yet. Start the conversation!</div>
           ) : (
