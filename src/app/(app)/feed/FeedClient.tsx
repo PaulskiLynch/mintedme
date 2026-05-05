@@ -39,26 +39,20 @@ interface Props {
 
 const ALL_CATEGORIES = ['Cars', 'Yachts', 'Watches', 'Art', 'Fashion', 'Jets', 'Mansions', 'Collectibles', 'Businesses']
 
-const REACTIONS = [
-  { type: 'flex',  label: '🔥 Flex'  },
-  { type: 'smart', label: '📈 Smart' },
-  { type: 'risky', label: '😬 Risky' },
-  { type: 'watch', label: '👀 Watch' },
-]
-
-const MARKET_SIGNALS: Record<string, string> = {
-  cars:         'Cars up 8% this week · Strong collector demand',
-  watches:      'Watches trending · Patek models +12%',
-  art:          'Contemporary art steady · 2 new drops expected',
-  yachts:       'Yachts gaining · Summer season effect',
-  mansions:     'Mansion market soft · -6% this month',
-  businesses:   'Businesses hot · Income assets in demand',
-  jets:         'Jets stable · Ultra-HNW buyers active',
-  fashion:      'Fashion drops imminent · Hype building',
-  collectibles: 'Collectibles mixed · Blue-chips outperforming',
-}
-
 const COMMENT_PROMPTS = ['Good buy?', 'Overpaid?', 'Future classic?', 'Flip it!', 'Hold it!']
+
+const TYPE_INFO: Record<string, { label: string; css: string }> = {
+  buy:           { label: 'PURCHASE',    css: 'purchase'    },
+  sell:          { label: 'SALE',        css: 'sale'        },
+  accept:        { label: 'SALE',        css: 'sale'        },
+  offer:         { label: 'OFFER',       css: 'offer'       },
+  auction_start: { label: 'AUCTION',     css: 'auction'     },
+  auction_end:   { label: 'AUCTION WIN', css: 'auction'     },
+  create_item:   { label: 'NEW ITEM',    css: 'new-item'    },
+  post:          { label: 'POST',        css: 'post'        },
+  achievement:   { label: 'ACHIEVEMENT', css: 'achievement' },
+  market_event:  { label: 'MARKET',      css: 'market'      },
+}
 
 function fmt(n: string | number | null | undefined) {
   if (!n) return null
@@ -82,7 +76,7 @@ function cap(s: string | undefined | null) {
   return s[0].toUpperCase() + s.slice(1)
 }
 
-function feedCopy(e: FeedEvent): string {
+function eventText(e: FeedEvent): string {
   const item = e.edition?.item.name ?? 'an item'
   const amt  = e.amount ? fmt(e.amount) ?? '' : ''
   switch (e.eventType) {
@@ -91,32 +85,57 @@ function feedCopy(e: FeedEvent): string {
     case 'offer':         return `offered ${amt} on ${item}`
     case 'accept':        return `accepted ${amt} for ${item}`
     case 'auction_start': return `started an auction on ${item}`
-    case 'auction_end':   return `won ${item} at auction${amt ? ' for ' + amt : ''}`
+    case 'auction_end':   return `won ${item}${amt ? ' for ' + amt : ''} at auction`
     case 'create_item':   return `crafted a new item: ${item}`
     case 'post':          return String(e.metadata?.text ?? '')
-    case 'achievement':
-    case 'market_event':  return String(e.metadata?.title ?? e.eventType)
     default:              return e.eventType.replace(/_/g, ' ')
   }
 }
 
-function storyLine(e: FeedEvent): string | null {
+function metaLine(e: FeedEvent): string {
+  const parts: string[] = []
   const cat = e.edition?.item.category
+  if (cat) parts.push(cap(cat))
+  parts.push(formatDistanceToNow(new Date(e.createdAt), { addSuffix: true }))
+
   const amt = e.amount ? fmt(e.amount) : null
+  const ref = e.edition?.item.referencePrice ? fmt(e.edition.item.referencePrice) : null
+
   switch (e.eventType) {
     case 'buy':
-      return `Cash ↓ ${amt ?? '?'} · ${cap(cat)} +1 · Net worth unchanged`
-    case 'sell':
-      return `Cash ↑ ${amt ?? '?'} · ${cap(cat)} -1 · Realised gain/loss depends on cost basis`
+      if (amt) parts.push(`Paid ${amt}`)
+      if (ref && ref !== amt) parts.push(`Ref ${ref}`)
+      break
+    case 'sell': case 'accept':
+      if (amt) parts.push(`Received ${amt}`)
+      break
     case 'auction_end':
-      return `Cash ↓ ${amt ?? '?'} · Won at auction · ${cap(cat)} +1`
-    case 'create_item':
-      return `New ${cap(cat)} item minted · Available in marketplace`
+      if (amt) parts.push(`Won for ${amt}`)
+      break
     case 'offer':
-      return `${amt ?? '?'} funds reserved · Waiting on seller response`
-    default:
-      return null
+      if (ref) parts.push(`Ref ${ref}`)
+      break
+    case 'create_item':
+      if (ref) parts.push(`Ref ${ref}`)
+      break
   }
+
+  if (e.targetUser) {
+    const label = (e.eventType === 'buy' || e.eventType === 'offer') ? 'Owner' : 'Buyer'
+    parts.push(`${label} @${e.targetUser.username}`)
+  }
+
+  return parts.join(' · ')
+}
+
+function isVisible(e: FeedEvent): boolean {
+  if (e.eventType === 'market_event' || e.eventType === 'achievement') {
+    return !!e.metadata?.title
+  }
+  if (e.eventType === 'post') {
+    return !!e.metadata?.text && String(e.metadata.text).trim().length > 0
+  }
+  return !!e.user
 }
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
@@ -147,25 +166,21 @@ function Module({ title, badge, collapsed, onToggle, children }: { title: string
 
 function ChallengeCards({ progress }: { progress: ChallengeProgress }) {
   const challenges = [
-    { icon: '🏎', label: 'Own 3 cars',       done: progress.carCount >= 3,      progress: `${progress.carCount}/3`   },
-    { icon: '🏆', label: 'Win an auction',    done: progress.hasWonAuction,      progress: progress.hasWonAuction ? '✓' : '—' },
-    { icon: '💰', label: '$500k cash',        done: progress.cashOk,             progress: progress.cashOk ? '✓' : '—'           },
-    { icon: '🏢', label: 'Own a business',    done: progress.hasBusiness,        progress: progress.hasBusiness ? '✓' : '—'      },
-    { icon: '🔄', label: 'Flip for profit',   done: false,                       progress: '—'                         },
+    { icon: '🏎', label: 'Own 3 cars',      done: progress.carCount >= 3,   sub: `${progress.carCount}/3`            },
+    { icon: '🏆', label: 'Win an auction',  done: progress.hasWonAuction,   sub: progress.hasWonAuction ? '✓' : '—' },
+    { icon: '💰', label: '$500k cash',      done: progress.cashOk,          sub: progress.cashOk ? '✓' : '—'        },
+    { icon: '🏢', label: 'Own a business',  done: progress.hasBusiness,     sub: progress.hasBusiness ? '✓' : '—'   },
+    { icon: '🔄', label: 'Flip for profit', done: false,                    sub: '—'                                 },
   ]
-
   return (
     <div style={{ marginBottom: 20 }}>
       <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--muted)', marginBottom: 10 }}>Challenges</div>
       <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
         {challenges.map(c => (
-          <div key={c.label} style={{
-            flexShrink: 0, background: c.done ? '#1e2a10' : 'var(--bg2)', border: `1px solid ${c.done ? 'var(--green)' : 'var(--border)'}`,
-            borderRadius: 10, padding: '10px 14px', minWidth: 120, textAlign: 'center',
-          }}>
+          <div key={c.label} style={{ flexShrink: 0, background: c.done ? '#1e2a10' : 'var(--bg2)', border: `1px solid ${c.done ? 'var(--green)' : 'var(--border)'}`, borderRadius: 10, padding: '10px 14px', minWidth: 110, textAlign: 'center' }}>
             <div style={{ fontSize: 22, marginBottom: 4 }}>{c.icon}</div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: c.done ? 'var(--green)' : 'var(--white)', marginBottom: 4, lineHeight: 1.3 }}>{c.label}</div>
-            <div style={{ fontSize: 13, fontWeight: 900, color: c.done ? 'var(--green)' : 'var(--muted)' }}>{c.progress}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: c.done ? 'var(--green)' : 'var(--white)', marginBottom: 3, lineHeight: 1.3 }}>{c.label}</div>
+            <div style={{ fontSize: 13, fontWeight: 900, color: c.done ? 'var(--green)' : 'var(--muted)' }}>{c.sub}</div>
           </div>
         ))}
       </div>
@@ -173,37 +188,58 @@ function ChallengeCards({ progress }: { progress: ChallengeProgress }) {
   )
 }
 
-// ─── Achievement / market event card ─────────────────────────────────────────
+// ─── Achievement card ─────────────────────────────────────────────────────────
 
 function AchievementCard({ event }: { event: FeedEvent }) {
-  const icon  = String(event.metadata?.icon  ?? '🏆')
-  const title = String(event.metadata?.title ?? event.eventType)
-  const desc  = String(event.metadata?.description ?? '')
-  const rankBefore = event.metadata?.rankBefore as number | undefined
-  const rankAfter  = event.metadata?.rankAfter  as number | undefined
-
-  const isMarket = event.eventType === 'market_event'
-  const border   = isMarket ? 'var(--red)' : 'var(--gold)'
-  const bg       = isMarket ? '#1a0a0a' : '#1a1500'
+  const icon        = String(event.metadata?.icon  ?? '🏆')
+  const title       = String(event.metadata?.title ?? '')
+  const desc        = String(event.metadata?.description ?? '')
+  const rankBefore  = event.metadata?.rankBefore as number | undefined
+  const rankAfter   = event.metadata?.rankAfter  as number | undefined
+  const username    = event.user?.username
 
   return (
-    <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: '14px 16px', marginBottom: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-        <span style={{ fontSize: 26, flexShrink: 0 }}>{icon}</span>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 800, fontSize: 14, lineHeight: 1.4 }}>{title}</div>
-          {desc && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>{desc}</div>}
-          {rankBefore !== undefined && rankAfter !== undefined && (
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-              <span style={{ fontSize: 11, background: 'var(--bg3)', borderRadius: 4, padding: '2px 8px', color: 'var(--muted)' }}>
-                Rank #{rankBefore} → <span style={{ color: 'var(--gold)', fontWeight: 800 }}>#{rankAfter}</span>
-              </span>
-            </div>
-          )}
-          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
-            {formatDistanceToNow(new Date(event.createdAt), { addSuffix: true })}
-          </div>
+    <div className="feed-post">
+      <span className="feed-type-pill achievement">ACHIEVEMENT</span>
+      <div style={{ fontWeight: 800, fontSize: 15, lineHeight: 1.4 }}>{icon} {title}</div>
+      {desc && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>{desc}</div>}
+      {rankBefore !== undefined && rankAfter !== undefined && (
+        <div style={{ marginTop: 8, fontSize: 12 }}>
+          Rank <span style={{ color: 'var(--muted)' }}>#{rankBefore}</span> → <span style={{ color: 'var(--gold)', fontWeight: 800 }}>#{rankAfter}</span>
         </div>
+      )}
+      {username && (
+        <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+          <Link href={`/mint/${username}`} className="btn btn-ghost btn-sm">View Profile →</Link>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Market event card ────────────────────────────────────────────────────────
+
+function MarketCard({ event }: { event: FeedEvent }) {
+  const icon     = String(event.metadata?.icon  ?? '📊')
+  const title    = String(event.metadata?.title ?? '')
+  const desc     = String(event.metadata?.description ?? '')
+  const category = String(event.metadata?.category ?? '')
+
+  // Strip leading emoji from title if it duplicates the icon
+  const cleanTitle = title.replace(/^[\p{Emoji}\s]+/u, '').trim()
+
+  return (
+    <div className="feed-post">
+      <span className="feed-type-pill market">MARKET</span>
+      <div style={{ fontWeight: 800, fontSize: 15, lineHeight: 1.4 }}>{icon} {cleanTitle || title}</div>
+      {desc && <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 6, lineHeight: 1.5 }}>{desc}</div>}
+      <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+        <Link
+          href={category ? `/marketplace?category=${category}` : '/marketplace'}
+          className="btn btn-gold btn-sm"
+        >
+          {category ? `Browse ${cap(category)} →` : 'Browse Market →'}
+        </Link>
       </div>
     </div>
   )
@@ -211,29 +247,26 @@ function AchievementCard({ event }: { event: FeedEvent }) {
 
 // ─── Feed post ────────────────────────────────────────────────────────────────
 
-function FeedPost({ event, myReaction: initReaction, likeCount: initLikes, commentCount: initCommCount, userId }: {
-  event: FeedEvent; myReaction: string | null; likeCount: number; commentCount: number; userId: string
+function FeedPost({ event, isLiked: initLiked, likeCount: initLikes, commentCount: initCommCount, userId }: {
+  event: FeedEvent; isLiked: boolean; likeCount: number; commentCount: number; userId: string
 }) {
-  const [myReaction, setMyReaction] = useState<string | null>(initReaction)
-  const [likes,      setLikes]      = useState(initLikes)
-  const [comments,   setComments]   = useState<Comment[]>([])
-  const [commCount,  setCommCount]  = useState(initCommCount)
-  const [expanded,   setExpanded]   = useState(false)
+  const [liked,        setLiked]       = useState(initLiked)
+  const [likes,        setLikes]       = useState(initLikes)
+  const [comments,     setComments]    = useState<Comment[]>([])
+  const [commCount,    setCommCount]   = useState(initCommCount)
+  const [expanded,     setExpanded]    = useState(false)
   const [commentInput, setCommentInput] = useState('')
-  const [posting,    setPosting]    = useState(false)
-  const [showOffer,  setShowOffer]  = useState(false)
-  const [offerAmt,   setOfferAmt]   = useState('')
-  const [offerBusy,  setOfferBusy]  = useState(false)
-  const [offerDone,  setOfferDone]  = useState(false)
+  const [posting,      setPosting]     = useState(false)
+  const [showOffer,    setShowOffer]   = useState(false)
+  const [offerAmt,     setOfferAmt]    = useState('')
+  const [offerBusy,    setOfferBusy]   = useState(false)
+  const [offerDone,    setOfferDone]   = useState(false)
 
-  async function react(type: string) {
-    const prev = myReaction
-    const isSame = prev === type
-    setMyReaction(isSame ? null : type)
-    setLikes(l => l + (isSame ? -1 : prev ? 0 : 1))
+  async function toggleLike() {
+    setLiked(p => !p); setLikes(l => l + (liked ? -1 : 1))
     await fetch(`/api/feed/${event.id}/like`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type }),
+      body: JSON.stringify({ type: 'like' }),
     })
   }
 
@@ -271,121 +304,80 @@ function FeedPost({ event, myReaction: initReaction, likeCount: initLikes, comme
     setOfferBusy(false)
   }
 
-  const item      = event.edition?.item
-  const refPrice  = item?.referencePrice
-  const isPost    = event.eventType === 'post'
-  const story     = storyLine(event)
-  const signal    = item?.category ? MARKET_SIGNALS[item.category] : null
+  const typeInfo = TYPE_INFO[event.eventType] ?? { label: event.eventType.toUpperCase(), css: 'post' }
+  const item     = event.edition?.item
+  const refPrice = item?.referencePrice
+  const meta     = metaLine(event)
+  const isOwner  = event.targetUser && (event.eventType === 'sell' || event.eventType === 'accept')
 
   return (
     <div className="feed-post">
-      {/* Header row */}
+      {/* Type pill */}
+      <span className={`feed-type-pill ${typeInfo.css}`}>{typeInfo.label}</span>
+
+      {/* Content row */}
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-        <Link href={event.user ? `/mint/${event.user.username}` : '#'}>
-          <Avatar avatarUrl={event.user?.avatarUrl ?? null} username={event.user?.username ?? '?'} />
-        </Link>
+        {event.user && (
+          <Link href={`/mint/${event.user.username}`} style={{ flexShrink: 0 }}>
+            <Avatar avatarUrl={event.user.avatarUrl} username={event.user.username} />
+          </Link>
+        )}
         <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Event line */}
           <div style={{ fontSize: 14, lineHeight: 1.5 }}>
-            {event.user
-              ? <Link href={`/mint/${event.user.username}`} style={{ fontWeight: 700 }}>@{event.user.username}</Link>
-              : <span style={{ fontWeight: 700 }}>Someone</span>
-            }{' '}
-            <span style={{ color: 'var(--muted)' }}>{feedCopy(event)}</span>
+            {event.user && (
+              <Link href={`/mint/${event.user.username}`} style={{ fontWeight: 700 }}>@{event.user.username} </Link>
+            )}
+            <span style={{ color: 'var(--muted)' }}>{eventText(event)}</span>
           </div>
-
-          {/* Price context */}
-          {!isPost && (event.amount || refPrice) && (
-            <div style={{ display: 'flex', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
-              {event.amount && <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--gold)' }}>
-                {event.eventType === 'offer' ? 'Offered' : event.eventType === 'sell' || event.eventType === 'accept' ? 'Received' : 'Paid'} {fmt(event.amount)}
-              </span>}
-              {refPrice     && <span style={{ fontSize: 12, color: 'var(--muted)' }}>Ref {fmt(refPrice)}</span>}
-            </div>
-          )}
-
-          {/* Counterparty */}
-          {event.targetUser && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 5 }}>
-              <Avatar avatarUrl={event.targetUser.avatarUrl} username={event.targetUser.username} size={18} />
-              <span style={{ fontSize: 11, color: 'var(--muted)' }}>
-                {event.eventType === 'buy' ? 'from' : 'to'}{' '}
-                <Link href={`/mint/${event.targetUser.username}`} style={{ fontWeight: 700, color: 'var(--white)' }}>
-                  @{event.targetUser.username}
-                </Link>
-              </span>
-            </div>
-          )}
-
-          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
-            {formatDistanceToNow(new Date(event.createdAt), { addSuffix: true })}
-            {item && <> · <span style={{ textTransform: 'capitalize' }}>{item.category}</span></>}
-          </div>
+          {/* Meta line */}
+          {meta && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>{meta}</div>}
         </div>
 
         {/* Thumbnail */}
         {item?.imageUrl && event.edition && (
-          <Link href={`/item/${event.edition.id}`}>
-            <img src={item.imageUrl} alt="" style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+          <Link href={`/item/${event.edition.id}`} style={{ flexShrink: 0 }}>
+            <img src={item.imageUrl} alt="" style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover' }} />
           </Link>
         )}
       </div>
 
-      {/* Story line */}
-      {story && (
-        <div style={{ marginTop: 8, padding: '8px 12px', background: 'var(--bg3)', borderRadius: 8, borderLeft: '3px solid var(--gold)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Portfolio impact</div>
-          <div style={{ fontSize: 12, color: 'var(--white)' }}>{story}</div>
-          {signal && (
-            <div style={{ fontSize: 11, color: 'var(--green)', marginTop: 4 }}>
-              📊 Market signal: {signal}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Offer done */}
-      {offerDone && <div style={{ marginTop: 8, fontSize: 12, color: 'var(--green)', fontWeight: 700 }}>Offer sent!</div>}
-
-      {/* Inline offer form */}
+      {/* Offer form */}
       {showOffer && event.edition && (
-        <form onSubmit={submitOffer} style={{ display: 'flex', gap: 8, marginTop: 10, padding: '10px', background: 'var(--bg3)', borderRadius: 8 }}>
+        <form onSubmit={submitOffer} style={{ display: 'flex', gap: 8, marginTop: 12, padding: '10px', background: 'var(--bg3)', borderRadius: 8 }}>
           <input
             className="form-input" type="number" min="1" step="1"
             value={offerAmt} onChange={e => setOfferAmt(e.target.value)}
             placeholder={refPrice ? `Ref ${fmt(refPrice)}` : 'Your offer $'}
             style={{ flex: 1, fontSize: 13 }} autoFocus required
           />
-          <button className="btn btn-gold" type="submit" disabled={offerBusy || !offerAmt} style={{ fontSize: 12, padding: '0 14px' }}>
-            {offerBusy ? '...' : 'Send'}
-          </button>
-          <button className="btn btn-ghost" type="button" onClick={() => setShowOffer(false)} style={{ fontSize: 12, padding: '0 10px' }}>✕</button>
+          <button className="btn btn-gold btn-sm" type="submit" disabled={offerBusy || !offerAmt}>{offerBusy ? '...' : 'Send'}</button>
+          <button className="btn btn-ghost btn-sm" type="button" onClick={() => setShowOffer(false)}>✕</button>
         </form>
       )}
+      {offerDone && <div style={{ marginTop: 8, fontSize: 12, color: 'var(--green)', fontWeight: 700 }}>Offer sent!</div>}
 
-      {/* Reactions row */}
-      <div className="feed-post-actions">
-        {REACTIONS.map(r => (
-          <button
-            key={r.type}
-            className={`feed-action-btn${myReaction === r.type ? ' liked' : ''}`}
-            onClick={() => react(r.type)}
-            style={{ fontSize: 12 }}
-          >
-            {r.label}
-          </button>
-        ))}
-        <button className={`feed-action-btn${expanded ? ' liked' : ''}`} onClick={loadAndToggleComments} style={{ fontSize: 12 }}>
-          💬 {commCount > 0 && commCount}
+      {/* Actions */}
+      <div className="feed-post-actions" style={{ alignItems: 'center' }}>
+        {/* Left: social */}
+        <button className={`feed-action-btn${liked ? ' liked' : ''}`} onClick={toggleLike}>
+          ♡ Like{likes > 0 ? ` ${likes}` : ''}
         </button>
-        {likes > 0 && <span style={{ fontSize: 11, color: 'var(--muted)', alignSelf: 'center', marginLeft: 4 }}>{likes}</span>}
-        {event.edition && !isPost && userId && !offerDone && (
-          <button className="feed-action-btn" onClick={() => setShowOffer(p => !p)} style={{ marginLeft: 'auto', fontSize: 12 }}>
-            {showOffer ? 'Cancel' : '+ Offer'}
-          </button>
-        )}
-        {event.edition && (
-          <Link href={`/item/${event.edition.id}`} className="feed-action-btn" style={{ fontSize: 12, ...(event.edition && !isPost ? {} : { marginLeft: 'auto' }) }}>View →</Link>
-        )}
+        <button className={`feed-action-btn${expanded ? ' liked' : ''}`} onClick={loadAndToggleComments}>
+          💬 {commCount > 0 ? commCount : 'Comment'}
+        </button>
+
+        {/* Right: primary CTAs */}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          {event.edition && userId && !offerDone && !isOwner && (
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowOffer(p => !p)}>
+              {showOffer ? 'Cancel' : 'Make Offer'}
+            </button>
+          )}
+          {event.edition && (
+            <Link href={`/item/${event.edition.id}`} className="btn btn-gold btn-sm">View Asset</Link>
+          )}
+        </div>
       </div>
 
       {/* Comments */}
@@ -402,7 +394,6 @@ function FeedPost({ event, myReaction: initReaction, likeCount: initLikes, comme
           ))}
           {userId && (
             <div>
-              {/* Quick comment prompts */}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
                 {COMMENT_PROMPTS.map(p => (
                   <button key={p} onClick={() => setCommentInput(p)} style={{ fontSize: 11, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: '3px 10px', cursor: 'pointer', color: 'var(--muted)' }}>{p}</button>
@@ -410,7 +401,7 @@ function FeedPost({ event, myReaction: initReaction, likeCount: initLikes, comme
               </div>
               <form onSubmit={postComment} style={{ display: 'flex', gap: 8 }}>
                 <input className="form-input" value={commentInput} onChange={e => setCommentInput(e.target.value)} placeholder="Add a comment…" maxLength={500} style={{ flex: 1, fontSize: 13 }} />
-                <button className="btn btn-gold" type="submit" disabled={posting || !commentInput.trim()} style={{ fontSize: 12, padding: '0 14px' }}>Post</button>
+                <button className="btn btn-gold btn-sm" type="submit" disabled={posting || !commentInput.trim()}>Post</button>
               </form>
             </div>
           )}
@@ -472,11 +463,7 @@ function QuickSellModal({ onClose }: { onClose: () => void }) {
                 setPrice(it?.listedPrice ?? it?.lastSalePrice ?? it?.referencePrice ?? '')
               }} required>
                 <option value="">Choose…</option>
-                {items.map(i => (
-                  <option key={i.editionId} value={i.editionId}>
-                    {i.itemName}{i.isListed ? ' (listed)' : ''}
-                  </option>
-                ))}
+                {items.map(i => <option key={i.editionId} value={i.editionId}>{i.itemName}{i.isListed ? ' (listed)' : ''}</option>)}
               </select>
             </div>
             {item && (
@@ -511,19 +498,18 @@ export default function FeedClient({
   reactionsByEventId, myRank, totalPlayers, classStats, challengeProgress,
 }: Props) {
   const [events,        setEvents]        = useState(initialEvents)
-  const [watching,      setWatching]      = useState(initialWatching)
-  const [bids,          setBids]          = useState(initialBids)
   const [auctions,      setAuctions]      = useState(initialAuctions)
-  const [friends,       setFriends]       = useState(initialFriends)
-  const [interests,     setInterests]     = useState<string[]>(initialInterests)
   const [filter,        setFilter]        = useState<string | null>(null)
   const [rightOpen,     setRightOpen]     = useState(false)
   const [darkMode,      setDarkMode]      = useState(true)
   const [collapsed,     setCollapsed]     = useState<Record<string, boolean>>({})
-  const [showPost,      setShowPost]      = useState(false)
-  const [postText,      setPostText]      = useState('')
-  const [postBusy,      setPostBusy]      = useState(false)
   const [showQuickSell, setShowQuickSell] = useState(false)
+
+  // Keep refs to avoid using in sidebar poll closure
+  const watching = initialWatching
+  const bids     = initialBids
+  const friends  = initialFriends
+  void watching; void bids; void friends; void initialInterests  // unused for now
 
   useEffect(() => {
     const theme = localStorage.getItem('theme')
@@ -543,7 +529,7 @@ export default function FeedClient({
       const res = await fetch('/api/me/sidebar')
       if (!res.ok) return
       const d = await res.json()
-      setWatching(d.watching); setBids(d.bids); setAuctions(d.auctions); setFriends(d.friends)
+      setAuctions(d.auctions)
     }, 30000)
     return () => clearInterval(t)
   }, [])
@@ -554,36 +540,21 @@ export default function FeedClient({
     localStorage.setItem('feed-collapsed', JSON.stringify(next))
   }
 
-  async function toggleInterest(cat: string) {
-    const lower = cat.toLowerCase()
-    const next = interests.includes(lower) ? interests.filter(i => i !== lower) : [...interests, lower]
-    setInterests(next)
-    await fetch('/api/me', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ interests: next }) })
-  }
-
-  async function submitPost(e: React.FormEvent) {
-    e.preventDefault()
-    if (!postText.trim()) return
-    setPostBusy(true)
-    const res = await fetch('/api/feed/post', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: postText }),
-    })
-    if (res.ok) {
-      const d = await res.json()
-      setEvents(prev => [d.event, ...prev])
-      setPostText(''); setShowPost(false)
-    }
-    setPostBusy(false)
-  }
-
-  const filteredEvents = filter ? events.filter(e => e.edition?.item.category === filter.toLowerCase() || e.eventType === 'achievement' || e.eventType === 'market_event') : events
-  const outbidCount    = bids.filter(b => !b.isLeading).length
+  const likedSet       = new Set(Object.keys(reactionsByEventId))
+  const visibleEvents  = events.filter(isVisible)
+  const filteredEvents = filter
+    ? visibleEvents.filter(e =>
+        e.edition?.item.category === filter.toLowerCase() ||
+        e.eventType === 'achievement' ||
+        e.eventType === 'market_event'
+      )
+    : visibleEvents
 
   return (
     <div className="feed-layout">
       {/* ── Main feed ─────────────────────────────── */}
       <div className="feed-main">
+        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div>
             <div className="page-title" style={{ marginBottom: 2 }}>Feed</div>
@@ -603,21 +574,7 @@ export default function FeedClient({
         {/* Challenge cards */}
         <ChallengeCards progress={challengeProgress} />
 
-        {/* Create post form */}
-        {showPost && (
-          <div style={{ background: 'var(--bg2)', border: '1px solid var(--gold)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
-            <form onSubmit={submitPost} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <textarea className="form-input" value={postText} onChange={e => setPostText(e.target.value)}
-                placeholder="What's happening in your Mint?" rows={3} maxLength={400} autoFocus style={{ resize: 'none', fontSize: 14 }} />
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <button type="button" className="btn btn-ghost" onClick={() => { setShowPost(false); setPostText('') }}>Cancel</button>
-                <button type="submit" className="btn btn-gold" disabled={postBusy || !postText.trim()}>{postBusy ? 'Posting…' : 'Post'}</button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* Category chips */}
+        {/* Category filter */}
         <div className="interest-chips" style={{ marginBottom: 20 }}>
           <button className={`chip${!filter ? ' active' : ''}`} onClick={() => setFilter(null)}>All</button>
           {ALL_CATEGORIES.map(cat => (
@@ -634,13 +591,12 @@ export default function FeedClient({
             {filter ? `No ${filter} activity yet.` : 'No activity yet. Buy something!'}
           </div>
         ) : filteredEvents.map(e => {
-          if (e.eventType === 'achievement' || e.eventType === 'market_event') {
-            return <AchievementCard key={e.id} event={e} />
-          }
+          if (e.eventType === 'achievement') return <AchievementCard key={e.id} event={e} />
+          if (e.eventType === 'market_event') return <MarketCard key={e.id} event={e} />
           return (
             <FeedPost
               key={e.id} event={e} userId={userId}
-              myReaction={reactionsByEventId[e.id] ?? null}
+              isLiked={likedSet.has(e.id)}
               likeCount={e.likeCount} commentCount={e.commentCount}
             />
           )
@@ -656,139 +612,60 @@ export default function FeedClient({
           <button onClick={() => setRightOpen(false)} style={{ alignSelf: 'flex-end', background: 'none', border: 'none', color: 'var(--muted)', fontSize: 20, cursor: 'pointer', marginBottom: 8 }}>✕</button>
         )}
 
-        {/* 1. Profile */}
+        {/* Profile */}
         <Module title="Profile" collapsed={!!collapsed['profile']} onToggle={() => toggleSection('profile')}>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
             <Avatar avatarUrl={userProfile.avatarUrl} username={userProfile.username} size={48} />
             <div>
               <div style={{ fontWeight: 700 }}>@{userProfile.username}</div>
               {userProfile.tagline && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{userProfile.tagline}</div>}
-              {myRank > 0 && <div style={{ fontSize: 11, color: 'var(--gold)', marginTop: 3 }}>Rank #{myRank} · {totalPlayers} players</div>}
+              {myRank > 0 && <div style={{ fontSize: 11, color: 'var(--gold)', marginTop: 3 }}>Rank #{myRank} of {totalPlayers}</div>}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 20, marginBottom: 12, fontSize: 12 }}>
-            <span><strong>{userProfile.followersCount}</strong> <span style={{ color: 'var(--muted)' }}>followers</span></span>
-            <span><strong>{userProfile.followingCount}</strong> <span style={{ color: 'var(--muted)' }}>following</span></span>
-          </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <Link href={`/mint/${userProfile.username}`} className="btn btn-ghost" style={{ fontSize: 12, flex: 1, textAlign: 'center' }}>My Mint</Link>
-            <Link href="/settings" className="btn btn-ghost" style={{ fontSize: 12, flex: 1, textAlign: 'center' }}>Edit Profile</Link>
+            <Link href={`/mint/${userProfile.username}`} className="btn btn-ghost btn-sm" style={{ flex: 1, textAlign: 'center' }}>My Mint</Link>
+            <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={() => { setShowQuickSell(true); setRightOpen(false) }}>Quick Sell</button>
           </div>
         </Module>
 
-        {/* 2. Class context */}
+        {/* Class / Leaderboard */}
         <Module title="Class" collapsed={!!collapsed['class']} onToggle={() => toggleSection('class')}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
             <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: '10px 12px' }}>
               <div style={{ color: 'var(--muted)', fontSize: 10, textTransform: 'uppercase', marginBottom: 2 }}>Players</div>
-              <div style={{ fontWeight: 800, fontSize: 18, color: 'var(--white)' }}>{totalPlayers}</div>
+              <div style={{ fontWeight: 900, fontSize: 22, color: 'var(--white)' }}>{totalPlayers}</div>
             </div>
             <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: '10px 12px' }}>
               <div style={{ color: 'var(--muted)', fontSize: 10, textTransform: 'uppercase', marginBottom: 2 }}>Online</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                 <span className="status-dot online" />
-                <span style={{ fontWeight: 800, fontSize: 18, color: 'var(--green)' }}>{classStats.onlineCount}</span>
+                <span style={{ fontWeight: 900, fontSize: 22, color: 'var(--green)' }}>{classStats.onlineCount}</span>
               </div>
             </div>
           </div>
           {classStats.topPlayerUsername && (
-            <div style={{ marginTop: 10, fontSize: 12, display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--muted)' }}>Top player</span>
+            <div style={{ fontSize: 12, display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ color: 'var(--muted)' }}>#1 player</span>
               <Link href={`/mint/${classStats.topPlayerUsername}`} style={{ fontWeight: 700, color: 'var(--gold)' }}>
                 @{classStats.topPlayerUsername}
               </Link>
             </div>
           )}
+          {myRank > 0 && (
+            <div style={{ fontSize: 12, display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ color: 'var(--muted)' }}>Your rank</span>
+              <span style={{ fontWeight: 700 }}>#{myRank}</span>
+            </div>
+          )}
           {classStats.hotCategory && (
-            <div style={{ marginTop: 6, fontSize: 12, display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--muted)' }}>Hot category</span>
+            <div style={{ fontSize: 12, display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--muted)' }}>Hot today</span>
               <span style={{ fontWeight: 700, textTransform: 'capitalize' }}>🔥 {classStats.hotCategory}</span>
             </div>
           )}
         </Module>
 
-        {/* 3. Watching */}
-        <Module title="Watching" collapsed={!!collapsed['watching']} onToggle={() => toggleSection('watching')}>
-          {watching.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Nothing watched yet.</div>
-          ) : watching.map(w => (
-            <Link key={w.editionId} href={w.auctionId ? `/auction/${w.auctionId}` : `/item/${w.editionId}`}
-              style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)', textDecoration: 'none' }}>
-              <div style={{ width: 32, height: 32, borderRadius: 4, background: 'var(--bg3)', overflow: 'hidden', flexShrink: 0 }}>
-                {w.imageUrl && <img src={w.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.itemName}</div>
-                <div style={{ fontSize: 11, color: 'var(--muted)' }}>{fmt(w.currentPrice)}{w.endsAt && ` · ${timeLeft(w.endsAt)}`}</div>
-              </div>
-              {w.auctionId && <span style={{ fontSize: 10, color: 'var(--red)', fontWeight: 700 }}>LIVE</span>}
-            </Link>
-          ))}
-        </Module>
-
-        {/* 4. Bids */}
-        <Module
-          title="Your Bids"
-          badge={outbidCount > 0 ? <span style={{ background: 'var(--red)', color: '#fff', borderRadius: 10, fontSize: 10, fontWeight: 900, padding: '1px 6px', marginLeft: 6 }}>{outbidCount}</span> : undefined}
-          collapsed={!!collapsed['bids']} onToggle={() => toggleSection('bids')}>
-          {bids.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>No active bids.</div>
-          ) : bids.map(b => (
-            <Link key={b.auctionId} href={`/auction/${b.auctionId}`}
-              style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)', textDecoration: 'none' }}>
-              <div style={{ width: 32, height: 32, borderRadius: 4, background: 'var(--bg3)', overflow: 'hidden', flexShrink: 0 }}>
-                {b.imageUrl && <img src={b.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.itemName}</div>
-                <div style={{ fontSize: 11, color: 'var(--muted)' }}>Your bid: {fmt(b.myBid)}</div>
-              </div>
-              <span style={{ fontSize: 10, fontWeight: 700, color: b.isLeading ? 'var(--green)' : 'var(--red)', flexShrink: 0 }}>
-                {b.isLeading ? '★ LEAD' : 'OUTBID'}
-              </span>
-            </Link>
-          ))}
-        </Module>
-
-        {/* 5. Quick Actions */}
-        <Module title="Quick Actions" collapsed={!!collapsed['actions']} onToggle={() => toggleSection('actions')}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <Link href="/studio" className="btn btn-gold btn-full" style={{ textAlign: 'center', fontSize: 13 }}>+ Craft Item</Link>
-            <button className="btn btn-ghost btn-full" style={{ fontSize: 13 }} onClick={() => { setShowQuickSell(true); setRightOpen(false) }}>Quick Sell</button>
-            <button className="btn btn-ghost btn-full" style={{ fontSize: 13 }} onClick={() => window.location.reload()}>↻ Refresh Feed</button>
-          </div>
-        </Module>
-
-        {/* 6. Friends Online */}
-        <Module title="Following" collapsed={!!collapsed['friends']} onToggle={() => toggleSection('friends')}>
-          {friends.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Not following anyone yet.</div>
-          ) : friends.slice(0, 8).map(f => (
-            <Link key={f.id} href={`/mint/${f.username}`}
-              style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '7px 0', borderBottom: '1px solid var(--border)', textDecoration: 'none' }}>
-              <Avatar avatarUrl={f.avatarUrl} username={f.username} size={28} />
-              <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>@{f.username}</span>
-              <span className={`status-dot ${f.status}`} />
-            </Link>
-          ))}
-          {friends.length > 8 && <div style={{ fontSize: 12, color: 'var(--gold)', marginTop: 8 }}>+{friends.length - 8} more</div>}
-        </Module>
-
-        {/* 7. Interests */}
-        <Module title="Your Interests" collapsed={!!collapsed['interests']} onToggle={() => toggleSection('interests')}>
-          <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>Tap to save · filters your feed</div>
-          <div className="interest-chips">
-            {ALL_CATEGORIES.map(cat => (
-              <button key={cat}
-                className={`chip${interests.includes(cat.toLowerCase()) ? ' active' : ''}`}
-                onClick={() => { toggleInterest(cat); setFilter(filter === cat.toLowerCase() ? null : cat.toLowerCase()) }}>
-                {cat}
-              </button>
-            ))}
-          </div>
-        </Module>
-
-        {/* 8. Live Auctions */}
+        {/* Live Auctions */}
         <Module title="Live Auctions" collapsed={!!collapsed['auctions']} onToggle={() => toggleSection('auctions')}>
           {auctions.length === 0 ? (
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>No active auctions right now.</div>
@@ -800,20 +677,19 @@ export default function FeedClient({
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--red)', display: 'inline-block', flexShrink: 0 }} />
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--red)', display: 'inline-block', animation: 'pulse 1.5s infinite' }} />
                     <span style={{ fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.itemName}</span>
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--muted)' }}>{fmt(a.currentBid)} · ends {timeLeft(a.endsAt)}</div>
                 </div>
               </div>
-              <Link href={`/auction/${a.id}`} className="btn btn-gold btn-full" style={{ fontSize: 12, textAlign: 'center' }}>Place Bid →</Link>
+              <Link href={`/auction/${a.id}`} className="btn btn-gold btn-full btn-sm" style={{ textAlign: 'center' }}>Place Bid →</Link>
             </div>
           ))}
           <Link href="/auctions" style={{ fontSize: 12, color: 'var(--gold)' }}>See all auctions →</Link>
         </Module>
       </div>
 
-      {/* Quick Sell modal */}
       {showQuickSell && <QuickSellModal onClose={() => setShowQuickSell(false)} />}
     </div>
   )

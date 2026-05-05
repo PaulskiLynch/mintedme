@@ -612,6 +612,26 @@ body.light {
 }
 .feed-post:hover { border-color: var(--gold-dim); }
 
+/* ── Event type pills ────────────────────────────────── */
+.feed-type-pill {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.feed-type-pill.purchase    { background: #1e2a15; color: #4caf7d; }
+.feed-type-pill.sale        { background: #1e2a15; color: #4caf7d; }
+.feed-type-pill.offer       { background: #1a1500; color: var(--gold); }
+.feed-type-pill.auction     { background: #1a1200; color: #ff9500; }
+.feed-type-pill.new-item    { background: #0a1a1a; color: #4ab8d8; }
+.feed-type-pill.achievement { background: #1a1500; color: var(--gold); border: 1px solid var(--gold-dim); }
+.feed-type-pill.market      { background: #1a0a0a; color: #e05a5a; }
+.feed-type-pill.post        { background: var(--bg3); color: var(--muted); }
+
 .feed-post-actions {
   display: flex;
   gap: 4px;
