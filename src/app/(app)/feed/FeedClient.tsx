@@ -296,7 +296,9 @@ function FeedPost({ event, myReaction: initReaction, likeCount: initLikes, comme
           {/* Price context */}
           {!isPost && (event.amount || refPrice) && (
             <div style={{ display: 'flex', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
-              {event.amount && <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--gold)' }}>Paid {fmt(event.amount)}</span>}
+              {event.amount && <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--gold)' }}>
+                {event.eventType === 'offer' ? 'Offered' : event.eventType === 'sell' || event.eventType === 'accept' ? 'Received' : 'Paid'} {fmt(event.amount)}
+              </span>}
               {refPrice     && <span style={{ fontSize: 12, color: 'var(--muted)' }}>Ref {fmt(refPrice)}</span>}
             </div>
           )}
