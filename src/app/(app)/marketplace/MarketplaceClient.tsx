@@ -142,7 +142,7 @@ export default function MarketplaceClient({ items, categories, currentCategory, 
                       {auctionEdition
                         ? <span style={{ color: '#ff6b35' }}>Live auction</span>
                         : availableCount > 0
-                        ? `${availableCount} of ${item.totalSupply} available`
+                        ? `${availableCount} of ${item.totalSupply} available from MilliBux`
                         : 'Secondary market only'}
                     </div>
                     {listedEdition && (

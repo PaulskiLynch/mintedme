@@ -173,7 +173,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
             <div className="item-owner-link" style={{ marginBottom: 16 }}>
               {edition.currentOwner
                 ? <>Owned by <Link href={`/mint/${edition.currentOwner.username}`}>@{edition.currentOwner.username}</Link></>
-                : 'Available — no owner yet'}
+                : 'Owned by MilliBux'}
             </div>
 
             {activeAuction && (
