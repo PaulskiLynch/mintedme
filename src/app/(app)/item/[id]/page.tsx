@@ -80,6 +80,30 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
             <p style={{ marginTop: 8, color: 'var(--muted)', fontSize: 12 }}>Inspired by: {item.inspirationName}</p>
           )}
 
+          {/* Performance stats */}
+          {(item.horsepower || item.topSpeed || item.zeroToHundred) && (
+            <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+              {item.horsepower && (
+                <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: '12px 14px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--white)' }}>{item.horsepower.toLocaleString()}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.08em', marginTop: 2 }}>HP</div>
+                </div>
+              )}
+              {item.topSpeed && (
+                <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: '12px 14px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--white)' }}>{item.topSpeed}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.08em', marginTop: 2 }}>KM/H</div>
+                </div>
+              )}
+              {item.zeroToHundred && (
+                <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: '12px 14px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--white)' }}>{Number(item.zeroToHundred).toFixed(1)}s</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.08em', marginTop: 2 }}>0–100</div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div style={{ marginTop: 32 }}>
             <h3 style={{ fontWeight: 900, fontSize: 16, marginBottom: 14 }}>Edition History</h3>
             {edition.ownerships.length === 0 ? (
@@ -114,11 +138,19 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
               Edition #{edition.editionNumber} of {item.totalSupply}
             </div>
 
-            <div className="item-price-big">
-              {edition.isListed && edition.listedPrice
-                ? '$' + Number(edition.listedPrice).toLocaleString()
-                : '$' + Number(item.minimumBid).toLocaleString() + ' min bid'}
-            </div>
+            {edition.isListed && edition.listedPrice ? (
+              <div className="item-price-big">${Number(edition.listedPrice).toLocaleString()}</div>
+            ) : edition.lastSalePrice ? (
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginBottom: 2 }}>LAST SOLD</div>
+                <div className="item-price-big">${Number(edition.lastSalePrice).toLocaleString()}</div>
+              </div>
+            ) : (
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginBottom: 2 }}>TRUE VALUE</div>
+                <div className="item-price-big">${Number(item.benchmarkPrice).toLocaleString()}</div>
+              </div>
+            )}
 
             {topOffer && (
               <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 4 }}>
@@ -134,7 +166,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
 
             {activeAuction && (
               <Link href={`/auction/${activeAuction.id}`} className="btn btn-gold btn-full btn-lg" style={{ textDecoration: 'none', display: 'block', textAlign: 'center', marginBottom: 12 }}>
-                Live auction · {activeAuction._count.bids} bid{activeAuction._count.bids !== 1 ? 's' : ''} · Min ${Number(activeAuction.minimumBid).toLocaleString()} →
+                Live auction · {activeAuction._count.bids} bid{activeAuction._count.bids !== 1 ? 's' : ''} · Place sealed bid →
               </Link>
             )}
 
