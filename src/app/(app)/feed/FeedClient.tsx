@@ -313,35 +313,38 @@ function FeedPost({ event, isLiked: initLiked, likeCount: initLikes, commentCoun
 
   return (
     <div className="feed-post">
-      {/* Type pill */}
-      <span className={`feed-type-pill ${typeInfo.css}`}>{typeInfo.label}</span>
-
-      {/* Content row */}
-      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+      {/* Header: avatar + text + pill */}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: item?.imageUrl ? 12 : 0 }}>
         {event.user && (
           <Link href={`/mint/${event.user.username}`} style={{ flexShrink: 0 }}>
             <Avatar avatarUrl={event.user.avatarUrl} username={event.user.username} />
           </Link>
         )}
         <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Event line */}
           <div style={{ fontSize: 14, lineHeight: 1.5 }}>
             {event.user && (
               <Link href={`/mint/${event.user.username}`} style={{ fontWeight: 700 }}>@{event.user.username} </Link>
             )}
             <span style={{ color: 'var(--muted)' }}>{eventText(event)}</span>
           </div>
-          {/* Meta line */}
           {meta && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>{meta}</div>}
         </div>
-
-        {/* Thumbnail */}
-        {item?.imageUrl && event.edition && (
-          <Link href={`/item/${event.edition.id}`} style={{ flexShrink: 0 }}>
-            <img src={item.imageUrl} alt="" style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover' }} />
-          </Link>
-        )}
+        <span className={`feed-type-pill ${typeInfo.css}`} style={{ flexShrink: 0, marginTop: 2 }}>{typeInfo.label}</span>
       </div>
+
+      {/* Full-width image */}
+      {item?.imageUrl && event.edition && (
+        <Link href={`/item/${event.edition.id}`} style={{ display: 'block', marginBottom: 12 }}>
+          <img src={item.imageUrl} alt={item.name ?? ''} className="feed-post-image" />
+        </Link>
+      )}
+
+      {/* Asset name below image */}
+      {item?.name && event.edition && (
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: 'var(--white)' }}>
+          {item.name}
+        </div>
+      )}
 
       {/* Offer form */}
       {showOffer && event.edition && (
