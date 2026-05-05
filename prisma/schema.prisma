@@ -298,6 +298,7 @@ model Follow {
 model FeedLike {
   userId      String
   feedEventId String
+  type        String   @default("like")  // like, flex, smart, risky, watch
   createdAt   DateTime @default(now())
 
   user      User      @relation(fields: [userId],      references: [id], onDelete: Cascade)

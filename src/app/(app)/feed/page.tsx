@@ -17,7 +17,11 @@ export default async function FeedPage() {
   const session = await auth()
   if (!session?.user?.id) redirect('/login')
 
-  const [events, userFull, watchedItems, activeBidAuctions, liveAuctions, followingUsers, likedIds] = await Promise.all([
+  const [
+    events, userFull, watchedItems, activeBidAuctions, liveAuctions,
+    followingUsers, myReactions, allUsers, onlineCount,
+    recentEventCategories, challengeEditions, hasWonAuction,
+  ] = await Promise.all([
     prisma.feedEvent.findMany({
       where: { isVisible: true },
       orderBy: { createdAt: 'desc' },
@@ -66,12 +70,58 @@ export default async function FeedPage() {
     }),
     prisma.feedLike.findMany({
       where: { userId: session.user.id },
-      select: { feedEventId: true },
+      select: { feedEventId: true, type: true },
+    }),
+    // All users sorted by balance for rank calculation
+    prisma.user.findMany({
+      select: { id: true, balance: true },
+      orderBy: { balance: 'desc' },
+    }),
+    // Online player count (active last 5 min)
+    prisma.user.count({
+      where: { lastSeenAt: { gte: new Date(Date.now() - 5 * 60 * 1000) } },
+    }),
+    // Recent feed events for hot-category calc
+    prisma.feedEvent.findMany({
+      where: { createdAt: { gte: new Date(Date.now() - 24 * 3600 * 1000) }, isVisible: true, editionId: { not: null } },
+      include: { edition: { include: { item: { select: { category: true } } } } },
+      take: 200,
+    }),
+    // Challenge: owned editions by category
+    prisma.itemEdition.findMany({
+      where: { currentOwnerId: session.user.id },
+      include: { item: { select: { category: true } } },
+    }),
+    // Challenge: has won an auction?
+    prisma.ownership.count({
+      where: { ownerId: session.user.id, transferType: 'auction_win' },
     }),
   ])
 
   if (!userFull) redirect('/login')
 
+  // ── Rank ──────────────────────────────────────────────────────────────────
+  const myRank       = allUsers.findIndex((u: { id: string }) => u.id === session.user.id) + 1
+  const totalPlayers = allUsers.length
+
+  // ── Class stats ───────────────────────────────────────────────────────────
+  const topPlayer = allUsers[0]?.id !== session.user.id
+    ? await prisma.user.findUnique({ where: { id: allUsers[0]?.id }, select: { username: true } })
+    : userFull
+
+  const catCounts: Record<string, number> = {}
+  for (const e of recentEventCategories) {
+    const cat = e.edition?.item.category
+    if (cat) catCounts[cat] = (catCounts[cat] ?? 0) + 1
+  }
+  const hotCategory = Object.entries(catCounts).sort(([, a], [, b]) => b - a)[0]?.[0] ?? null
+
+  // ── Challenge progress ────────────────────────────────────────────────────
+  const carCount    = challengeEditions.filter((e: { item: { category: string } }) => e.item.category === 'cars').length
+  const hasBusiness = challengeEditions.some((e: { item: { category: string } }) => e.item.category === 'businesses')
+  const cashOk      = Number(userFull.balance) >= 500_000
+
+  // ── Serialise events ──────────────────────────────────────────────────────
   const serialisedEvents = events.map((e: typeof events[0]) => ({
     id:           e.id,
     eventType:    e.eventType,
@@ -132,6 +182,9 @@ export default async function FeedPage() {
     status:    onlineStatus(f.following.lastSeenAt),
   }))
 
+  const reactionsByEventId: Record<string, string> = {}
+  for (const r of myReactions) reactionsByEventId[r.feedEventId] = r.type
+
   return (
     <FeedClient
       userId={session.user.id}
@@ -149,7 +202,11 @@ export default async function FeedPage() {
       initialAuctions={auctions}
       initialFriends={friends}
       initialInterests={(userFull.interests as string[] | null) ?? []}
-      likedEventIds={likedIds.map((l: { feedEventId: string }) => l.feedEventId)}
+      reactionsByEventId={reactionsByEventId}
+      myRank={myRank}
+      totalPlayers={totalPlayers}
+      classStats={{ onlineCount, topPlayerUsername: topPlayer?.username ?? null, hotCategory }}
+      challengeProgress={{ carCount, hasWonAuction: hasWonAuction > 0, hasBusiness, cashOk }}
     />
   )
 }
