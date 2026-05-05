@@ -122,7 +122,7 @@ export default async function LeaderboardPage() {
                 <div style={{ fontWeight: 900, fontSize: 18, color: isMe ? 'var(--gold)' : 'var(--white)' }}>
                   {fmt(u.netWorth)}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                <div className="lb-breakdown" style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
                   {fmt(u.balance)} cash · {fmt(u.mintValue)} mint
                 </div>
               </div>

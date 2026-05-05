@@ -368,7 +368,7 @@ function FeedPost({ event, isLiked: initLiked, likeCount: initLikes, commentCoun
         </button>
 
         {/* Right: primary CTAs */}
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div className="feed-cta-group" style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
           {event.edition && userId && !offerDone && !isOwner && (
             <button className="btn btn-ghost btn-sm" onClick={() => setShowOffer(p => !p)}>
               {showOffer ? 'Cancel' : 'Make Offer'}

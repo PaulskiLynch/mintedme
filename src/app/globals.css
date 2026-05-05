@@ -496,20 +496,20 @@ textarea.form-input { resize: vertical; min-height: 80px; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
 /* ── Mobile components (hidden on desktop) ──────── */
-.mobile-topbar {
-  display: none;
-}
-.mobile-nav {
-  display: none;
-}
+.mobile-topbar { display: none; }
+.mobile-nav    { display: none; }
 
 /* ── Mobile ─────────────────────────────────────── */
 @media (max-width: 768px) {
+  /* ── Shell ── */
   .sidebar { display: none; }
-  .main-content { margin-left: 0; padding: 16px 16px 80px; }
-  .items-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+  .main-content {
+    margin-left: 0;
+    padding: 68px 14px 84px;
+    max-width: 100vw;
+  }
 
-  /* Top bar */
+  /* ── Top bar ── */
   .mobile-topbar {
     display: flex;
     align-items: center;
@@ -519,27 +519,13 @@ textarea.form-input { resize: vertical; min-height: 80px; }
     height: 52px;
     background: var(--bg2);
     border-bottom: 1px solid var(--border);
-    padding: 0 20px;
+    padding: 0 16px;
     z-index: 100;
   }
-  .mobile-logo {
-    font-size: 18px;
-    font-weight: 900;
-    color: var(--gold);
-    letter-spacing: -0.5px;
-  }
-  .mobile-balance {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--gold);
-  }
+  .mobile-logo    { font-size: 18px; font-weight: 900; color: var(--gold); letter-spacing: -0.5px; }
+  .mobile-balance { font-size: 13px; font-weight: 700; color: var(--gold); }
 
-  /* Offset main content below top bar */
-  .main-content {
-    padding-top: 68px;
-  }
-
-  /* Bottom nav */
+  /* ── Bottom nav ── */
   .mobile-nav {
     display: flex;
     position: fixed;
@@ -562,8 +548,84 @@ textarea.form-input { resize: vertical; min-height: 80px; }
     transition: color 0.15s;
   }
   .mobile-nav-item.active { color: var(--gold); }
-  .mobile-nav-icon { font-size: 20px; line-height: 1; }
+  .mobile-nav-icon  { font-size: 20px; line-height: 1; }
   .mobile-nav-label { font-size: 10px; font-weight: 600; }
+
+  /* ── Typography ── */
+  .page-title { font-size: 22px; }
+  .page-sub   { font-size: 13px; margin-bottom: 16px; }
+
+  /* ── Cards + grids ── */
+  .card { border-radius: 10px; }
+  .items-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+
+  /* ── Stats ── */
+  .stats-row { gap: 8px; }
+  .stat-box  { min-width: calc(50% - 4px); padding: 12px 14px; }
+  .stat-value { font-size: 18px; }
+
+  /* ── Category / interest chips: horizontal scroll row ── */
+  .interest-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    gap: 6px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .interest-chips::-webkit-scrollbar { display: none; }
+  .chip { white-space: nowrap; flex-shrink: 0; }
+
+  /* ── Feed ── */
+  .feed-post { padding: 12px; margin-bottom: 10px; }
+  .feed-post-actions { flex-wrap: wrap; gap: 6px; padding-top: 8px; margin-top: 8px; }
+
+  /* CTA group (Make Offer + View Asset) drops to its own full-width row */
+  .feed-cta-group {
+    margin-left: 0 !important;
+    width: 100%;
+    display: flex;
+    gap: 8px;
+  }
+  .feed-cta-group > * {
+    flex: 1;
+    justify-content: center;
+    text-align: center;
+  }
+
+  /* Drawer button: stays inline in the header, not a floating FAB */
+  .feed-drawer-btn {
+    position: static !important;
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+    border-radius: 8px;
+  }
+
+  /* ── Feed right panel: full-width drawer on mobile ── */
+  .feed-right {
+    width: 100% !important;
+    border-radius: 0;
+  }
+
+  /* ── Leaderboard ── */
+  .lb-breakdown { display: none; }
+  .lb-name      { font-size: 14px; }
+
+  /* ── Item detail ── */
+  .item-detail { gap: 16px; }
+  .item-action-box { position: static; padding: 16px; }
+  .item-price-big  { font-size: 26px; }
+
+  /* ── Modals ── */
+  .modal { padding: 20px; border-radius: 12px; }
+  .overlay { padding: 12px; align-items: flex-end; }
+
+  /* ── Tabs ── */
+  .tab { padding: 8px 14px; font-size: 13px; }
+
+  /* ── Auth ── */
+  .auth-box { padding: 24px; }
 }
 
 /* ── Light mode ─────────────────────────────────────── */
