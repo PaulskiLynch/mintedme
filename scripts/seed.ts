@@ -145,7 +145,7 @@ async function main() {
         editionId: ev.editionKey ? editionIds[ev.editionKey] : undefined,
         eventType: ev.eventType,
         amount:    ev.amount ?? undefined,
-        metadata:  (ev as { metadata?: object }).metadata ?? null,
+        metadata:  (ev as { metadata?: object }).metadata ?? undefined,
         isVisible: true,
         createdAt: ev.createdAt,
       },
