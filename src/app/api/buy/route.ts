@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
 
       const isPrimarySale = !edition.currentOwnerId
       if (!isPrimarySale && (!edition.isListed || !edition.listedPrice)) throw new Error('Item is not listed for sale')
-      const price = isPrimarySale ? Number(edition.item.minimumBid) : Number(edition.listedPrice)
+      const price = isPrimarySale ? Number(edition.item.benchmarkPrice) : Number(edition.listedPrice)
 
       const buyer = await tx.user.findUnique({ where: { id: buyerId } })
       if (!buyer) throw new Error('Buyer not found')

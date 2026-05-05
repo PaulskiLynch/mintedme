@@ -234,13 +234,13 @@ export default function ItemActions({
             Supply locked — unlocks as more users join
           </div>
         ) : (
-          <button className="btn btn-gold btn-full btn-lg" onClick={handleBuy} disabled={busy || !userId || balance < minBid} style={{ marginBottom: 12 }}>
-            {busy ? 'Buying...' : `Buy now — $${minBid.toLocaleString()}`}
+          <button className="btn btn-gold btn-full btn-lg" onClick={handleBuy} disabled={busy || !userId || balance < benchmark} style={{ marginBottom: 12 }}>
+            {busy ? 'Buying...' : `Buy now — $${benchmark.toLocaleString()}`}
           </button>
         )}
 
         {!userId && <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginBottom: 12 }}>Sign in to buy</div>}
-        {userId && minBid > 0 && balance < minBid && !supplyLocked && (
+        {userId && benchmark > 0 && balance < benchmark && !supplyLocked && (
           <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 12 }}>Insufficient balance (you have ${balance.toLocaleString()})</div>
         )}
 
