@@ -16,7 +16,10 @@ export default async function MintProfilePage({ params }: { params: Promise<{ us
     include: {
       ownedEditions: {
         where: { isFrozen: false },
-        include: { item: { select: { id: true, name: true, category: true, class: true, imageUrl: true } } },
+        include: {
+          item: { select: { id: true, name: true, category: true, class: true, imageUrl: true } },
+          _count: { select: { offers: { where: { status: 'pending' } } } },
+        },
         orderBy: { lastSalePrice: 'desc' },
       },
       _count: { select: { createdItems: true } },
@@ -90,7 +93,10 @@ export default async function MintProfilePage({ params }: { params: Promise<{ us
               <div className="items-grid">
                 {editions.map(e => (
                   <Link key={e.id} href={`/item/${e.id}`} style={{ textDecoration: 'none' }}>
-                    <div className={`item-card tier-${e.item.class}`}>
+                    <div className={`item-card tier-${e.item.class}`} style={{ position: 'relative' }}>
+                      {isOwn && e._count.offers > 0 && (
+                        <span style={{ position: 'absolute', top: 6, right: 6, background: 'var(--gold)', color: '#000', fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 4, zIndex: 2, letterSpacing: '0.05em' }}>OFFER</span>
+                      )}
                       <div className="item-card-img">
                         {e.item.imageUrl ? <img src={e.item.imageUrl} alt={e.item.name} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 12 }}>No image</div>}
                       </div>

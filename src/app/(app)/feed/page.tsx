@@ -24,8 +24,8 @@ export default async function FeedPage() {
       take: 60,
       include: {
         user:       { select: { username: true, avatarUrl: true } },
-        targetUser: { select: { username: true } },
-        edition:    { include: { item: { select: { name: true, imageUrl: true, category: true } } } },
+        targetUser: { select: { username: true, avatarUrl: true } },
+        edition:    { include: { item: { select: { name: true, imageUrl: true, category: true, referencePrice: true } } } },
         _count:     { select: { likes: true, comments: true } },
       },
     }),
@@ -82,7 +82,15 @@ export default async function FeedPage() {
     metadata:     e.metadata as Record<string, unknown> | null,
     user:         e.user,
     targetUser:   e.targetUser,
-    edition:      e.edition ? { id: e.edition.id, item: e.edition.item } : null,
+    edition:      e.edition ? {
+      id:   e.edition.id,
+      item: {
+        name:           e.edition.item.name,
+        imageUrl:       e.edition.item.imageUrl,
+        category:       e.edition.item.category,
+        referencePrice: e.edition.item.referencePrice?.toString() ?? null,
+      },
+    } : null,
   }))
 
   const watching = watchedItems.map((w: typeof watchedItems[0]) => {
