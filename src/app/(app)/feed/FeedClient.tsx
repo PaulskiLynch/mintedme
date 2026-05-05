@@ -14,7 +14,7 @@ interface FeedEvent {
   targetUser: { username: string; avatarUrl: string | null } | null
   edition: {
     id: string
-    item: { name: string; imageUrl: string | null; category: string }
+    item: { name: string; imageUrl: string | null; category: string; benchmarkPrice: string; minimumBid: string }
   } | null
 }
 interface WatchItem    { editionId: string; itemName: string; imageUrl: string | null; currentPrice: string; endsAt: string | null; auctionId: string | null }
@@ -120,6 +120,73 @@ function metaLine(e: FeedEvent): string {
   return parts.join(' · ')
 }
 
+const REACTIONS = [
+  { type: 'smart', emoji: '📈', label: 'Smart' },
+  { type: 'bold',  emoji: '🔥', label: 'Bold'  },
+  { type: 'risky', emoji: '😬', label: 'Risky' },
+  { type: 'steal', emoji: '💰', label: 'Steal' },
+]
+
+function verdictLine(e: FeedEvent): { text: string; colour: string } | null {
+  if (!e.amount || !e.edition?.item.benchmarkPrice) return null
+  const amount = Number(e.amount)
+  const bench  = Number(e.edition.item.benchmarkPrice)
+  if (!bench) return null
+  const pct = ((amount - bench) / bench) * 100
+
+  switch (e.eventType) {
+    case 'buy':
+      if (pct < -25) return { text: `📉 ${Math.abs(pct).toFixed(0)}% below market · Smart buy`, colour: 'var(--green)' }
+      if (pct >  25) return { text: `📈 ${pct.toFixed(0)}% above market · Overpaid`,             colour: 'var(--red)'   }
+      return { text: 'Fair market price', colour: 'var(--muted)' }
+    case 'offer':
+      if (pct < -60) return { text: `😬 Lowball — ${Math.abs(pct).toFixed(0)}% below market`,   colour: 'var(--red)'   }
+      if (pct < -25) return { text: `${Math.abs(pct).toFixed(0)}% below ask`,                    colour: 'var(--muted)' }
+      if (pct >   0) return { text: `📈 Above market · Strong offer`,                            colour: 'var(--green)' }
+      return null
+    case 'sell': case 'accept':
+      if (pct >  25) return { text: `💰 ${pct.toFixed(0)}% above market · Great flip`,           colour: 'var(--green)' }
+      if (pct < -25) return { text: `${Math.abs(pct).toFixed(0)}% below market · Under-sold`,    colour: 'var(--red)'   }
+      return { text: 'Fair sale', colour: 'var(--muted)' }
+    case 'auction_end':
+      if (pct < -20) return { text: `💰 Won ${Math.abs(pct).toFixed(0)}% below market · Bargain`, colour: 'var(--green)' }
+      if (pct >  20) return { text: `${pct.toFixed(0)}% above market · Paid up`,                  colour: 'var(--muted)' }
+      return null
+  }
+  return null
+}
+
+function impactLine(e: FeedEvent): string | null {
+  if (!e.amount || !e.edition?.item.benchmarkPrice) return null
+  const amount = Number(e.amount)
+  const bench  = Number(e.edition.item.benchmarkPrice)
+
+  if (e.eventType === 'buy') {
+    const equity = bench - amount
+    if (equity > 0)  return `Impact: +${fmt(equity)} instant equity`
+    if (equity < -100) return `Impact: ${fmt(equity)} (overpaid)`
+  }
+  if (e.eventType === 'sell' || e.eventType === 'accept') {
+    return `Impact: +${fmt(amount)} to balance`
+  }
+  if (e.eventType === 'auction_end' && amount) {
+    const equity = bench - amount
+    if (equity > 0) return `Impact: +${fmt(equity)} instant equity`
+  }
+  return null
+}
+
+function dedupeEvents(events: FeedEvent[]): FeedEvent[] {
+  const counter = new Map<string, number>()
+  return events.filter(e => {
+    if (!e.user || !e.edition) return true
+    const key = `${e.user.username}|${e.edition.item.name}|${e.eventType}`
+    const n = (counter.get(key) ?? 0) + 1
+    counter.set(key, n)
+    return n <= 2
+  })
+}
+
 function isVisible(e: FeedEvent): boolean {
   if (e.eventType === 'market_event' || e.eventType === 'achievement' || e.eventType === 'income') {
     return !!e.metadata?.title
@@ -128,6 +195,36 @@ function isVisible(e: FeedEvent): boolean {
     return !!e.metadata?.text && String(e.metadata.text).trim().length > 0
   }
   return !!e.user
+}
+
+// ─── Biggest Move Today ───────────────────────────────────────────────────────
+
+function BiggestMoveToday({ events }: { events: FeedEvent[] }) {
+  const DAY = 86400000
+  const candidates = events.filter(e =>
+    Date.now() - new Date(e.createdAt).getTime() < DAY &&
+    (e.eventType === 'buy' || e.eventType === 'sell' || e.eventType === 'auction_end') &&
+    e.amount && e.user
+  )
+  if (!candidates.length) return null
+  const top = candidates.sort((a, b) => Number(b.amount) - Number(a.amount))[0]
+  const verdict = verdictLine(top)
+
+  return (
+    <div style={{ marginBottom: 20, background: 'linear-gradient(135deg, #1a1400, #2a2000)', border: '1px solid var(--gold)', borderRadius: 12, padding: '14px 16px' }}>
+      <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--gold)', letterSpacing: '0.1em', marginBottom: 8 }}>🔥 BIGGEST MOVE TODAY</div>
+      <div style={{ fontSize: 14, lineHeight: 1.5 }}>
+        <Link href={`/mint/${top.user!.username}`} style={{ fontWeight: 700 }}>@{top.user!.username}</Link>
+        {' '}<span style={{ color: 'var(--muted)' }}>{eventText(top)}</span>
+      </div>
+      {verdict && <div style={{ fontSize: 12, color: verdict.colour, marginTop: 4, fontWeight: 700 }}>{verdict.text}</div>}
+      {top.edition && (
+        <div style={{ marginTop: 10 }}>
+          <Link href={`/item/${top.edition.id}`} className="btn btn-gold btn-sm">View Asset →</Link>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
@@ -239,10 +336,10 @@ function MarketCard({ event }: { event: FeedEvent }) {
 
 // ─── Feed post ────────────────────────────────────────────────────────────────
 
-function FeedPost({ event, isLiked: initLiked, likeCount: initLikes, commentCount: initCommCount, userId }: {
-  event: FeedEvent; isLiked: boolean; likeCount: number; commentCount: number; userId: string
+function FeedPost({ event, myReaction: initReaction, likeCount: initLikes, commentCount: initCommCount, userId }: {
+  event: FeedEvent; myReaction: string | null; likeCount: number; commentCount: number; userId: string
 }) {
-  const [liked,        setLiked]       = useState(initLiked)
+  const [myReaction,   setMyReaction]  = useState(initReaction)
   const [likes,        setLikes]       = useState(initLikes)
   const [comments,     setComments]    = useState<Comment[]>([])
   const [commCount,    setCommCount]   = useState(initCommCount)
@@ -250,15 +347,22 @@ function FeedPost({ event, isLiked: initLiked, likeCount: initLikes, commentCoun
   const [commentInput, setCommentInput] = useState('')
   const [posting,      setPosting]     = useState(false)
   const [showOffer,    setShowOffer]   = useState(false)
-  const [offerAmt,     setOfferAmt]    = useState('')
+  const [offerRaw,     setOfferRaw]    = useState('')
+  const [offerDisplay, setOfferDisplay] = useState('')
   const [offerBusy,    setOfferBusy]   = useState(false)
   const [offerDone,    setOfferDone]   = useState(false)
 
-  async function toggleLike() {
-    setLiked(p => !p); setLikes(l => l + (liked ? -1 : 1))
+  const bench     = Number(event.edition?.item.benchmarkPrice ?? 0)
+  const offerNum  = Number(offerRaw || 0)
+  const offerPct  = bench && offerNum ? ((offerNum - bench) / bench * 100) : null
+
+  async function toggleReaction(type: string) {
+    const next = myReaction === type ? null : type
+    setMyReaction(next)
+    setLikes(l => next ? (myReaction ? l : l + 1) : l - 1)
     await fetch(`/api/feed/${event.id}/like`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'like' }),
+      body: JSON.stringify({ type }),
     })
   }
 
@@ -286,11 +390,11 @@ function FeedPost({ event, isLiked: initLiked, likeCount: initLikes, commentCoun
 
   async function submitOffer(e: React.FormEvent) {
     e.preventDefault()
-    if (!event.edition || !offerAmt) return
+    if (!event.edition || !offerRaw) return
     setOfferBusy(true)
     const res = await fetch('/api/offers', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ editionId: event.edition.id, amount: Number(offerAmt) }),
+      body: JSON.stringify({ editionId: event.edition.id, amount: Number(offerRaw) }),
     })
     if (res.ok) { setOfferDone(true); setShowOffer(false) }
     setOfferBusy(false)
@@ -299,11 +403,13 @@ function FeedPost({ event, isLiked: initLiked, likeCount: initLikes, commentCoun
   const typeInfo = TYPE_INFO[event.eventType] ?? { label: event.eventType.toUpperCase(), css: 'post' }
   const item     = event.edition?.item
   const meta     = metaLine(event)
+  const verdict  = verdictLine(event)
+  const impact   = impactLine(event)
   const isOwner  = event.targetUser && (event.eventType === 'sell' || event.eventType === 'accept')
 
   return (
     <div className="feed-post">
-      {/* Header: avatar + text + pill */}
+      {/* Header */}
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: item?.imageUrl ? 12 : 0 }}>
         {event.user && (
           <Link href={`/mint/${event.user.username}`} style={{ flexShrink: 0 }}>
@@ -324,61 +430,99 @@ function FeedPost({ event, isLiked: initLiked, likeCount: initLikes, commentCoun
 
       {/* Full-width image */}
       {item?.imageUrl && event.edition && (
-        <Link href={`/item/${event.edition.id}`} style={{ display: 'block', marginBottom: 12 }}>
+        <Link href={`/item/${event.edition.id}`} style={{ display: 'block', marginBottom: 10 }}>
           <img src={item.imageUrl} alt={item.name ?? ''} className="feed-post-image" />
         </Link>
       )}
 
-      {/* Asset name below image */}
+      {/* Asset name */}
       {item?.name && event.edition && (
-        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: 'var(--white)' }}>
-          {item.name}
-        </div>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6, color: 'var(--white)' }}>{item.name}</div>
       )}
 
-      {/* Offer form */}
+      {/* Verdict + impact */}
+      {verdict && (
+        <div style={{ fontSize: 12, color: verdict.colour, fontWeight: 700, marginBottom: impact ? 2 : 8 }}>{verdict.text}</div>
+      )}
+      {impact && (
+        <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>{impact}</div>
+      )}
+
+      {/* Inline offer form */}
       {showOffer && event.edition && (
-        <form onSubmit={submitOffer} style={{ display: 'flex', gap: 8, marginTop: 12, padding: '10px', background: 'var(--bg3)', borderRadius: 8 }}>
-          <input
-            className="form-input" type="number" min="1" step="1"
-            value={offerAmt} onChange={e => setOfferAmt(e.target.value)}
-            placeholder="Your offer $"
-            style={{ flex: 1, fontSize: 13 }} autoFocus required
-          />
-          <button className="btn btn-gold btn-sm" type="submit" disabled={offerBusy || !offerAmt}>{offerBusy ? '...' : 'Send'}</button>
-          <button className="btn btn-ghost btn-sm" type="button" onClick={() => setShowOffer(false)}>✕</button>
+        <form onSubmit={submitOffer} style={{ marginBottom: 10, padding: '12px', background: 'var(--bg3)', borderRadius: 8 }}>
+          {bench > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
+              <span>Market value: <strong style={{ color: 'var(--white)' }}>{fmt(bench)}</strong></span>
+              {offerPct !== null && (
+                <span style={{ color: offerPct < -30 ? 'var(--red)' : offerPct > 0 ? 'var(--green)' : 'var(--muted)', fontWeight: 700 }}>
+                  {offerPct > 0 ? '+' : ''}{offerPct.toFixed(0)}% vs market
+                </span>
+              )}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', fontWeight: 700, pointerEvents: 'none' }}>$</span>
+              <input
+                className="form-input" type="text" inputMode="numeric"
+                value={offerDisplay}
+                onChange={e => {
+                  const raw = e.target.value.replace(/[^0-9]/g, '')
+                  setOfferRaw(raw)
+                  setOfferDisplay(raw ? Number(raw).toLocaleString() : '')
+                }}
+                placeholder={bench ? bench.toLocaleString() : 'Your offer'}
+                style={{ paddingLeft: 22, fontSize: 13 }} autoFocus required
+              />
+            </div>
+            <button className="btn btn-gold btn-sm" type="submit" disabled={offerBusy || !offerRaw}>{offerBusy ? '...' : 'Send'}</button>
+            <button className="btn btn-ghost btn-sm" type="button" onClick={() => setShowOffer(false)}>✕</button>
+          </div>
         </form>
       )}
-      {offerDone && <div style={{ marginTop: 8, fontSize: 12, color: 'var(--green)', fontWeight: 700 }}>Offer sent!</div>}
+      {offerDone && <div style={{ marginBottom: 8, fontSize: 12, color: 'var(--green)', fontWeight: 700 }}>Offer sent!</div>}
 
-      {/* Actions */}
-      <div className="feed-post-actions" style={{ alignItems: 'center' }}>
-        {/* Left: social */}
-        <button className={`feed-action-btn${liked ? ' liked' : ''}`} onClick={toggleLike}>
-          ♡ Like{likes > 0 ? ` ${likes}` : ''}
-        </button>
-        <button className={`feed-action-btn${expanded ? ' liked' : ''}`} onClick={loadAndToggleComments}>
-          💬 {commCount > 0 ? commCount : 'Comment'}
-        </button>
+      {/* Reactions row */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+        {REACTIONS.map(r => (
+          <button
+            key={r.type}
+            onClick={() => toggleReaction(r.type)}
+            style={{
+              fontSize: 11, fontWeight: 700,
+              background: myReaction === r.type ? 'var(--bg3)' : 'transparent',
+              border: `1px solid ${myReaction === r.type ? 'var(--gold)' : 'var(--border)'}`,
+              color:  myReaction === r.type ? 'var(--gold)' : 'var(--muted)',
+              borderRadius: 6, padding: '4px 8px', cursor: 'pointer',
+            }}
+          >
+            {r.emoji} {r.label}
+          </button>
+        ))}
+        {likes > 0 && <span style={{ fontSize: 11, color: 'var(--muted)', alignSelf: 'center', marginLeft: 2 }}>{likes} reaction{likes !== 1 ? 's' : ''}</span>}
 
-        {/* Right: primary CTAs */}
-        <div className="feed-cta-group" style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+        {/* CTAs pushed right */}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+          <button className={`feed-action-btn${expanded ? ' liked' : ''}`} onClick={loadAndToggleComments} style={{ fontSize: 11 }}>
+            💬 {commCount > 0 ? commCount : ''}
+          </button>
           {event.edition && userId && !offerDone && !isOwner && (
-            <button className="btn btn-ghost btn-sm" onClick={() => setShowOffer(p => !p)}>
-              {showOffer ? 'Cancel' : 'Make Offer'}
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowOffer(p => !p)} style={{ fontSize: 11 }}>
+              {showOffer ? 'Cancel' : 'Offer'}
             </button>
           )}
           {event.edition && (
-            <Link href={`/item/${event.edition.id}`} className="btn btn-gold btn-sm">View Asset</Link>
+            <Link href={`/item/${event.edition.id}`} className="btn btn-gold btn-sm" style={{ fontSize: 11 }}>View →</Link>
           )}
         </div>
       </div>
 
       {/* Comments */}
       {expanded && (
-        <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+        <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
           {comments.map(c => (
-            <div key={c.id} style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <div key={c.id} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
               <Avatar avatarUrl={c.user.avatarUrl} username={c.user.username} size={24} />
               <div style={{ flex: 1, background: 'var(--bg3)', borderRadius: 8, padding: '6px 10px', fontSize: 13 }}>
                 <span style={{ fontWeight: 700, fontSize: 12, color: 'var(--gold)', marginRight: 6 }}>@{c.user.username}</span>
@@ -534,16 +678,17 @@ export default function FeedClient({
     localStorage.setItem('feed-collapsed', JSON.stringify(next))
   }
 
-  const likedSet       = new Set(Object.keys(reactionsByEventId))
   const visibleEvents  = events.filter(isVisible)
-  const filteredEvents = filter
-    ? visibleEvents.filter(e =>
-        e.edition?.item.category === filter.toLowerCase() ||
-        e.eventType === 'achievement' ||
-        e.eventType === 'income' ||
-        e.eventType === 'market_event'
-      )
-    : visibleEvents
+  const filteredEvents = dedupeEvents(
+    filter
+      ? visibleEvents.filter(e =>
+          e.edition?.item.category === filter.toLowerCase() ||
+          e.eventType === 'achievement' ||
+          e.eventType === 'income' ||
+          e.eventType === 'market_event'
+        )
+      : visibleEvents
+  )
 
   return (
     <div className="feed-layout">
@@ -580,6 +725,9 @@ export default function FeedClient({
           ))}
         </div>
 
+        {/* Biggest Move Today */}
+        <BiggestMoveToday events={visibleEvents} />
+
         {/* Feed */}
         {filteredEvents.length === 0 ? (
           <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--muted)', fontWeight: 700 }}>
@@ -592,7 +740,7 @@ export default function FeedClient({
           return (
             <FeedPost
               key={e.id} event={e} userId={userId}
-              isLiked={likedSet.has(e.id)}
+              myReaction={reactionsByEventId[e.id] ?? null}
               likeCount={e.likeCount} commentCount={e.commentCount}
             />
           )

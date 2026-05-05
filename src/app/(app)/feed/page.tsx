@@ -29,7 +29,7 @@ export default async function FeedPage() {
       include: {
         user:       { select: { username: true, avatarUrl: true } },
         targetUser: { select: { username: true, avatarUrl: true } },
-        edition:    { include: { item: { select: { name: true, imageUrl: true, category: true } } } },
+        edition:    { include: { item: { select: { name: true, imageUrl: true, category: true, benchmarkPrice: true, minimumBid: true } } } },
         _count:     { select: { likes: true, comments: true } },
       },
     }),
@@ -135,9 +135,11 @@ export default async function FeedPage() {
     edition:      e.edition ? {
       id:   e.edition.id,
       item: {
-        name:     e.edition.item.name,
-        imageUrl: e.edition.item.imageUrl,
-        category: e.edition.item.category,
+        name:           e.edition.item.name,
+        imageUrl:       e.edition.item.imageUrl,
+        category:       e.edition.item.category,
+        benchmarkPrice: e.edition.item.benchmarkPrice.toString(),
+        minimumBid:     e.edition.item.minimumBid.toString(),
       },
     } : null,
   }))
