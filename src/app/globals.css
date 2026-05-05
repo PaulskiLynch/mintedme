@@ -675,11 +675,13 @@ body.light {
 .feed-post:hover { border-color: var(--gold-dim); }
 
 .feed-post-image {
-  width: 100%;
-  height: 220px;
+  width: calc(100% - 32px);
+  max-width: 480px;
+  aspect-ratio: 16 / 9;
   object-fit: cover;
   border-radius: 8px;
   display: block;
+  margin: 0 16px;
 }
 
 /* ── Event type pills ────────────────────────────────── */
