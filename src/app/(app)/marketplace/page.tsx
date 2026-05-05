@@ -32,10 +32,11 @@ export default async function MarketplacePage({
     include: {
       editions: {
         where:   { isFrozen: false },
-        select:  { id: true, editionNumber: true, currentOwnerId: true, isListed: true, listedPrice: true, isInAuction: true, lastSalePrice: true },
+        select:  { id: true, editionNumber: true, currentOwnerId: true, isListed: true, listedPrice: true, isInAuction: true, lastSalePrice: true, lastSaleDate: true },
         orderBy: { editionNumber: 'asc' },
         take: 50,
       },
+      _count: { select: { wishlistedBy: true } },
     },
     take: 100,
   })
@@ -49,10 +50,12 @@ export default async function MarketplacePage({
         horsepower:    i.horsepower    ?? null,
         topSpeed:      i.topSpeed      ?? null,
         zeroToHundred: i.zeroToHundred?.toString() ?? null,
+        watcherCount:  i._count.wishlistedBy,
         editions: i.editions.map((e: typeof i.editions[0]) => ({
           ...e,
           listedPrice:   e.listedPrice?.toString()   ?? null,
           lastSalePrice: e.lastSalePrice?.toString() ?? null,
+          lastSaleDate:  e.lastSaleDate?.toISOString() ?? null,
         })),
       }))}
       categories={CATEGORIES}
