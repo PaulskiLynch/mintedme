@@ -28,6 +28,7 @@ export default function ItemActions({ editionId, itemId, itemName, isOwner, isLi
   const [showList, setShowList]         = useState(false)
   const [showAuction, setShowAuction]   = useState(false)
   const [offerAmt, setOfferAmt]         = useState('')
+  const [offerDisplay, setOfferDisplay] = useState('')
   const [listPrice, setListPrice]       = useState(listedPrice ?? minimumBid ?? '')
   const [message, setMessage]           = useState('')
   const [startBid, setStartBid]         = useState(minimumBid ?? '')
@@ -60,7 +61,7 @@ export default function ItemActions({ editionId, itemId, itemName, isOwner, isLi
     const res = await fetch('/api/offers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ editionId, amount: Number(offerAmt), message }),
+      body: JSON.stringify({ editionId, amount: Number(offerAmt.replace(/,/g, '')), message }),
     })
     const json = await res.json()
     if (res.ok) { setShowOffer(false); router.refresh() } else { setError(json.error || 'Offer failed') }
@@ -183,7 +184,20 @@ export default function ItemActions({ editionId, itemId, itemName, isOwner, isLi
             <form onSubmit={handleOffer}>
               <div className="form-group">
                 <label className="form-label">Your offer (USD)</label>
-                <input className="form-input" type="number" min="1" max={balance} value={offerAmt} onChange={e => setOfferAmt(e.target.value)} placeholder={minimumBid ? `ref: $${Number(minimumBid).toLocaleString()}` : 'Enter amount'} required autoFocus />
+                <input
+                  className="form-input"
+                  type="text"
+                  inputMode="numeric"
+                  value={offerDisplay}
+                  onChange={e => {
+                    const raw = e.target.value.replace(/[^0-9]/g, '')
+                    setOfferAmt(raw)
+                    setOfferDisplay(raw ? Number(raw).toLocaleString() : '')
+                  }}
+                  placeholder={minimumBid ? `ref: $${Number(minimumBid).toLocaleString()}` : 'Enter amount'}
+                  required
+                  autoFocus
+                />
               </div>
               <div className="offer-warning">
                 Your funds will be reserved for 48 hours while the offer is active.
