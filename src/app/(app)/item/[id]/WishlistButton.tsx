@@ -7,12 +7,14 @@ interface Props {
   itemId: string
   userId: string | null
   initialWishlisted: boolean
+  initialCount: number
 }
 
-export default function WishlistButton({ itemId, userId, initialWishlisted }: Props) {
+export default function WishlistButton({ itemId, userId, initialWishlisted, initialCount }: Props) {
   const router = useRouter()
   const [wishlisted, setWishlisted] = useState(initialWishlisted)
-  const [busy, setBusy] = useState(false)
+  const [count, setCount]           = useState(initialCount)
+  const [busy, setBusy]             = useState(false)
 
   async function toggle() {
     if (!userId) { router.push('/login'); return }
@@ -25,6 +27,7 @@ export default function WishlistButton({ itemId, userId, initialWishlisted }: Pr
     if (res.ok) {
       const json = await res.json()
       setWishlisted(json.wishlisted)
+      setCount(c => json.wishlisted ? c + 1 : Math.max(0, c - 1))
     }
     setBusy(false)
   }
@@ -36,21 +39,25 @@ export default function WishlistButton({ itemId, userId, initialWishlisted }: Pr
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 6,
+        justifyContent: 'space-between',
         background: wishlisted ? 'var(--bg3)' : 'transparent',
         border: `1px solid ${wishlisted ? 'var(--gold)' : 'var(--border)'}`,
         borderRadius: 8,
-        padding: '8px 14px',
+        padding: '10px 14px',
         fontSize: 13,
         fontWeight: 700,
         color: wishlisted ? 'var(--gold)' : 'var(--muted)',
         cursor: busy ? 'default' : 'pointer',
         width: '100%',
-        justifyContent: 'center',
         marginTop: 8,
       }}
     >
-      {wishlisted ? '★ On wishlist' : '☆ Add to wishlist'}
+      <span>{wishlisted ? '👀 Watching' : '👀 Watch asset'}</span>
+      {count > 0 && (
+        <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.8 }}>
+          {count} player{count !== 1 ? 's' : ''}
+        </span>
+      )}
     </button>
   )
 }

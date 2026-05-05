@@ -26,7 +26,12 @@ interface Props {
   topOffer:         string | null
   weeklyUpkeep:     number
   supplyLocked:     boolean
-  supplyInfo:       string
+  availableNow:     number
+  alreadyClaimed:   number
+  totalEver:        number
+  watcherCount:     number
+  pendingOfferCount: number
+  trendPct:         number | null
 }
 
 function timeAgo(iso: string | null): string | null {
@@ -45,7 +50,9 @@ export default function ItemActions({
   userId, userBalance, currentOwnerId,
   ownerUsername, ownerLastSeenAt, ownerRareCount,
   minimumBid, benchmarkPrice, lastSalePrice, topOffer,
-  weeklyUpkeep, supplyLocked, supplyInfo,
+  weeklyUpkeep, supplyLocked,
+  availableNow, alreadyClaimed, totalEver,
+  watcherCount, pendingOfferCount, trendPct,
 }: Props) {
   const router = useRouter()
   const [busy, setBusy]               = useState(false)
@@ -70,10 +77,19 @@ export default function ItemActions({
   const [reportDesc, setReportDesc]   = useState('')
   const [reportSent, setReportSent]   = useState(false)
 
-  const balance  = Number(userBalance ?? 0)
-  const minBid   = Number(minimumBid ?? 0)
-  const buyPrice = Number(listedPrice ?? 0)
+  const balance   = Number(userBalance ?? 0)
+  const minBid    = Number(minimumBid ?? 0)
+  const buyPrice  = Number(listedPrice ?? 0)
   const benchmark = Number(benchmarkPrice ?? 0)
+
+  const demand = (watcherCount + pendingOfferCount * 2) >= 6 ? 'High'
+               : (watcherCount + pendingOfferCount * 2) >= 2 ? 'Medium'
+               : 'Normal'
+
+  const supplyLine = availableNow > 0
+    ? `${availableNow} available now · ${totalEver} total ever`
+    : `${totalEver} total ever`
+  const claimedLine = alreadyClaimed > 0 ? `${alreadyClaimed} already claimed` : null
 
   async function handleBuy() {
     if (!userId) { router.push('/login'); return }
@@ -138,7 +154,8 @@ export default function ItemActions({
       <div>
         {error && <div className="form-error" style={{ marginBottom: 12 }}>{error}</div>}
 
-        <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>{supplyInfo}</div>
+        <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>{supplyLine}</div>
+        {claimedLine && <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>{claimedLine}</div>}
 
         {isInAuction ? (
           <div style={{ fontSize: 13, color: 'var(--gold)', fontWeight: 700, marginBottom: 12 }}>Live auction in progress</div>
@@ -227,7 +244,12 @@ export default function ItemActions({
     return (
       <div>
         {error && <div className="form-error" style={{ marginBottom: 12 }}>{error}</div>}
-        <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>{supplyInfo}</div>
+
+        <UrgencyBar watcherCount={watcherCount} pendingOfferCount={pendingOfferCount} />
+
+        <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>{supplyLine}</div>
+        {claimedLine && <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>{claimedLine}</div>}
+        {!claimedLine && <div style={{ marginBottom: 12 }} />}
 
         {supplyLocked ? (
           <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '14px 16px', fontSize: 13, color: 'var(--muted)', textAlign: 'center', marginBottom: 12 }}>
@@ -244,7 +266,7 @@ export default function ItemActions({
           <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 12 }}>Insufficient balance (you have ${balance.toLocaleString()})</div>
         )}
 
-        <PriceContext benchmark={benchmark} lastSalePrice={lastSalePrice} topOffer={topOffer} />
+        <PriceContext benchmark={benchmark} lastSalePrice={lastSalePrice} topOffer={topOffer} trendPct={trendPct} demand={demand} />
 
         <button onClick={() => setShowReport(true)} style={{ marginTop: 12, background: 'none', border: 'none', color: 'var(--muted)', fontSize: 12, cursor: 'pointer', padding: 0 }}>
           Report this item
@@ -261,6 +283,12 @@ export default function ItemActions({
   return (
     <div>
       {error && <div className="form-error" style={{ marginBottom: 12 }}>{error}</div>}
+
+      <UrgencyBar watcherCount={watcherCount} pendingOfferCount={pendingOfferCount} />
+
+      <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>{supplyLine}</div>
+      {claimedLine && <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>{claimedLine}</div>}
+      {!claimedLine && <div style={{ marginBottom: 12 }} />}
 
       {/* Offer form */}
       {!isInAuction && (
@@ -312,7 +340,7 @@ export default function ItemActions({
       )}
 
       {/* Price context */}
-      <PriceContext benchmark={benchmark} lastSalePrice={lastSalePrice} topOffer={topOffer} />
+      <PriceContext benchmark={benchmark} lastSalePrice={lastSalePrice} topOffer={topOffer} trendPct={trendPct} demand={demand} />
 
       {/* Owner context */}
       {ownerUsername && (
@@ -343,14 +371,54 @@ export default function ItemActions({
   )
 }
 
-function PriceContext({ benchmark, lastSalePrice, topOffer }: { benchmark: number; lastSalePrice: string | null; topOffer: string | null }) {
+function UrgencyBar({ watcherCount, pendingOfferCount }: { watcherCount: number; pendingOfferCount: number }) {
+  const signals: string[] = []
+  if (watcherCount > 0) signals.push(`🔥 ${watcherCount} player${watcherCount !== 1 ? 's' : ''} watching`)
+  if (pendingOfferCount > 0) signals.push(`📋 ${pendingOfferCount} offer${pendingOfferCount !== 1 ? 's' : ''} pending`)
+  if (signals.length === 0) return null
+  return (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+      {signals.map(s => (
+        <span key={s} style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 8px' }}>
+          {s}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function PriceContext({ benchmark, lastSalePrice, topOffer, trendPct, demand }: {
+  benchmark: number
+  lastSalePrice: string | null
+  topOffer: string | null
+  trendPct: number | null
+  demand: string
+}) {
+  const trendColour = trendPct == null ? 'var(--muted)'
+                    : trendPct > 0 ? 'var(--green)'
+                    : trendPct < 0 ? 'var(--red)'
+                    : 'var(--muted)'
+  const trendLabel = trendPct == null ? null
+                   : trendPct > 0 ? `↑ +${trendPct.toFixed(1)}% vs last sale`
+                   : trendPct < 0 ? `↓ ${trendPct.toFixed(1)}% vs last sale`
+                   : '→ Stable'
+
+  const demandColour = demand === 'High' ? 'var(--green)' : demand === 'Medium' ? 'var(--gold)' : 'var(--muted)'
+
   return (
     <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 14 }}>
       <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--muted)', letterSpacing: '0.08em', marginBottom: 10 }}>PRICE CONTEXT</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
           <span style={{ color: 'var(--muted)' }}>True value</span>
-          <span style={{ fontWeight: 700 }}>${benchmark.toLocaleString()}</span>
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ fontWeight: 700 }}>${benchmark.toLocaleString()}</span>
+            {trendLabel && <div style={{ fontSize: 11, color: trendColour, marginTop: 1 }}>{trendLabel}</div>}
+          </div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+          <span style={{ color: 'var(--muted)' }}>Demand</span>
+          <span style={{ fontWeight: 700, color: demandColour }}>{demand}</span>
         </div>
         {lastSalePrice && (
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>

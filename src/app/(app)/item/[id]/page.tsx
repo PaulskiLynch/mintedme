@@ -44,7 +44,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
   const item    = edition.item
   const isOwner = session?.user?.id === edition.currentOwnerId
 
-  const [userData, wishlistEntry, ownerRareCount] = await Promise.all([
+  const [userData, wishlistEntry, ownerRareCount, wishlistCount, claimedCount] = await Promise.all([
     session?.user?.id
       ? prisma.user.findUnique({ where: { id: session.user.id }, select: { balance: true } })
       : null,
@@ -53,12 +53,11 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
       : null,
     edition.currentOwnerId
       ? prisma.itemEdition.count({
-          where: {
-            currentOwnerId: edition.currentOwnerId,
-            item: { rarityTier: { in: ['Exotic', 'Legendary', 'Mythic'] } },
-          },
+          where: { currentOwnerId: edition.currentOwnerId, item: { rarityTier: { in: ['Exotic', 'Legendary', 'Mythic'] } } },
         })
       : Promise.resolve(0),
+    prisma.wishlist.count({ where: { itemId: item.id } }),
+    prisma.itemEdition.count({ where: { itemId: item.id, currentOwnerId: { not: null } } }),
   ])
 
   const topOffer = edition.offers[0]?.amount?.toString() ?? null
@@ -69,8 +68,13 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
   ])
   const allowedEditions = Math.min(item.totalSupply, maxEditions(item.rarityTier, userCount))
   const supplyLocked    = !!edition.currentOwnerId && mintedCount >= allowedEditions
-  const supplyInfo      = `${mintedCount} minted · ${allowedEditions} unlocked · ${item.totalSupply.toLocaleString()} max supply`
+  const availableNow    = Math.max(0, allowedEditions - claimedCount)
   const upkeep          = weeklyUpkeep(item.rarityTier, Number(item.benchmarkPrice))
+
+  // Trend: % diff between benchmark and last sale price
+  const trendPct = edition.lastSalePrice
+    ? Number((((Number(item.benchmarkPrice) - Number(edition.lastSalePrice)) / Number(edition.lastSalePrice)) * 100).toFixed(1))
+    : null
 
   const activeAuction = edition.isInAuction
     ? await prisma.auction.findFirst({
@@ -204,7 +208,12 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
               topOffer={topOffer}
               weeklyUpkeep={upkeep}
               supplyLocked={supplyLocked}
-              supplyInfo={supplyInfo}
+              availableNow={availableNow}
+              alreadyClaimed={claimedCount}
+              totalEver={item.totalSupply}
+              watcherCount={wishlistCount}
+              pendingOfferCount={edition.offers.length}
+              trendPct={trendPct}
             />
 
             {!isOwner && (
@@ -212,6 +221,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                 itemId={item.id}
                 userId={session?.user?.id ?? null}
                 initialWishlisted={!!wishlistEntry}
+                initialCount={wishlistCount}
               />
             )}
 
