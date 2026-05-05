@@ -192,6 +192,11 @@ input, textarea, select { font-family: inherit; }
   50%       { box-shadow: 0 0 50px #c8a96e80; }
 }
 
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
 /* ── Class badges ─────────────────────────────── */
 .class-badge {
   display: inline-block;

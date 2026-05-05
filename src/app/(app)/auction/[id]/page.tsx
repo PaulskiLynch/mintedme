@@ -10,27 +10,36 @@ export default async function AuctionPage({ params }: { params: Promise<{ id: st
   const { id } = await params
   const session = await auth()
 
-  const auction = await prisma.auction.findUnique({
-    where: { id },
-    include: {
-      edition: {
-        include: {
-          item: { select: { name: true, imageUrl: true, category: true, class: true } },
+  const [auction, initialMessages] = await Promise.all([
+    prisma.auction.findUnique({
+      where: { id },
+      include: {
+        edition: {
+          include: {
+            item: { select: { name: true, imageUrl: true, category: true, class: true } },
+          },
+        },
+        seller:        { select: { id: true, username: true } },
+        currentWinner: { select: { username: true } },
+        bids: {
+          include: { user: { select: { username: true } } },
+          orderBy: { amount: 'desc' },
+          take: 20,
         },
       },
-      seller:        { select: { id: true, username: true } },
-      currentWinner: { select: { username: true } },
-      bids: {
-        include: { user: { select: { username: true } } },
-        orderBy: { amount: 'desc' },
-        take: 20,
-      },
-    },
-  })
+    }),
+    prisma.auctionMessage.findMany({
+      where: { auctionId: id },
+      include: { user: { select: { username: true, avatarUrl: true } } },
+      orderBy: { createdAt: 'asc' },
+      take: 100,
+    }),
+  ])
+
   if (!auction) notFound()
 
   const userData = session?.user?.id
-    ? await prisma.user.findUnique({ where: { id: session.user.id }, select: { balance: true } })
+    ? await prisma.user.findUnique({ where: { id: session.user.id }, select: { balance: true, username: true } })
     : null
 
   const isSeller = session?.user?.id === auction.sellerId
@@ -38,7 +47,7 @@ export default async function AuctionPage({ params }: { params: Promise<{ id: st
   return (
     <div>
       <div style={{ marginBottom: 20 }}>
-        <Link href="/marketplace" style={{ color: 'var(--muted)', fontSize: 13 }}>← Marketplace</Link>
+        <Link href="/auctions" style={{ color: 'var(--muted)', fontSize: 13 }}>← Auctions</Link>
       </div>
       <div style={{ marginBottom: 20 }}>
         <div className="page-title" style={{ marginBottom: 4 }}>Live Auction</div>
@@ -64,7 +73,14 @@ export default async function AuctionPage({ params }: { params: Promise<{ id: st
         }))}
         userId={session?.user?.id ?? null}
         userBalance={userData?.balance?.toString() ?? null}
+        userUsername={userData?.username ?? null}
         isSeller={isSeller}
+        initialMessages={initialMessages.map((m: typeof initialMessages[0]) => ({
+          id: m.id,
+          message: m.message,
+          createdAt: m.createdAt.toISOString(),
+          user: m.user,
+        }))}
       />
     </div>
   )

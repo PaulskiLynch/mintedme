@@ -38,6 +38,8 @@ model User {
   auctionsAsSeller   Auction[]          @relation("AuctionSeller")
   auctionWins        Auction[]          @relation("AuctionWinner")
   bids               Bid[]
+  maxBids            MaxBid[]
+  auctionMessages    AuctionMessage[]
   reports            Report[]
 
   @@map("users")
@@ -166,10 +168,12 @@ model Auction {
   endsAt          DateTime
   createdAt       DateTime @default(now())
 
-  edition       ItemEdition @relation(fields: [editionId], references: [id])
-  seller        User        @relation("AuctionSeller", fields: [sellerId], references: [id])
-  currentWinner User?       @relation("AuctionWinner", fields: [currentWinnerId], references: [id])
+  edition       ItemEdition      @relation(fields: [editionId], references: [id])
+  seller        User             @relation("AuctionSeller", fields: [sellerId], references: [id])
+  currentWinner User?            @relation("AuctionWinner", fields: [currentWinnerId], references: [id])
   bids          Bid[]
+  maxBids       MaxBid[]
+  messages      AuctionMessage[]
 
   @@map("auctions")
 }
@@ -268,6 +272,33 @@ model Report {
   edition  ItemEdition? @relation(fields: [editionId], references: [id])
 
   @@map("reports")
+}
+
+model MaxBid {
+  id        String   @id @default(uuid())
+  auctionId String
+  userId    String
+  maxAmount Decimal  @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+
+  auction Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([auctionId, userId])
+  @@map("max_bids")
+}
+
+model AuctionMessage {
+  id        String   @id @default(uuid())
+  auctionId String
+  userId    String
+  message   String   @db.VarChar(500)
+  createdAt DateTime @default(now())
+
+  auction Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@map("auction_messages")
 }
 
 model PriceHistory {
