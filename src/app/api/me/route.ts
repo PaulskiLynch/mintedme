@@ -6,7 +6,7 @@ export async function PATCH(req: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { username, tagline, avatarUrl } = await req.json()
+  const { username, tagline, avatarUrl, interests } = await req.json()
 
   if (username !== undefined) {
     if (typeof username !== 'string' || username.trim().length < 3)
@@ -26,6 +26,7 @@ export async function PATCH(req: Request) {
       ...(username  !== undefined && { username:  username.trim().toLowerCase() }),
       ...(tagline   !== undefined && { tagline:   tagline.trim().slice(0, 120) || null }),
       ...(avatarUrl !== undefined && { avatarUrl: avatarUrl.trim() || null }),
+      ...(interests !== undefined && { interests: Array.isArray(interests) ? interests : [] }),
     },
     select: { username: true, tagline: true, avatarUrl: true },
   })

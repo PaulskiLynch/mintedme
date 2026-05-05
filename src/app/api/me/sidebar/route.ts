@@ -1,9 +1,6 @@
-import { redirect } from 'next/navigation'
+import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
-import FeedClient from './FeedClient'
-
-export const dynamic = 'force-dynamic'
 
 function onlineStatus(lastSeen: Date | null): 'online' | 'idle' | 'offline' {
   if (!lastSeen) return 'offline'
@@ -13,29 +10,11 @@ function onlineStatus(lastSeen: Date | null): 'online' | 'idle' | 'offline' {
   return 'offline'
 }
 
-export default async function FeedPage() {
+export async function GET() {
   const session = await auth()
-  if (!session?.user?.id) redirect('/login')
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const [events, userFull, watchedItems, activeBidAuctions, liveAuctions, followingUsers, likedIds] = await Promise.all([
-    prisma.feedEvent.findMany({
-      where: { isVisible: true },
-      orderBy: { createdAt: 'desc' },
-      take: 60,
-      include: {
-        user:       { select: { username: true, avatarUrl: true } },
-        targetUser: { select: { username: true } },
-        edition:    { include: { item: { select: { name: true, imageUrl: true, category: true } } } },
-        _count:     { select: { likes: true, comments: true } },
-      },
-    }),
-    prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: {
-        username: true, tagline: true, avatarUrl: true, balance: true, interests: true,
-        _count: { select: { followers: true, following: true } },
-      },
-    }),
+  const [watchedItems, activeBidAuctions, liveAuctions, followingUsers] = await Promise.all([
     prisma.watchedItem.findMany({
       where: { userId: session.user.id },
       include: {
@@ -64,26 +43,7 @@ export default async function FeedPage() {
       where: { followerId: session.user.id },
       include: { following: { select: { id: true, username: true, avatarUrl: true, lastSeenAt: true } } },
     }),
-    prisma.feedLike.findMany({
-      where: { userId: session.user.id },
-      select: { feedEventId: true },
-    }),
   ])
-
-  if (!userFull) redirect('/login')
-
-  const serialisedEvents = events.map((e: typeof events[0]) => ({
-    id:           e.id,
-    eventType:    e.eventType,
-    amount:       e.amount?.toString() ?? null,
-    createdAt:    e.createdAt.toISOString(),
-    likeCount:    e._count.likes,
-    commentCount: e._count.comments,
-    metadata:     e.metadata as Record<string, unknown> | null,
-    user:         e.user,
-    targetUser:   e.targetUser,
-    edition:      e.edition ? { id: e.edition.id, item: e.edition.item } : null,
-  }))
 
   const watching = watchedItems.map((w: typeof watchedItems[0]) => {
     const auction = w.edition.auctions[0] ?? null
@@ -124,24 +84,5 @@ export default async function FeedPage() {
     status:    onlineStatus(f.following.lastSeenAt),
   }))
 
-  return (
-    <FeedClient
-      userId={session.user.id}
-      userProfile={{
-        username:       userFull.username,
-        tagline:        userFull.tagline,
-        avatarUrl:      userFull.avatarUrl,
-        balance:        userFull.balance.toString(),
-        followersCount: userFull._count.followers,
-        followingCount: userFull._count.following,
-      }}
-      initialEvents={serialisedEvents}
-      initialWatching={watching}
-      initialBids={bids}
-      initialAuctions={auctions}
-      initialFriends={friends}
-      initialInterests={(userFull.interests as string[] | null) ?? []}
-      likedEventIds={likedIds.map((l: { feedEventId: string }) => l.feedEventId)}
-    />
-  )
+  return NextResponse.json({ watching, bids, auctions, friends })
 }

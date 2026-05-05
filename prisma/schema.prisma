@@ -35,11 +35,18 @@ model User {
   createdItems       Item[]             @relation("ItemCreator")
   submissions        CreatorSubmission[]
   ownerships         Ownership[]
+  interests          Json?
+  lastSeenAt         DateTime?
+
   auctionsAsSeller   Auction[]          @relation("AuctionSeller")
   auctionWins        Auction[]          @relation("AuctionWinner")
   bids               Bid[]
   maxBids            MaxBid[]
   auctionMessages    AuctionMessage[]
+  followers          Follow[]           @relation("Following")
+  following          Follow[]           @relation("Follower")
+  feedLikes          FeedLike[]
+  feedComments       FeedComment[]
   reports            Report[]
 
   @@map("users")
@@ -206,6 +213,8 @@ model FeedEvent {
   user       User?        @relation("FeedActor", fields: [userId], references: [id])
   targetUser User?        @relation("FeedTarget", fields: [targetUserId], references: [id])
   edition    ItemEdition? @relation(fields: [editionId], references: [id])
+  likes      FeedLike[]
+  comments   FeedComment[]
 
   @@map("feed_events")
 }
@@ -272,6 +281,43 @@ model Report {
   edition  ItemEdition? @relation(fields: [editionId], references: [id])
 
   @@map("reports")
+}
+
+model Follow {
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("Follower",  fields: [followerId],  references: [id], onDelete: Cascade)
+  following User @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@id([followerId, followingId])
+  @@map("follows")
+}
+
+model FeedLike {
+  userId      String
+  feedEventId String
+  createdAt   DateTime @default(now())
+
+  user      User      @relation(fields: [userId],      references: [id], onDelete: Cascade)
+  feedEvent FeedEvent @relation(fields: [feedEventId], references: [id], onDelete: Cascade)
+
+  @@id([userId, feedEventId])
+  @@map("feed_likes")
+}
+
+model FeedComment {
+  id          String   @id @default(uuid())
+  feedEventId String
+  userId      String
+  message     String   @db.VarChar(500)
+  createdAt   DateTime @default(now())
+
+  feedEvent FeedEvent @relation(fields: [feedEventId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId],      references: [id])
+
+  @@map("feed_comments")
 }
 
 model MaxBid {
