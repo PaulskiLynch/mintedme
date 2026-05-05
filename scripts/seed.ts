@@ -55,7 +55,7 @@ async function main() {
     { key: 'porsche',   name: 'Vintage Porsche 959',    category: 'cars',        class: 'elite',   referencePrice: 28_000,  totalSupply: 10, imageUrl: 'https://images.unsplash.com/photo-1544636331-e26879cd4d9b?w=400&fit=crop' },
     { key: 'patek',     name: 'Patek Philippe Royal',   category: 'watches',     class: 'grail',   referencePrice: 85_000,  totalSupply: 3,  imageUrl: 'https://images.unsplash.com/photo-1523170335258-f5ed11844a49?w=400&fit=crop' },
     { key: 'canvas',    name: 'Midnight Canvas',        category: 'art',         class: 'elite',   referencePrice: 12_000,  totalSupply: 10, imageUrl: 'https://images.unsplash.com/photo-1578301978018-3005759f48f7?w=400&fit=crop' },
-    { key: 'cafe',      name: 'Midnight Café Chain',    category: 'businesses',  class: 'elite',   referencePrice: 120_000, totalSupply: 5,  imageUrl: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=400&fit=crop' },
+    { key: 'cafe',      name: 'Midnight Café Chain',    category: 'businesses',  class: 'elite',   referencePrice: 120_000, totalSupply: 5,  imageUrl: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=400&fit=crop', hasIncome: true, incomePerView: 40 },
     { key: 'yacht',     name: 'Pacific Blue Yacht',     category: 'yachts',      class: 'grail',   referencePrice: 180_000, totalSupply: 3,  imageUrl: 'https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?w=400&fit=crop' },
   ]
 
@@ -67,7 +67,13 @@ async function main() {
       continue
     }
     const item = await prisma.item.create({
-      data: { name: def.name, category: def.category, class: def.class, referencePrice: def.referencePrice, totalSupply: def.totalSupply, imageUrl: def.imageUrl, isApproved: true },
+      data: {
+        name: def.name, category: def.category, class: def.class,
+        referencePrice: def.referencePrice, totalSupply: def.totalSupply,
+        imageUrl: def.imageUrl, isApproved: true,
+        hasIncome: (def as { hasIncome?: boolean }).hasIncome ?? false,
+        incomePerView: (def as { incomePerView?: number }).incomePerView ?? undefined,
+      },
     })
     itemIds[def.key] = item.id
   }

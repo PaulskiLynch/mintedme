@@ -65,6 +65,8 @@ model Item {
   maxPriceBand     Decimal? @db.Decimal(12, 2)
   hasOwnershipCost Boolean  @default(false)
   ownershipCostPct Decimal? @db.Decimal(5, 4)
+  hasIncome        Boolean  @default(false)
+  incomePerView    Decimal? @db.Decimal(10, 2)
   creatorId        String?
   isOfficial       Boolean  @default(true)
   isApproved       Boolean  @default(true)
@@ -90,6 +92,7 @@ model ItemEdition {
   listedPrice    Decimal?  @db.Decimal(12, 2)
   isInAuction    Boolean   @default(false)
   isFrozen       Boolean   @default(false)
+  lastIncomeAt   DateTime?
   createdAt      DateTime  @default(now())
 
   item         Item           @relation(fields: [itemId], references: [id], onDelete: Cascade)
@@ -102,6 +105,7 @@ model ItemEdition {
   auctions     Auction[]
   priceHistory PriceHistory[]
   reports      Report[]
+  views        ItemView[]
 
   @@unique([itemId, editionNumber])
   @@map("item_editions")
@@ -358,4 +362,15 @@ model PriceHistory {
   edition ItemEdition @relation(fields: [editionId], references: [id], onDelete: Cascade)
 
   @@map("price_history")
+}
+
+model ItemView {
+  id        String   @id @default(uuid())
+  editionId String
+  userId    String?
+  createdAt DateTime @default(now())
+
+  edition ItemEdition @relation(fields: [editionId], references: [id], onDelete: Cascade)
+
+  @@map("item_views")
 }

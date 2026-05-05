@@ -51,6 +51,7 @@ const TYPE_INFO: Record<string, { label: string; css: string }> = {
   create_item:   { label: 'NEW ITEM',    css: 'new-item'    },
   post:          { label: 'POST',        css: 'post'        },
   achievement:   { label: 'ACHIEVEMENT', css: 'achievement' },
+  income:        { label: 'INCOME',      css: 'achievement' },
   market_event:  { label: 'MARKET',      css: 'market'      },
 }
 
@@ -129,7 +130,7 @@ function metaLine(e: FeedEvent): string {
 }
 
 function isVisible(e: FeedEvent): boolean {
-  if (e.eventType === 'market_event' || e.eventType === 'achievement') {
+  if (e.eventType === 'market_event' || e.eventType === 'achievement' || e.eventType === 'income') {
     return !!e.metadata?.title
   }
   if (e.eventType === 'post') {
@@ -546,6 +547,7 @@ export default function FeedClient({
     ? visibleEvents.filter(e =>
         e.edition?.item.category === filter.toLowerCase() ||
         e.eventType === 'achievement' ||
+        e.eventType === 'income' ||
         e.eventType === 'market_event'
       )
     : visibleEvents
@@ -592,6 +594,7 @@ export default function FeedClient({
           </div>
         ) : filteredEvents.map(e => {
           if (e.eventType === 'achievement') return <AchievementCard key={e.id} event={e} />
+          if (e.eventType === 'income')      return <AchievementCard key={e.id} event={e} />
           if (e.eventType === 'market_event') return <MarketCard key={e.id} event={e} />
           return (
             <FeedPost

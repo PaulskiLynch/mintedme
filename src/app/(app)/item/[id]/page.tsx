@@ -31,6 +31,11 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
   })
   if (!edition) notFound()
 
+  // Log view (fire-and-forget — don't await, never block render)
+  if (edition.item.hasIncome) {
+    prisma.itemView.create({ data: { editionId: id, userId: session?.user?.id ?? undefined } }).catch(() => {})
+  }
+
   const item = edition.item
   const isOwner  = session?.user?.id === edition.currentOwnerId
   const userData = session?.user?.id
