@@ -48,11 +48,7 @@ input, textarea, select { font-family: inherit; }
 }
 
 .sidebar-logo {
-  padding: 0 20px 24px;
-  font-size: 22px;
-  font-weight: 900;
-  color: var(--gold);
-  letter-spacing: -0.5px;
+  padding: 0 16px 20px;
 }
 
 .sidebar-user {
@@ -522,7 +518,7 @@ textarea.form-input { resize: vertical; min-height: 80px; }
     padding: 0 16px;
     z-index: 100;
   }
-  .mobile-logo    { font-size: 18px; font-weight: 900; color: var(--gold); letter-spacing: -0.5px; }
+  .mobile-logo    { display: block; }
   .mobile-balance { font-size: 13px; font-weight: 700; color: var(--gold); }
 
   /* ── Bottom nav ── */
