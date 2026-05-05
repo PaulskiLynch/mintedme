@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     const result = await prisma.$transaction(async (tx) => {
       const edition = await tx.itemEdition.findUnique({
         where: { id: editionId },
-        include: { item: { select: { benchmarkPrice: true, rarityTier: true, minimumBid: true } } },
+        include: { item: { select: { benchmarkPrice: true, rarityTier: true, minimumBid: true, name: true } } },
       })
       if (!edition) throw new Error('Edition not found')
       if (edition.currentOwnerId !== session.user.id) throw new Error('Not your item')
@@ -37,6 +37,23 @@ export async function POST(req: NextRequest) {
         where: { id: editionId },
         data: { isInAuction: true, isListed: false, listedPrice: null },
       })
+
+      // Notify users who have this item on their wishlist
+      const wishlisters = await tx.wishlist.findMany({
+        where: { itemId: edition.itemId, userId: { not: session.user.id } },
+        select: { userId: true },
+      })
+      if (wishlisters.length > 0) {
+        await tx.notification.createMany({
+          data: wishlisters.map(w => ({
+            userId:          w.userId,
+            type:            'wishlist_auction',
+            message:         `${edition.item.name} is now in auction — place your bid!`,
+            relatedEntityId: auction.id,
+            actionUrl:       `/auction/${auction.id}`,
+          })),
+        })
+      }
 
       return { ok: true, auctionId: auction.id }
     })

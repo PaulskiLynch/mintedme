@@ -33,6 +33,7 @@ model User {
   feedEventsTargeted FeedEvent[]        @relation("FeedTarget")
   notifications      Notification[]
   watchedItems       WatchedItem[]
+  wishlist           Wishlist[]
   createdItems       Item[]             @relation("ItemCreator")
   submissions        CreatorSubmission[]
   ownerships         Ownership[]
@@ -75,8 +76,9 @@ model Item {
   itemStatus       String   @default("active")        // draft | active | retired
   createdAt        DateTime @default(now())
 
-  creator  User?         @relation("ItemCreator", fields: [creatorId], references: [id])
-  editions ItemEdition[]
+  creator   User?      @relation("ItemCreator", fields: [creatorId], references: [id])
+  editions  ItemEdition[]
+  wishlistedBy Wishlist[]
 
   @@map("items")
 }
@@ -255,6 +257,18 @@ model WatchedItem {
 
   @@id([userId, editionId])
   @@map("watched_items")
+}
+
+model Wishlist {
+  userId    String
+  itemId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@id([userId, itemId])
+  @@map("wishlists")
 }
 
 model CreatorSubmission {

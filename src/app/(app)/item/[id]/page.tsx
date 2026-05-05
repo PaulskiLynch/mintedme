@@ -4,6 +4,7 @@ import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
 import { maxEditions } from '@/lib/supply'
 import ItemActions from './ItemActions'
+import WishlistButton from './WishlistButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,9 +38,14 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
 
   const item    = edition.item
   const isOwner = session?.user?.id === edition.currentOwnerId
-  const userData = session?.user?.id
-    ? await prisma.user.findUnique({ where: { id: session.user.id }, select: { balance: true } })
-    : null
+  const [userData, wishlistEntry] = await Promise.all([
+    session?.user?.id
+      ? prisma.user.findUnique({ where: { id: session.user.id }, select: { balance: true } })
+      : null,
+    session?.user?.id
+      ? prisma.wishlist.findUnique({ where: { userId_itemId: { userId: session.user.id, itemId: item.id } } })
+      : null,
+  ])
 
   const topOffer = edition.offers[0]?.amount?.toString() ?? null
 
@@ -182,6 +188,14 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
               supplyLocked={supplyLocked}
               supplyInfo={supplyInfo}
             />
+
+            {!isOwner && (
+              <WishlistButton
+                itemId={item.id}
+                userId={session?.user?.id ?? null}
+                initialWishlisted={!!wishlistEntry}
+              />
+            )}
 
             {isOwner && edition.offers.length > 0 && (
               <div style={{ marginTop: 24, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
