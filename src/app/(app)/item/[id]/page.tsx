@@ -8,6 +8,11 @@ import WishlistButton from './WishlistButton'
 
 export const dynamic = 'force-dynamic'
 
+function weeklyUpkeep(rarityTier: string, benchmarkPrice: number): number {
+  const rates: Record<string, number> = { Exotic: 0.001, Legendary: 0.0025, Mythic: 0.003 }
+  return Math.round(benchmarkPrice * (rates[rarityTier] ?? 0))
+}
+
 export default async function ItemPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const session = await auth()
@@ -16,7 +21,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
     where: { id },
     include: {
       item: true,
-      currentOwner: { select: { id: true, username: true, avatarUrl: true } },
+      currentOwner: { select: { id: true, username: true, avatarUrl: true, lastSeenAt: true } },
       offers: {
         where: { status: 'pending' },
         include: { buyer: { select: { username: true } } },
@@ -38,13 +43,22 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
 
   const item    = edition.item
   const isOwner = session?.user?.id === edition.currentOwnerId
-  const [userData, wishlistEntry] = await Promise.all([
+
+  const [userData, wishlistEntry, ownerRareCount] = await Promise.all([
     session?.user?.id
       ? prisma.user.findUnique({ where: { id: session.user.id }, select: { balance: true } })
       : null,
     session?.user?.id
       ? prisma.wishlist.findUnique({ where: { userId_itemId: { userId: session.user.id, itemId: item.id } } })
       : null,
+    edition.currentOwnerId
+      ? prisma.itemEdition.count({
+          where: {
+            currentOwnerId: edition.currentOwnerId,
+            item: { rarityTier: { in: ['Exotic', 'Legendary', 'Mythic'] } },
+          },
+        })
+      : Promise.resolve(0),
   ])
 
   const topOffer = edition.offers[0]?.amount?.toString() ?? null
@@ -56,6 +70,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
   const allowedEditions = Math.min(item.totalSupply, maxEditions(item.rarityTier, userCount))
   const supplyLocked    = !!edition.currentOwnerId && mintedCount >= allowedEditions
   const supplyInfo      = `${mintedCount} minted · ${allowedEditions} unlocked · ${item.totalSupply.toLocaleString()} max supply`
+  const upkeep          = weeklyUpkeep(item.rarityTier, Number(item.benchmarkPrice))
 
   const activeAuction = edition.isInAuction
     ? await prisma.auction.findFirst({
@@ -71,7 +86,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
       </div>
 
       <div className="item-detail">
-        {/* Left: image */}
+        {/* Left: image + stats + history */}
         <div>
           <div className="item-detail-img">
             {item.imageUrl
@@ -82,6 +97,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
           {item.description && (
             <p style={{ marginTop: 16, color: 'var(--muted)', fontSize: 14, lineHeight: 1.6 }}>{item.description}</p>
           )}
+
           {/* Performance stats */}
           {(item.horsepower || item.topSpeed || item.zeroToHundred) && (
             <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
@@ -154,20 +170,14 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
               </div>
             )}
 
-            {topOffer && (
-              <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 4 }}>
-                Highest offer: <span style={{ color: 'var(--green)', fontWeight: 700 }}>${Number(topOffer).toLocaleString()}</span>
-              </div>
-            )}
-
-            <div className="item-owner-link">
+            <div className="item-owner-link" style={{ marginBottom: 16 }}>
               {edition.currentOwner
                 ? <>Owned by <Link href={`/mint/${edition.currentOwner.username}`}>@{edition.currentOwner.username}</Link></>
                 : 'Available — no owner yet'}
             </div>
 
             {activeAuction && (
-              <Link href={`/auction/${activeAuction.id}`} className="btn btn-gold btn-full btn-lg" style={{ textDecoration: 'none', display: 'block', textAlign: 'center', marginBottom: 12 }}>
+              <Link href={`/auction/${activeAuction.id}`} className="btn btn-gold btn-full btn-lg" style={{ textDecoration: 'none', display: 'block', textAlign: 'center', marginBottom: 16 }}>
                 Live auction · {activeAuction._count.bids} bid{activeAuction._count.bids !== 1 ? 's' : ''} · Place sealed bid →
               </Link>
             )}
@@ -176,6 +186,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
               editionId={edition.id}
               itemId={item.id}
               itemName={item.name}
+              rarityTier={item.rarityTier}
               isOwner={isOwner}
               isListed={edition.isListed}
               listedPrice={edition.listedPrice?.toString() ?? null}
@@ -184,7 +195,14 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
               userId={session?.user?.id ?? null}
               userBalance={userData?.balance?.toString() ?? null}
               currentOwnerId={edition.currentOwnerId}
+              ownerUsername={edition.currentOwner?.username ?? null}
+              ownerLastSeenAt={edition.currentOwner?.lastSeenAt?.toISOString() ?? null}
+              ownerRareCount={ownerRareCount}
               minimumBid={item.minimumBid.toString()}
+              benchmarkPrice={item.benchmarkPrice.toString()}
+              lastSalePrice={edition.lastSalePrice?.toString() ?? null}
+              topOffer={topOffer}
+              weeklyUpkeep={upkeep}
               supplyLocked={supplyLocked}
               supplyInfo={supplyInfo}
             />
@@ -199,7 +217,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
 
             {isOwner && edition.offers.length > 0 && (
               <div style={{ marginTop: 24, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Incoming Offers</div>
+                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Incoming Offers ({edition.offers.length})</div>
                 {edition.offers.map((o: typeof edition.offers[0]) => (
                   <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
                     <span style={{ color: 'var(--muted)' }}>@{o.buyer.username}</span>
