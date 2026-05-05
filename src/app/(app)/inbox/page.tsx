@@ -11,10 +11,7 @@ export default async function InboxPage() {
 
   const userId = session.user.id
 
-  // Mark all notifications read
-  await prisma.notification.updateMany({ where: { userId, isRead: false }, data: { isRead: true } })
-
-  const [incoming, outgoing, notifications] = await Promise.all([
+  const [incoming, outgoing] = await Promise.all([
     prisma.offer.findMany({
       where: { edition: { currentOwnerId: userId }, status: 'pending' },
       include: {
@@ -31,18 +28,12 @@ export default async function InboxPage() {
       orderBy: { createdAt: 'desc' },
       take: 30,
     }),
-    prisma.notification.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-    }),
   ])
 
   return (
     <InboxClient
       incoming={incoming.map((o: typeof incoming[0]) => ({ ...o, amount: o.amount.toString(), expiresAt: o.expiresAt.toISOString(), createdAt: o.createdAt.toISOString(), updatedAt: o.updatedAt.toISOString(), edition: { ...o.edition, lastSalePrice: o.edition.lastSalePrice?.toString() ?? null, listedPrice: o.edition.listedPrice?.toString() ?? null, highestOffer: o.edition.highestOffer?.toString() ?? null } }))}
       outgoing={outgoing.map((o: typeof outgoing[0]) => ({ ...o, amount: o.amount.toString(), expiresAt: o.expiresAt.toISOString(), createdAt: o.createdAt.toISOString(), updatedAt: o.updatedAt.toISOString(), edition: { ...o.edition, lastSalePrice: o.edition.lastSalePrice?.toString() ?? null, listedPrice: o.edition.listedPrice?.toString() ?? null, highestOffer: o.edition.highestOffer?.toString() ?? null } }))}
-      notifications={notifications.map((n: typeof notifications[0]) => ({ ...n, createdAt: n.createdAt.toISOString() }))}
     />
   )
 }

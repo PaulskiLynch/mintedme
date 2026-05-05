@@ -11,11 +11,21 @@ interface Props {
 }
 
 const NAV = [
-  { href: '/feed',        label: 'Feed',        icon: '◎' },
-  { href: '/marketplace', label: 'Market',       icon: '◈' },
-  { href: '/auctions',    label: 'Auctions',     icon: '⏱' },
-  { href: '/mint',        label: 'My Mint',      icon: '◆' },
-  { href: '/inbox',       label: 'Inbox',        icon: '🔔' },
+  { href: '/feed',          label: 'Feed',          icon: '◎' },
+  { href: '/marketplace',   label: 'Market',         icon: '◈' },
+  { href: '/auctions',      label: 'Auctions',       icon: '⏱' },
+  { href: '/leaderboard',   label: 'Leaderboard',    icon: '▲' },
+  { href: '/mint',          label: 'My Mint',        icon: '◆' },
+  { href: '/inbox',         label: 'Inbox',          icon: '✉' },
+  { href: '/notifications', label: 'Notifications',  icon: '🔔' },
+]
+
+const MOBILE_NAV = [
+  { href: '/feed',          label: 'Feed',    icon: '◎' },
+  { href: '/marketplace',   label: 'Market',  icon: '◈' },
+  { href: '/leaderboard',   label: 'Ranks',   icon: '▲' },
+  { href: '/mint',          label: 'Mint',    icon: '◆' },
+  { href: '/notifications', label: 'Alerts',  icon: '🔔' },
 ]
 
 export default function Sidebar({ username, balance, isAdmin = false, unreadCount = 0 }: Props) {
@@ -37,7 +47,7 @@ export default function Sidebar({ username, balance, isAdmin = false, unreadCoun
             <Link key={n.href} href={n.href} className={`nav-link${path.startsWith(n.href) ? ' active' : ''}`}>
               <span style={{ fontSize: 16 }}>{n.icon}</span>
               {n.label}
-              {n.href === '/inbox' && unreadCount > 0 && (
+              {n.href === '/notifications' && unreadCount > 0 && (
                 <span style={{ marginLeft: 'auto', background: '#e05a5a', color: '#fff', borderRadius: 10, fontSize: 10, fontWeight: 900, padding: '1px 6px' }}>{unreadCount}</span>
               )}
             </Link>
@@ -70,11 +80,11 @@ export default function Sidebar({ username, balance, isAdmin = false, unreadCoun
 
       {/* Mobile bottom nav */}
       <nav className="mobile-nav">
-        {NAV.map(n => (
+        {MOBILE_NAV.map(n => (
           <Link key={n.href} href={n.href} className={`mobile-nav-item${path.startsWith(n.href) ? ' active' : ''}`}>
             <span className="mobile-nav-icon">{n.icon}</span>
             <span className="mobile-nav-label">{n.label}</span>
-            {n.href === '/inbox' && unreadCount > 0 && (
+            {n.href === '/notifications' && unreadCount > 0 && (
               <span style={{ position: 'absolute', top: 6, right: '50%', transform: 'translateX(8px)', background: '#e05a5a', color: '#fff', borderRadius: 8, fontSize: 9, fontWeight: 900, padding: '1px 4px' }}>{unreadCount}</span>
             )}
           </Link>
