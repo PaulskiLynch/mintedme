@@ -29,7 +29,7 @@ export default async function FeedPage() {
       include: {
         user:       { select: { username: true, avatarUrl: true } },
         targetUser: { select: { username: true, avatarUrl: true } },
-        edition:    { include: { item: { select: { name: true, imageUrl: true, category: true, referencePrice: true } } } },
+        edition:    { include: { item: { select: { name: true, imageUrl: true, category: true } } } },
         _count:     { select: { likes: true, comments: true } },
       },
     }),
@@ -45,8 +45,8 @@ export default async function FeedPage() {
       include: {
         edition: {
           include: {
-            item: { select: { name: true, imageUrl: true, referencePrice: true } },
-            auctions: { where: { status: 'active' }, select: { id: true, currentBid: true, startingBid: true, endsAt: true }, take: 1 },
+            item: { select: { name: true, imageUrl: true } },
+            auctions: { where: { status: 'active' }, select: { id: true, minimumBid: true, endsAt: true }, take: 1 },
           },
         },
       },
@@ -135,10 +135,9 @@ export default async function FeedPage() {
     edition:      e.edition ? {
       id:   e.edition.id,
       item: {
-        name:           e.edition.item.name,
-        imageUrl:       e.edition.item.imageUrl,
-        category:       e.edition.item.category,
-        referencePrice: e.edition.item.referencePrice?.toString() ?? null,
+        name:     e.edition.item.name,
+        imageUrl: e.edition.item.imageUrl,
+        category: e.edition.item.category,
       },
     } : null,
   }))
@@ -149,7 +148,7 @@ export default async function FeedPage() {
       editionId:    w.editionId,
       itemName:     w.edition.item.name,
       imageUrl:     w.edition.item.imageUrl,
-      currentPrice: (auction ? Number(auction.currentBid ?? auction.startingBid) : Number(w.edition.item.referencePrice ?? 0)).toString(),
+      currentPrice: (auction ? Number(auction.minimumBid) : 0).toString(),
       endsAt:       auction?.endsAt.toISOString() ?? null,
       auctionId:    auction?.id ?? null,
     }
@@ -161,8 +160,8 @@ export default async function FeedPage() {
     itemName:   a.edition.item.name,
     imageUrl:   a.edition.item.imageUrl,
     myBid:      a.bids[0]?.amount.toString() ?? '0',
-    currentBid: a.currentBid?.toString() ?? a.startingBid.toString(),
-    isLeading:  a.currentWinnerId === session.user.id,
+    minimumBid: a.minimumBid.toString(),
+    isLeading:  false,
     endsAt:     a.endsAt.toISOString(),
   }))
 
@@ -171,7 +170,7 @@ export default async function FeedPage() {
     editionId:  a.editionId,
     itemName:   a.edition.item.name,
     imageUrl:   a.edition.item.imageUrl,
-    currentBid: (a.currentBid ?? a.startingBid).toString(),
+    minimumBid: a.minimumBid.toString(),
     endsAt:     a.endsAt.toISOString(),
   }))
 

@@ -1,11 +1,10 @@
-import Link from 'next/link'
 import { prisma } from '@/lib/db'
 import { auth } from '@/auth'
 import MarketplaceClient from './MarketplaceClient'
 
 export const dynamic = 'force-dynamic'
 
-const CATEGORIES = ['All', 'Cars', 'Yachts', 'Watches', 'Art', 'Fashion', 'Jets', 'Mansions', 'Collectibles', 'Businesses']
+const CATEGORIES = ['All', 'Cars']
 
 export default async function MarketplacePage({
   searchParams,
@@ -18,22 +17,22 @@ export default async function MarketplacePage({
   const where = {
     isApproved: true,
     isFrozen:   false,
+    itemStatus: 'active',
     ...(category && category !== 'All' ? { category: category.toLowerCase() } : {}),
     ...(q ? { name: { contains: q, mode: 'insensitive' as const } } : {}),
   }
 
-  const orderBy = sort === 'price_asc'    ? [{ referencePrice: 'asc'  as const }]
-               : sort === 'price_desc'   ? [{ referencePrice: 'desc' as const }]
-               : sort === 'newest'       ? [{ createdAt: 'desc' as const }]
-               :                          [{ createdAt: 'desc' as const }]
+  const orderBy = sort === 'price_asc'  ? [{ minimumBid: 'asc'  as const }]
+               : sort === 'price_desc' ? [{ minimumBid: 'desc' as const }]
+               :                        [{ createdAt:   'desc' as const }]
 
   const items = await prisma.item.findMany({
     where,
     orderBy,
     include: {
       editions: {
-        where: { isFrozen: false },
-        select: { id: true, editionNumber: true, currentOwnerId: true, isListed: true, listedPrice: true, isInAuction: true, lastSalePrice: true },
+        where:   { isFrozen: false },
+        select:  { id: true, editionNumber: true, currentOwnerId: true, isListed: true, listedPrice: true, isInAuction: true, lastSalePrice: true },
         orderBy: { editionNumber: 'asc' },
         take: 50,
       },
@@ -45,10 +44,7 @@ export default async function MarketplacePage({
     <MarketplaceClient
       items={items.map((i: typeof items[0]) => ({
         ...i,
-        referencePrice:   i.referencePrice?.toString()   ?? null,
-        minPriceBand:     i.minPriceBand?.toString()     ?? null,
-        maxPriceBand:     i.maxPriceBand?.toString()     ?? null,
-        ownershipCostPct: i.ownershipCostPct?.toString() ?? null,
+        minimumBid:  i.minimumBid.toString(),
         editions: i.editions.map((e: typeof i.editions[0]) => ({
           ...e,
           listedPrice:   e.listedPrice?.toString()   ?? null,

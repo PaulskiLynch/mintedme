@@ -4,23 +4,31 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
-const CATEGORIES = ['cars', 'yachts', 'watches', 'art', 'fashion', 'jets', 'mansions', 'collectibles', 'businesses']
-const USER_CLASSES  = ['essential', 'premium', 'elite', 'grail']
-const ADMIN_CLASSES = ['essential', 'premium', 'elite', 'grail', 'unique']
+const CATEGORIES    = ['cars', 'yachts', 'watches', 'art', 'fashion', 'jets', 'mansions', 'collectibles', 'businesses']
+const USER_RARITIES  = ['Common', 'Rare', 'Exotic']
+const ADMIN_RARITIES = ['Common', 'Rare', 'Exotic', 'Legendary', 'Mythic']
 
-const CLASS_DESC: Record<string, string> = {
-  essential: '10,000 max supply · entry tier',
-  premium:   '1,000 max supply · popular tier',
-  elite:     '100 max supply · rare tier',
-  grail:     '10 max supply · ultra-rare',
-  unique:    '1 of 1 · admin only',
+const RARITY_DESC: Record<string, string> = {
+  Common:    '10 max supply · entry tier',
+  Rare:      '7 max supply · popular tier',
+  Exotic:    '5 max supply · rare tier',
+  Legendary: '3 max supply · ultra-rare',
+  Mythic:    '1 of 1 · admin only',
+}
+
+const RARITY_COLOUR: Record<string, string> = {
+  Common:    '#888',
+  Rare:      '#4ab8d8',
+  Exotic:    '#b07fef',
+  Legendary: '#e0a030',
+  Mythic:    '#e05a5a',
 }
 
 interface Submission {
   id:         string
   name:       string
   category:   string
-  class:      string
+  rarityTier: string
   isApproved: boolean
   isFrozen:   boolean
   imageUrl:   string | null
@@ -30,22 +38,20 @@ interface Submission {
 
 export default function StudioClient({ isAdmin, submissions: initial }: { isAdmin: boolean; submissions: Submission[] }) {
   const router = useRouter()
-  const [showForm, setShowForm]         = useState(false)
-  const [submissions, setSubmissions]   = useState(initial)
-  const [busy, setBusy]                 = useState(false)
-  const [error, setError]               = useState('')
-  const [success, setSuccess]           = useState('')
+  const [showForm, setShowForm]       = useState(false)
+  const [submissions, setSubmissions] = useState(initial)
+  const [busy, setBusy]               = useState(false)
+  const [error, setError]             = useState('')
+  const [success, setSuccess]         = useState('')
 
-  const [name, setName]           = useState('')
-  const [description, setDesc]    = useState('')
-  const [category, setCategory]   = useState('cars')
-  const [itemClass, setClass]     = useState('elite')
-  const [imageUrl, setImageUrl]   = useState('')
-  const [refPrice, setRefPrice]   = useState('')
-  const [hasOwnerCost, setOwnerCost] = useState(false)
-  const [ownerCostPct, setOwnerCostPct] = useState('0.5')
+  const [name, setName]             = useState('')
+  const [description, setDesc]      = useState('')
+  const [category, setCategory]     = useState('cars')
+  const [rarityTier, setRarity]     = useState('Exotic')
+  const [imageUrl, setImageUrl]     = useState('')
+  const [suggestedPrice, setPrice]  = useState('')
 
-  const classes = isAdmin ? ADMIN_CLASSES : USER_CLASSES
+  const rarities = isAdmin ? ADMIN_RARITIES : USER_RARITIES
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -53,18 +59,14 @@ export default function StudioClient({ isAdmin, submissions: initial }: { isAdmi
     const res = await fetch('/api/studio', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name, description, category, class: itemClass, imageUrl: imageUrl || null,
-        referencePrice: Number(refPrice),
-        hasOwnershipCost: hasOwnerCost,
-        ownershipCostPct: hasOwnerCost ? Number(ownerCostPct) / 100 : null,
-      }),
+      body: JSON.stringify({ name, description, category, rarityTier, imageUrl: imageUrl || null, suggestedPrice: Number(suggestedPrice) }),
     })
     const json = await res.json()
     if (res.ok) {
       setSuccess('Item submitted! It will appear in the marketplace once approved by an admin.')
       setShowForm(false)
-      setName(''); setDesc(''); setImageUrl(''); setRefPrice('')
+      setName(''); setDesc(''); setImageUrl(''); setPrice('')
+      setSubmissions(prev => [{ id: json.itemId, name, category, rarityTier, isApproved: false, isFrozen: false, imageUrl: imageUrl || null, editions: 0, createdAt: new Date().toISOString() }, ...prev])
       router.refresh()
     } else {
       setError(json.error || 'Submission failed')
@@ -74,21 +76,18 @@ export default function StudioClient({ isAdmin, submissions: initial }: { isAdmi
 
   return (
     <div style={{ marginTop: 28 }}>
-      {/* Success banner */}
       {success && (
         <div style={{ background: '#1e2a15', border: '1px solid var(--green)', borderRadius: 8, padding: '12px 16px', marginBottom: 20, color: 'var(--green)', fontSize: 13 }}>
           {success}
         </div>
       )}
 
-      {/* Submit button */}
       {!showForm && (
         <button className="btn btn-gold" onClick={() => setShowForm(true)} style={{ marginBottom: 32 }}>
           + Craft new item
         </button>
       )}
 
-      {/* Submission form */}
       {showForm && (
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: 24, marginBottom: 32 }}>
           <div style={{ fontWeight: 900, fontSize: 17, marginBottom: 20 }}>Craft a new item</div>
@@ -96,7 +95,7 @@ export default function StudioClient({ isAdmin, submissions: initial }: { isAdmi
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div className="form-group">
                 <label className="form-label">Item name</label>
-                <input className="form-input" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Matte Black G-Wagon" required maxLength={80} />
+                <input className="form-input" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Phantom GT Coupe" required maxLength={80} />
               </div>
               <div className="form-group">
                 <label className="form-label">Category</label>
@@ -111,17 +110,14 @@ export default function StudioClient({ isAdmin, submissions: initial }: { isAdmi
               <textarea className="form-input" value={description} onChange={e => setDesc(e.target.value)} placeholder="What makes this special?" rows={2} style={{ resize: 'vertical' }} maxLength={300} />
             </div>
 
-            {/* Class picker */}
             <div className="form-group">
-              <label className="form-label">Tier</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, marginTop: 6 }}>
-                {classes.map(c => (
-                  <button key={c} type="button" onClick={() => setClass(c)}
-                    style={{ padding: '10px 12px', borderRadius: 8, border: `1.5px solid ${itemClass === c ? 'var(--gold)' : 'var(--border)'}`, background: itemClass === c ? 'rgba(200,169,110,0.1)' : 'var(--bg3)', textAlign: 'left', cursor: 'pointer' }}>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: itemClass === c ? 'var(--gold)' : 'var(--white)', textTransform: 'capitalize' }}>
-                      {c} {c === 'unique' && '★'}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{CLASS_DESC[c]}</div>
+              <label className="form-label">Rarity tier</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 8, marginTop: 6 }}>
+                {rarities.map(r => (
+                  <button key={r} type="button" onClick={() => setRarity(r)}
+                    style={{ padding: '10px 12px', borderRadius: 8, border: `1.5px solid ${rarityTier === r ? RARITY_COLOUR[r] : 'var(--border)'}`, background: rarityTier === r ? RARITY_COLOUR[r] + '18' : 'var(--bg3)', textAlign: 'left', cursor: 'pointer' }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: rarityTier === r ? RARITY_COLOUR[r] : 'var(--white)' }}>{r}</div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{RARITY_DESC[r]}</div>
                   </button>
                 ))}
               </div>
@@ -129,8 +125,9 @@ export default function StudioClient({ isAdmin, submissions: initial }: { isAdmi
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div className="form-group">
-                <label className="form-label">Reference price (USD)</label>
-                <input className="form-input" type="number" min="1" value={refPrice} onChange={e => setRefPrice(e.target.value)} placeholder="e.g. 250000" required />
+                <label className="form-label">Suggested value (USD)</label>
+                <input className="form-input" type="number" min="1" value={suggestedPrice} onChange={e => setPrice(e.target.value)} placeholder="e.g. 500000" required />
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>Minimum bid will be 10% of this. Admin sets final pricing.</div>
               </div>
               <div className="form-group">
                 <label className="form-label">Image URL</label>
@@ -138,34 +135,18 @@ export default function StudioClient({ isAdmin, submissions: initial }: { isAdmi
               </div>
             </div>
 
-            <div className="form-group">
-              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13 }}>
-                <input type="checkbox" checked={hasOwnerCost} onChange={e => setOwnerCost(e.target.checked)} />
-                Has weekly ownership cost (e.g. yacht, jet, mansion)
-              </label>
-              {hasOwnerCost && (
-                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input className="form-input" type="number" min="0.1" max="5" step="0.1" value={ownerCostPct} onChange={e => setOwnerCostPct(e.target.value)} style={{ width: 100 }} />
-                  <span style={{ fontSize: 13, color: 'var(--muted)' }}>% of value per week</span>
-                </div>
-              )}
-            </div>
-
             {error && <div className="form-error">{error}</div>}
 
             <div style={{ display: 'flex', gap: 10 }}>
-              <button className="btn btn-gold" type="submit" disabled={busy || !name || !refPrice}>
+              <button className="btn btn-gold" type="submit" disabled={busy || !name || !suggestedPrice}>
                 {busy ? 'Submitting...' : 'Submit for approval'}
               </button>
-              <button className="btn btn-ghost" type="button" onClick={() => { setShowForm(false); setError('') }}>
-                Cancel
-              </button>
+              <button className="btn btn-ghost" type="button" onClick={() => { setShowForm(false); setError('') }}>Cancel</button>
             </div>
           </form>
         </div>
       )}
 
-      {/* My submissions */}
       <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--muted)', marginBottom: 14 }}>
         MY SUBMISSIONS {submissions.length > 0 && `· ${submissions.length}`}
       </div>
@@ -184,7 +165,7 @@ export default function StudioClient({ isAdmin, submissions: initial }: { isAdmi
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 700 }}>{s.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                  {s.category} · <span className={`class-badge class-${s.class}`}>{s.class}</span>
+                  {s.category} · <span style={{ color: RARITY_COLOUR[s.rarityTier] ?? 'var(--muted)', fontWeight: 700 }}>{s.rarityTier}</span>
                   {' '}· {s.editions} editions
                 </div>
               </div>

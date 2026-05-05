@@ -17,7 +17,7 @@ export default async function MintProfilePage({ params }: { params: Promise<{ us
       ownedEditions: {
         where: { isFrozen: false },
         include: {
-          item: { select: { id: true, name: true, category: true, class: true, imageUrl: true } },
+          item: { select: { id: true, name: true, category: true, rarityTier: true, imageUrl: true } },
           _count: { select: { offers: { where: { status: 'pending' } } } },
         },
         orderBy: { lastSalePrice: 'desc' },
@@ -93,7 +93,7 @@ export default async function MintProfilePage({ params }: { params: Promise<{ us
               <div className="items-grid">
                 {editions.map(e => (
                   <Link key={e.id} href={`/item/${e.id}`} style={{ textDecoration: 'none' }}>
-                    <div className={`item-card tier-${e.item.class}`} style={{ position: 'relative' }}>
+                    <div className={`item-card tier-${e.item.rarityTier.toLowerCase()}`} style={{ position: 'relative' }}>
                       {isOwn && e._count.offers > 0 && (
                         <span style={{ position: 'absolute', top: 6, right: 6, background: 'var(--gold)', color: '#000', fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 4, zIndex: 2, letterSpacing: '0.05em' }}>OFFER</span>
                       )}

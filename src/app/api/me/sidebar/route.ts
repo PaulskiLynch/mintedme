@@ -20,8 +20,8 @@ export async function GET() {
       include: {
         edition: {
           include: {
-            item: { select: { name: true, imageUrl: true, referencePrice: true } },
-            auctions: { where: { status: 'active' }, select: { id: true, currentBid: true, startingBid: true, endsAt: true }, take: 1 },
+            item:     { select: { name: true, imageUrl: true } },
+            auctions: { where: { status: 'active' }, select: { id: true, minimumBid: true, endsAt: true }, take: 1 },
           },
         },
       },
@@ -29,18 +29,18 @@ export async function GET() {
     prisma.auction.findMany({
       where: { status: 'active', bids: { some: { userId: session.user.id } } },
       include: {
-        bids: { where: { userId: session.user.id }, orderBy: { amount: 'desc' }, take: 1 },
+        bids:    { where: { userId: session.user.id }, orderBy: { amount: 'desc' }, take: 1 },
         edition: { include: { item: { select: { name: true, imageUrl: true } } } },
       },
     }),
     prisma.auction.findMany({
-      where: { status: 'active' },
+      where:   { status: 'active' },
       orderBy: { endsAt: 'asc' },
-      take: 3,
+      take:    3,
       include: { edition: { include: { item: { select: { name: true, imageUrl: true } } } } },
     }),
     prisma.follow.findMany({
-      where: { followerId: session.user.id },
+      where:   { followerId: session.user.id },
       include: { following: { select: { id: true, username: true, avatarUrl: true, lastSeenAt: true } } },
     }),
   ])
@@ -51,7 +51,7 @@ export async function GET() {
       editionId:    w.editionId,
       itemName:     w.edition.item.name,
       imageUrl:     w.edition.item.imageUrl,
-      currentPrice: (auction ? Number(auction.currentBid ?? auction.startingBid) : Number(w.edition.item.referencePrice ?? 0)).toString(),
+      currentPrice: (auction ? Number(auction.minimumBid) : 0).toString(),
       endsAt:       auction?.endsAt.toISOString() ?? null,
       auctionId:    auction?.id ?? null,
     }
@@ -63,8 +63,8 @@ export async function GET() {
     itemName:   a.edition.item.name,
     imageUrl:   a.edition.item.imageUrl,
     myBid:      a.bids[0]?.amount.toString() ?? '0',
-    currentBid: a.currentBid?.toString() ?? a.startingBid.toString(),
-    isLeading:  a.currentWinnerId === session.user.id,
+    minimumBid: a.minimumBid.toString(),
+    isLeading:  false,
     endsAt:     a.endsAt.toISOString(),
   }))
 
@@ -73,7 +73,7 @@ export async function GET() {
     editionId:  a.editionId,
     itemName:   a.edition.item.name,
     imageUrl:   a.edition.item.imageUrl,
-    currentBid: (a.currentBid ?? a.startingBid).toString(),
+    minimumBid: a.minimumBid.toString(),
     endsAt:     a.endsAt.toISOString(),
   }))
 

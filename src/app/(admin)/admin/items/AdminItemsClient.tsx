@@ -8,12 +8,12 @@ interface Item {
   id:           string
   name:         string
   category:     string
-  class:        string
+  rarityTier:   string
   imageUrl:     string | null
   isApproved:   boolean
   isFrozen:     boolean
   isOfficial:   boolean
-  referencePrice: string | null
+  minimumBid:   string
   totalSupply:  number
   editionCount: number
   creatorName:  string | null
@@ -77,9 +77,9 @@ export default function AdminItemsClient({ items: initial }: { items: Item[] }) 
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 900, fontSize: 15 }}>{item.name}</div>
               <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                {item.category} · <span className={`class-badge class-${item.class}`}>{item.class}</span>
+                {item.category} · <span style={{ color: 'var(--gold)', fontWeight: 700 }}>{item.rarityTier}</span>
                 {' '}· {item.editionCount}/{item.totalSupply} editions
-                {item.referencePrice && <> · ${Number(item.referencePrice).toLocaleString()}</>}
+                {' '}· ${Number(item.minimumBid).toLocaleString()} min bid
                 {item.creatorName && <> · by @{item.creatorName}</>}
                 {item.isOfficial && <> · <span style={{ color: 'var(--gold)' }}>official</span></>}
               </div>

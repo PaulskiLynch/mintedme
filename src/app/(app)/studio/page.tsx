@@ -13,7 +13,7 @@ export default async function StudioPage() {
     where: { creatorId: session.user.id },
     orderBy: { createdAt: 'desc' },
     select: {
-      id: true, name: true, category: true, class: true,
+      id: true, name: true, category: true, rarityTier: true,
       isApproved: true, isFrozen: true, createdAt: true, imageUrl: true,
       _count: { select: { editions: true } },
     },
@@ -29,7 +29,7 @@ export default async function StudioPage() {
           id:         s.id,
           name:       s.name,
           category:   s.category,
-          class:      s.class,
+          rarityTier: s.rarityTier,
           isApproved: s.isApproved,
           isFrozen:   s.isFrozen,
           imageUrl:   s.imageUrl,

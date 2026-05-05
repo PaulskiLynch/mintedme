@@ -14,22 +14,14 @@ export default async function AuctionPage({ params }: { params: Promise<{ id: st
     prisma.auction.findUnique({
       where: { id },
       include: {
-        edition: {
-          include: {
-            item: { select: { name: true, imageUrl: true, category: true, class: true } },
-          },
-        },
-        seller:        { select: { id: true, username: true } },
+        edition: { include: { item: { select: { name: true, imageUrl: true, rarityTier: true } } } },
+        seller:  { select: { id: true, username: true } },
         currentWinner: { select: { username: true } },
-        bids: {
-          include: { user: { select: { username: true } } },
-          orderBy: { amount: 'desc' },
-          take: 20,
-        },
+        _count:  { select: { bids: true } },
       },
     }),
     prisma.auctionMessage.findMany({
-      where: { auctionId: id },
+      where:   { auctionId: id },
       include: { user: { select: { username: true, avatarUrl: true } } },
       orderBy: { createdAt: 'asc' },
       take: 100,
@@ -38,11 +30,18 @@ export default async function AuctionPage({ params }: { params: Promise<{ id: st
 
   if (!auction) notFound()
 
-  const userData = session?.user?.id
-    ? await prisma.user.findUnique({ where: { id: session.user.id }, select: { balance: true, username: true } })
-    : null
+  const [userData, myBid] = await Promise.all([
+    session?.user?.id
+      ? prisma.user.findUnique({ where: { id: session.user.id }, select: { balance: true, lockedBalance: true, username: true } })
+      : null,
+    session?.user?.id
+      ? prisma.bid.findUnique({ where: { auctionId_userId: { auctionId: id, userId: session.user.id } }, select: { amount: true, status: true } })
+      : null,
+  ])
 
-  const isSeller = session?.user?.id === auction.sellerId
+  const isSeller   = session?.user?.id === auction.sellerId
+  const isSettled  = auction.status === 'settled'
+  const available  = userData ? Number(userData.balance) - Number(userData.lockedBalance) : 0
 
   return (
     <div>
@@ -50,7 +49,9 @@ export default async function AuctionPage({ params }: { params: Promise<{ id: st
         <Link href="/auctions" style={{ color: 'var(--muted)', fontSize: 13 }}>← Auctions</Link>
       </div>
       <div style={{ marginBottom: 20 }}>
-        <div className="page-title" style={{ marginBottom: 4 }}>Live Auction</div>
+        <div className="page-title" style={{ marginBottom: 4 }}>
+          {isSettled ? 'Settled Auction' : 'Live Auction'}
+        </div>
         <div className="page-sub">{auction.edition.item.name} · Edition #{auction.edition.editionNumber}</div>
       </div>
       <AuctionClient
@@ -59,27 +60,22 @@ export default async function AuctionPage({ params }: { params: Promise<{ id: st
         editionNum={auction.edition.editionNumber}
         imageUrl={auction.edition.item.imageUrl}
         editionId={auction.editionId}
+        rarityTier={auction.rarityTier}
         status={auction.status}
-        startingBid={auction.startingBid.toString()}
-        currentBid={auction.currentBid?.toString() ?? null}
+        minimumBid={auction.minimumBid.toString()}
         endsAt={auction.endsAt.toISOString()}
         sellerId={auction.sellerId}
-        winnerName={auction.currentWinner?.username ?? null}
-        bids={auction.bids.map((b: typeof auction.bids[0]) => ({
-          id: b.id,
-          amount: b.amount.toString(),
-          createdAt: b.createdAt.toISOString(),
-          user: b.user,
-        }))}
+        bidCount={auction._count.bids}
+        winnerName={isSettled ? (auction.currentWinner?.username ?? null) : null}
+        winningBid={isSettled ? (auction.winningBid?.toString() ?? null) : null}
+        luckyUndervalueWin={isSettled ? auction.luckyUndervalueWin : false}
+        myBid={myBid ? { amount: myBid.amount.toString(), status: myBid.status } : null}
         userId={session?.user?.id ?? null}
-        userBalance={userData?.balance?.toString() ?? null}
+        availableBalance={available.toString()}
         userUsername={userData?.username ?? null}
         isSeller={isSeller}
         initialMessages={initialMessages.map((m: typeof initialMessages[0]) => ({
-          id: m.id,
-          message: m.message,
-          createdAt: m.createdAt.toISOString(),
-          user: m.user,
+          id: m.id, message: m.message, createdAt: m.createdAt.toISOString(), user: m.user,
         }))}
       />
     </div>

@@ -31,32 +31,31 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
   })
   if (!edition) notFound()
 
-  // Log view (fire-and-forget — don't await, never block render)
   if (edition.item.hasIncome) {
     prisma.itemView.create({ data: { editionId: id, userId: session?.user?.id ?? undefined } }).catch(() => {})
   }
 
-  const item = edition.item
-  const isOwner  = session?.user?.id === edition.currentOwnerId
+  const item    = edition.item
+  const isOwner = session?.user?.id === edition.currentOwnerId
   const userData = session?.user?.id
     ? await prisma.user.findUnique({ where: { id: session.user.id }, select: { balance: true } })
     : null
 
-  const topOffer     = edition.offers[0]?.amount?.toString() ?? null
+  const topOffer = edition.offers[0]?.amount?.toString() ?? null
 
-  // Supply calculation
   const [userCount, mintedCount] = await Promise.all([
     prisma.user.count(),
     prisma.itemEdition.count({ where: { itemId: item.id } }),
   ])
-  const allowedEditions = Math.min(item.totalSupply, maxEditions(item.class, userCount))
-  // Locked only when ALL editions are owned AND we can't mint more
-  const unownedExists   = !edition.currentOwnerId  // this edition itself is available
-  const supplyLocked    = !unownedExists && mintedCount >= allowedEditions
+  const allowedEditions = Math.min(item.totalSupply, maxEditions(item.rarityTier, userCount))
+  const supplyLocked    = !!edition.currentOwnerId && mintedCount >= allowedEditions
   const supplyInfo      = `${mintedCount} minted · ${allowedEditions} unlocked · ${item.totalSupply.toLocaleString()} max supply`
 
   const activeAuction = edition.isInAuction
-    ? await prisma.auction.findFirst({ where: { editionId: id, status: 'active' }, select: { id: true, currentBid: true, startingBid: true, endsAt: true } })
+    ? await prisma.auction.findFirst({
+        where: { editionId: id, status: 'active' },
+        select: { id: true, minimumBid: true, endsAt: true, _count: { select: { bids: true } } },
+      })
     : null
 
   return (
@@ -69,23 +68,22 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
         {/* Left: image */}
         <div>
           <div className="item-detail-img">
-            {item.imageUrl ? (
-              <img src={item.imageUrl} alt={item.name} />
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)' }}>
-                No image
-              </div>
-            )}
+            {item.imageUrl
+              ? <img src={item.imageUrl} alt={item.name} />
+              : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)' }}>No image</div>
+            }
           </div>
           {item.description && (
             <p style={{ marginTop: 16, color: 'var(--muted)', fontSize: 14, lineHeight: 1.6 }}>{item.description}</p>
           )}
+          {item.inspirationName && (
+            <p style={{ marginTop: 8, color: 'var(--muted)', fontSize: 12 }}>Inspired by: {item.inspirationName}</p>
+          )}
 
-          {/* Ownership history */}
           <div style={{ marginTop: 32 }}>
             <h3 style={{ fontWeight: 900, fontSize: 16, marginBottom: 14 }}>Edition History</h3>
             {edition.ownerships.length === 0 ? (
-              <div style={{ color: 'var(--muted)', fontSize: 13 }}>No sales yet. Be the first owner.</div>
+              <div style={{ color: 'var(--muted)', fontSize: 13 }}>No sales yet.</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {edition.ownerships.map((o: typeof edition.ownerships[0]) => (
@@ -108,7 +106,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
         <div>
           <div className="item-action-box">
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-              <span className={`class-badge class-${item.class}`}>{item.class}</span>
+              <span className={`class-badge class-${item.rarityTier.toLowerCase()}`}>{item.rarityTier}</span>
               <span style={{ fontSize: 12, color: 'var(--muted)' }}>{item.category}</span>
             </div>
             <h1 style={{ fontSize: 22, fontWeight: 900, marginBottom: 4 }}>{item.name}</h1>
@@ -119,9 +117,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
             <div className="item-price-big">
               {edition.isListed && edition.listedPrice
                 ? '$' + Number(edition.listedPrice).toLocaleString()
-                : item.referencePrice
-                ? '$' + Number(item.referencePrice).toLocaleString()
-                : 'Make an offer'}
+                : '$' + Number(item.minimumBid).toLocaleString() + ' min bid'}
             </div>
 
             {topOffer && (
@@ -138,14 +134,8 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
 
             {activeAuction && (
               <Link href={`/auction/${activeAuction.id}`} className="btn btn-gold btn-full btn-lg" style={{ textDecoration: 'none', display: 'block', textAlign: 'center', marginBottom: 12 }}>
-                Live auction — ${Number(activeAuction.currentBid ?? activeAuction.startingBid).toLocaleString()} →
+                Live auction · {activeAuction._count.bids} bid{activeAuction._count.bids !== 1 ? 's' : ''} · Min ${Number(activeAuction.minimumBid).toLocaleString()} →
               </Link>
-            )}
-
-            {item.hasOwnershipCost && item.ownershipCostPct && (
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16 }}>
-                Ownership cost: {(Number(item.ownershipCostPct) * 100).toFixed(1)}%/week
-              </div>
             )}
 
             <ItemActions
@@ -160,12 +150,11 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
               userId={session?.user?.id ?? null}
               userBalance={userData?.balance?.toString() ?? null}
               currentOwnerId={edition.currentOwnerId}
-              referencePrice={item.referencePrice?.toString() ?? null}
+              minimumBid={item.minimumBid.toString()}
               supplyLocked={supplyLocked}
               supplyInfo={supplyInfo}
             />
 
-            {/* Active offers (owner view) */}
             {isOwner && edition.offers.length > 0 && (
               <div style={{ marginTop: 24, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
                 <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Incoming Offers</div>

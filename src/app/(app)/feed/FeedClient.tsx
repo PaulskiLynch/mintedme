@@ -14,16 +14,16 @@ interface FeedEvent {
   targetUser: { username: string; avatarUrl: string | null } | null
   edition: {
     id: string
-    item: { name: string; imageUrl: string | null; category: string; referencePrice: string | null }
+    item: { name: string; imageUrl: string | null; category: string }
   } | null
 }
 interface WatchItem    { editionId: string; itemName: string; imageUrl: string | null; currentPrice: string; endsAt: string | null; auctionId: string | null }
-interface ActiveBid    { auctionId: string; editionId: string; itemName: string; imageUrl: string | null; myBid: string; currentBid: string; isLeading: boolean; endsAt: string }
-interface LiveAuction  { id: string; editionId: string; itemName: string; imageUrl: string | null; currentBid: string; endsAt: string }
+interface ActiveBid    { auctionId: string; editionId: string; itemName: string; imageUrl: string | null; myBid: string; minimumBid: string; isLeading: boolean; endsAt: string }
+interface LiveAuction  { id: string; editionId: string; itemName: string; imageUrl: string | null; minimumBid: string; endsAt: string }
 interface Friend       { id: string; username: string; avatarUrl: string | null; status: 'online' | 'idle' | 'offline' }
 interface UserProfile  { username: string; tagline: string | null; avatarUrl: string | null; balance: string; followersCount: number; followingCount: number }
 interface Comment      { id: string; message: string; createdAt: string; user: { username: string; avatarUrl: string | null } }
-interface InventoryItem { editionId: string; itemName: string; imageUrl: string | null; isListed: boolean; listedPrice: string | null; lastSalePrice: string | null; referencePrice: string | null }
+interface InventoryItem { editionId: string; itemName: string; imageUrl: string | null; isListed: boolean; listedPrice: string | null; lastSalePrice: string | null; minimumBid: string | null }
 interface ClassStats   { onlineCount: number; topPlayerUsername: string | null; hotCategory: string | null }
 interface ChallengeProgress { carCount: number; hasWonAuction: boolean; hasBusiness: boolean; cashOk: boolean }
 
@@ -100,24 +100,15 @@ function metaLine(e: FeedEvent): string {
   parts.push(formatDistanceToNow(new Date(e.createdAt), { addSuffix: true }))
 
   const amt = e.amount ? fmt(e.amount) : null
-  const ref = e.edition?.item.referencePrice ? fmt(e.edition.item.referencePrice) : null
-
   switch (e.eventType) {
     case 'buy':
       if (amt) parts.push(`Paid ${amt}`)
-      if (ref && ref !== amt) parts.push(`Ref ${ref}`)
       break
     case 'sell': case 'accept':
       if (amt) parts.push(`Received ${amt}`)
       break
     case 'auction_end':
       if (amt) parts.push(`Won for ${amt}`)
-      break
-    case 'offer':
-      if (ref) parts.push(`Ref ${ref}`)
-      break
-    case 'create_item':
-      if (ref) parts.push(`Ref ${ref}`)
       break
   }
 
@@ -307,7 +298,6 @@ function FeedPost({ event, isLiked: initLiked, likeCount: initLikes, commentCoun
 
   const typeInfo = TYPE_INFO[event.eventType] ?? { label: event.eventType.toUpperCase(), css: 'post' }
   const item     = event.edition?.item
-  const refPrice = item?.referencePrice
   const meta     = metaLine(event)
   const isOwner  = event.targetUser && (event.eventType === 'sell' || event.eventType === 'accept')
 
@@ -352,7 +342,7 @@ function FeedPost({ event, isLiked: initLiked, likeCount: initLikes, commentCoun
           <input
             className="form-input" type="number" min="1" step="1"
             value={offerAmt} onChange={e => setOfferAmt(e.target.value)}
-            placeholder={refPrice ? `Ref ${fmt(refPrice)}` : 'Your offer $'}
+            placeholder="Your offer $"
             style={{ flex: 1, fontSize: 13 }} autoFocus required
           />
           <button className="btn btn-gold btn-sm" type="submit" disabled={offerBusy || !offerAmt}>{offerBusy ? '...' : 'Send'}</button>
@@ -464,7 +454,7 @@ function QuickSellModal({ onClose }: { onClose: () => void }) {
               <select className="form-input" value={selected} onChange={e => {
                 setSelected(e.target.value)
                 const it = items.find(i => i.editionId === e.target.value)
-                setPrice(it?.listedPrice ?? it?.lastSalePrice ?? it?.referencePrice ?? '')
+                setPrice(it?.listedPrice ?? it?.lastSalePrice ?? it?.minimumBid ?? '')
               }} required>
                 <option value="">Choose…</option>
                 {items.map(i => <option key={i.editionId} value={i.editionId}>{i.itemName}{i.isListed ? ' (listed)' : ''}</option>)}
@@ -686,7 +676,7 @@ export default function FeedClient({
                     <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--red)', display: 'inline-block', animation: 'pulse 1.5s infinite' }} />
                     <span style={{ fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.itemName}</span>
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>{fmt(a.currentBid)} · ends {timeLeft(a.endsAt)}</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>Min {fmt(a.minimumBid)} · ends {timeLeft(a.endsAt)}</div>
                 </div>
               </div>
               <Link href={`/auction/${a.id}`} className="btn btn-gold btn-full btn-sm" style={{ textAlign: 'center' }}>Place Bid →</Link>

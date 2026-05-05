@@ -20,7 +20,7 @@ export async function GET(req: Request) {
       isFrozen: false,
     },
     include: {
-      item: { select: { name: true, referencePrice: true, incomePerView: true, category: true } },
+      item:         { select: { name: true, minimumBid: true, incomePerView: true, category: true } },
       currentOwner: { select: { id: true, isFrozen: true } },
     },
   })
@@ -43,7 +43,7 @@ export async function GET(req: Request) {
       where: { editionId: edition.id, createdAt: { lte: now } },
     })
 
-    const refPrice  = Number(edition.item.referencePrice ?? edition.lastSalePrice ?? 0)
+    const refPrice  = Number(edition.item.minimumBid)
     const perView   = Number(edition.item.incomePerView ?? 0)
     const baseYield = refPrice * BASE_YIELD_PCT
     const viewIncome = viewCount * perView

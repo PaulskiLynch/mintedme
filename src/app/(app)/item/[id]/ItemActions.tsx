@@ -15,12 +15,12 @@ interface Props {
   userId:         string | null
   userBalance:    string | null
   currentOwnerId: string | null
-  referencePrice: string | null
+  minimumBid:     string
   supplyLocked:   boolean
   supplyInfo:     string
 }
 
-export default function ItemActions({ editionId, itemId, itemName, isOwner, isListed, listedPrice, isInAuction, isFrozen, userId, userBalance, currentOwnerId, referencePrice, supplyLocked, supplyInfo }: Props) {
+export default function ItemActions({ editionId, itemId, itemName, isOwner, isListed, listedPrice, isInAuction, isFrozen, userId, userBalance, currentOwnerId, minimumBid, supplyLocked, supplyInfo }: Props) {
   const router = useRouter()
   const [busy, setBusy]           = useState(false)
   const [error, setError]         = useState('')
@@ -28,9 +28,9 @@ export default function ItemActions({ editionId, itemId, itemName, isOwner, isLi
   const [showList, setShowList]         = useState(false)
   const [showAuction, setShowAuction]   = useState(false)
   const [offerAmt, setOfferAmt]         = useState('')
-  const [listPrice, setListPrice]       = useState(listedPrice ?? referencePrice ?? '')
+  const [listPrice, setListPrice]       = useState(listedPrice ?? minimumBid ?? '')
   const [message, setMessage]           = useState('')
-  const [startBid, setStartBid]         = useState(referencePrice ?? '')
+  const [startBid, setStartBid]         = useState(minimumBid ?? '')
   const [durationHours, setDurationHours] = useState('24')
 
   async function handleBuy() {
@@ -103,7 +103,7 @@ export default function ItemActions({ editionId, itemId, itemName, isOwner, isLi
 
   const balance  = Number(userBalance ?? 0)
   const price    = Number(listedPrice ?? 0)
-  const refPrice = Number(referencePrice ?? 0)
+  const refPrice = Number(minimumBid ?? 0)
 
   // Primary sale — no owner yet, buy at reference price
   if (!currentOwnerId) {
@@ -115,7 +115,7 @@ export default function ItemActions({ editionId, itemId, itemName, isOwner, isLi
           <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '14px 16px', fontSize: 13, color: 'var(--muted)', textAlign: 'center' }}>
             Supply locked — unlocks as more users join
           </div>
-        ) : referencePrice ? (
+        ) : minimumBid ? (
           <button className="btn btn-gold btn-full btn-lg" onClick={handleBuy} disabled={busy || !userId || balance < refPrice}>
             {busy ? 'Buying...' : `Buy now — $${refPrice.toLocaleString()}`}
           </button>
@@ -183,7 +183,7 @@ export default function ItemActions({ editionId, itemId, itemName, isOwner, isLi
             <form onSubmit={handleOffer}>
               <div className="form-group">
                 <label className="form-label">Your offer (USD)</label>
-                <input className="form-input" type="number" min="1" max={balance} value={offerAmt} onChange={e => setOfferAmt(e.target.value)} placeholder={referencePrice ? `ref: $${Number(referencePrice).toLocaleString()}` : 'Enter amount'} required autoFocus />
+                <input className="form-input" type="number" min="1" max={balance} value={offerAmt} onChange={e => setOfferAmt(e.target.value)} placeholder={minimumBid ? `ref: $${Number(minimumBid).toLocaleString()}` : 'Enter amount'} required autoFocus />
               </div>
               <div className="offer-warning">
                 Your funds will be reserved for 48 hours while the offer is active.

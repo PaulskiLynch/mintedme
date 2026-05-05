@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
             tx.user.count(),
             tx.itemEdition.count({ where: { itemId: body.itemId } }),
           ])
-          const allowed = Math.min(item.totalSupply, maxEditions(item.class, userCount))
+          const allowed = Math.min(item.totalSupply, maxEditions(item.rarityTier, userCount))
           if (mintedCount >= allowed) throw new Error(`Supply locked — available when more users join (currently ${mintedCount}/${allowed})`)
 
           const newEdition = await tx.itemEdition.create({
@@ -58,9 +58,7 @@ export async function POST(req: NextRequest) {
 
       const isPrimarySale = !edition.currentOwnerId
       if (!isPrimarySale && (!edition.isListed || !edition.listedPrice)) throw new Error('Item is not listed for sale')
-      if (isPrimarySale && !edition.item.referencePrice) throw new Error('No price set')
-
-      const price = isPrimarySale ? Number(edition.item.referencePrice) : Number(edition.listedPrice)
+      const price = isPrimarySale ? Number(edition.item.minimumBid) : Number(edition.listedPrice)
 
       const buyer = await tx.user.findUnique({ where: { id: buyerId } })
       if (!buyer) throw new Error('Buyer not found')

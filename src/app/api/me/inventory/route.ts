@@ -8,7 +8,7 @@ export async function GET() {
 
   const editions = await prisma.itemEdition.findMany({
     where: { currentOwnerId: session.user.id, isFrozen: false, isInAuction: false },
-    include: { item: { select: { name: true, imageUrl: true, referencePrice: true } } },
+    include: { item: { select: { name: true, imageUrl: true, minimumBid: true } } },
     orderBy: { lastSalePrice: 'desc' },
   })
 
@@ -20,7 +20,7 @@ export async function GET() {
       isListed:     e.isListed,
       listedPrice:  e.listedPrice?.toString() ?? null,
       lastSalePrice: e.lastSalePrice?.toString() ?? null,
-      referencePrice: e.item.referencePrice?.toString() ?? null,
+      minimumBid: e.item.minimumBid.toString(),
     })),
   })
 }

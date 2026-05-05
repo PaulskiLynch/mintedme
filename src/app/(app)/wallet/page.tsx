@@ -28,7 +28,7 @@ export default async function WalletPage() {
       ownedEditions: {
         select: {
           lastSalePrice: true,
-          item: { select: { referencePrice: true } },
+          item: { select: { minimumBid: true } },
         },
       },
     },
@@ -37,7 +37,7 @@ export default async function WalletPage() {
 
   const mintValue = user.ownedEditions.reduce(
     (sum: number, e: typeof user.ownedEditions[0]) =>
-      sum + Number(e.lastSalePrice ?? e.item.referencePrice ?? 0),
+      sum + Number(e.lastSalePrice ?? e.item.minimumBid),
     0
   )
   const netWorth = Number(user.balance) + mintValue

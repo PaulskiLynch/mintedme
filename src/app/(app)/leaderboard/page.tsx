@@ -28,7 +28,7 @@ export default async function LeaderboardPage() {
       _count: { select: { ownedEditions: { where: { isFrozen: false } } } },
       ownedEditions: {
         where:  { isFrozen: false },
-        select: { lastSalePrice: true, item: { select: { referencePrice: true } } },
+        select: { lastSalePrice: true, item: { select: { minimumBid: true } } },
       },
     },
   })
@@ -36,8 +36,8 @@ export default async function LeaderboardPage() {
   const ranked = users
     .map(u => {
       const mintValue = u.ownedEditions.reduce(
-        (s: number, e: { lastSalePrice: { toString(): string } | null; item: { referencePrice: { toString(): string } | null } }) =>
-          s + Number(e.lastSalePrice ?? e.item.referencePrice ?? 0),
+        (s: number, e: { lastSalePrice: { toString(): string } | null; item: { minimumBid: { toString(): string } } }) =>
+          s + Number(e.lastSalePrice ?? e.item.minimumBid),
         0,
       )
       const netWorth = Number(u.balance) + mintValue

@@ -1,15 +1,10 @@
-export function maxEditions(itemClass: string, userCount: number): number {
-  switch (itemClass) {
-    case 'unique':    return 1
-    case 'grail':     return Math.min(10,    2 + Math.floor(userCount / 50))
-    case 'elite':     return Math.min(100,   5 + Math.floor(userCount / 5))
-    case 'premium':   return Math.min(1000,  20 + userCount * 10)
-    case 'essential': return Math.min(10000, 100 + userCount * 50)
+export function maxEditions(rarityTier: string, userCount: number): number {
+  switch (rarityTier) {
+    case 'Mythic':    return 1
+    case 'Legendary': return Math.min(3,  1 + Math.floor(userCount / 200))
+    case 'Exotic':    return Math.min(5,  2 + Math.floor(userCount / 100))
+    case 'Rare':      return Math.min(7,  3 + Math.floor(userCount / 50))
+    case 'Common':    return Math.min(10, 5 + Math.floor(userCount / 20))
     default:          return 1
   }
-}
-
-export function supplyLabel(itemClass: string, userCount: number, totalSupply: number): string {
-  const max = Math.min(totalSupply, maxEditions(itemClass, userCount))
-  return `${max.toLocaleString()} in circulation`
 }

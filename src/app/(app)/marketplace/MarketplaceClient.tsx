@@ -18,12 +18,10 @@ interface Item {
   id: string
   name: string
   category: string
-  class: string
-  imageUrl: string
+  rarityTier: string
+  imageUrl: string | null
   totalSupply: number
-  referencePrice: string | null
-  hasOwnershipCost: boolean
-  ownershipCostPct: string | null
+  minimumBid: string
   isOfficial: boolean
   editions: Edition[]
 }
@@ -37,26 +35,12 @@ interface Props {
   userId: string | null
 }
 
-function classBadge(c: string) {
-  const map: Record<string, string> = {
-    essential: 'class-essential',
-    premium:   'class-premium',
-    elite:     'class-elite',
-    grail:     'class-grail',
-    unique:    'class-unique',
-  }
-  return map[c] ?? 'class-essential'
-}
-
-function tierBorder(c: string) {
-  const map: Record<string, string> = {
-    essential: 'tier-essential',
-    premium:   'tier-premium',
-    elite:     'tier-elite',
-    grail:     'tier-grail',
-    unique:    'tier-unique',
-  }
-  return map[c] ?? 'tier-essential'
+const RARITY_COLOURS: Record<string, string> = {
+  Common:    '#888',
+  Rare:      '#4ab8d8',
+  Exotic:    '#b07fef',
+  Legendary: '#e0a030',
+  Mythic:    '#e05a5a',
 }
 
 function fmt(n: string | null) {
@@ -85,23 +69,15 @@ export default function MarketplaceClient({ items, categories, currentCategory, 
   return (
     <div>
       <div className="page-title">Marketplace</div>
-      <div className="page-sub">Browse and acquire luxury assets</div>
+      <div className="page-sub">Browse and acquire collector cars</div>
 
-      {/* Search */}
       <form onSubmit={handleSearch} style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            className="form-input"
-            style={{ maxWidth: 360 }}
-            placeholder="Search items..."
-            value={q}
-            onChange={e => setQ(e.target.value)}
-          />
+          <input className="form-input" style={{ maxWidth: 360 }} placeholder="Search cars..." value={q} onChange={e => setQ(e.target.value)} />
           <button className="btn btn-outline" type="submit">Search</button>
         </div>
       </form>
 
-      {/* Category pills */}
       <div className="pill-row">
         {categories.map(c => (
           <button key={c} className={`pill${currentCategory === c ? ' active' : ''}`} onClick={() => nav({ category: c, sort: currentSort, q })}>
@@ -110,7 +86,6 @@ export default function MarketplaceClient({ items, categories, currentCategory, 
         ))}
       </div>
 
-      {/* Sort */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 24, alignItems: 'center' }}>
         <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>SORT:</span>
         {[['newest', 'Newest'], ['price_asc', 'Price ↑'], ['price_desc', 'Price ↓']].map(([v, l]) => (
@@ -120,47 +95,43 @@ export default function MarketplaceClient({ items, categories, currentCategory, 
         ))}
       </div>
 
-      {/* Grid */}
       {items.length === 0 ? (
-        <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--muted)', fontWeight: 700 }}>
-          No items found.
-        </div>
+        <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--muted)', fontWeight: 700 }}>No cars found.</div>
       ) : (
         <div className="items-grid">
           {items.map(item => {
             const listedEdition  = item.editions.find(e => e.isListed)
+            const auctionEdition = item.editions.find(e => e.isInAuction)
             const availableCount = item.editions.filter(e => !e.currentOwnerId).length
-            const price = listedEdition?.listedPrice ?? item.referencePrice
+            const price          = listedEdition?.listedPrice ?? item.minimumBid
+            const colour         = RARITY_COLOURS[item.rarityTier] ?? 'var(--muted)'
+            const editionId      = listedEdition?.id ?? auctionEdition?.id ?? item.editions[0]?.id
 
             return (
-              <Link key={item.id} href={`/item/${item.editions[0]?.id ?? item.id}`} style={{ textDecoration: 'none' }}>
-                <div className={`item-card ${tierBorder(item.class)}`}>
+              <Link key={item.id} href={editionId ? `/item/${editionId}` : '#'} style={{ textDecoration: 'none' }}>
+                <div className="item-card" style={{ borderColor: colour + '55' }}>
                   <div className="item-card-img">
-                    {item.imageUrl ? (
-                      <img src={item.imageUrl} alt={item.name} />
-                    ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 12 }}>
-                        No image
-                      </div>
-                    )}
+                    {item.imageUrl
+                      ? <img src={item.imageUrl} alt={item.name} />
+                      : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: 12 }}>No image</div>
+                    }
                   </div>
                   <div className="item-card-body">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
                       <div className="item-card-name">{item.name}</div>
-                      <span className={`class-badge ${classBadge(item.class)}`}>{item.class}</span>
+                      <span style={{ fontSize: 10, fontWeight: 800, color: colour, flexShrink: 0, marginLeft: 6 }}>{item.rarityTier.toUpperCase()}</span>
                     </div>
-                    <div className="item-card-meta">{item.category}</div>
-                    <div className="item-card-price">{fmt(price) ?? 'Offer only'}</div>
+                    <div className="item-card-price">{fmt(price)}</div>
                     <div className="item-card-edition">
-                      {availableCount > 0
+                      {auctionEdition
+                        ? <span style={{ color: '#ff6b35' }}>Live auction</span>
+                        : availableCount > 0
                         ? `${availableCount} of ${item.totalSupply} available`
                         : 'Secondary market only'}
                     </div>
                     {listedEdition && (
-                      <div style={{ marginTop: 8 }}>
-                        <span style={{ fontSize: 11, background: 'var(--gold)', color: '#0d0d0d', fontWeight: 900, padding: '2px 8px', borderRadius: 4 }}>
-                          BUY NOW
-                        </span>
+                      <div style={{ marginTop: 6 }}>
+                        <span style={{ fontSize: 11, background: 'var(--gold)', color: '#0d0d0d', fontWeight: 900, padding: '2px 8px', borderRadius: 4 }}>BUY NOW</span>
                       </div>
                     )}
                   </div>
