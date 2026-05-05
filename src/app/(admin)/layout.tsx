@@ -12,7 +12,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <div style={{ width: 200, background: 'var(--bg2)', borderRight: '1px solid var(--border)', padding: '24px 0', flexShrink: 0 }}>
         <div style={{ padding: '0 20px 20px', borderBottom: '1px solid var(--border)', marginBottom: 8 }}>
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--gold)' }}>ADMIN</div>
-          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>MintedMe</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>MilliBux</div>
         </div>
         {[
           { href: '/admin',             label: 'Overview' },

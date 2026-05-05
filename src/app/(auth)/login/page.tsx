@@ -28,7 +28,7 @@ export default function LoginPage() {
   return (
     <div className="auth-wrap">
       <div className="auth-box">
-        <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--gold)', marginBottom: 24 }}>MINTED</div>
+        <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--gold)', marginBottom: 24 }}>MILLIBUX</div>
         <div className="auth-title">Welcome back</div>
         <div className="auth-sub">Sign in to your Mint</div>
         {error && <div className="form-error">{error}</div>}

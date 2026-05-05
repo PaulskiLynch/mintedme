@@ -38,7 +38,7 @@ export default function SignupPage() {
   return (
     <div className="auth-wrap">
       <div className="auth-box">
-        <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--gold)', marginBottom: 24 }}>MINTED</div>
+        <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--gold)', marginBottom: 24 }}>MILLIBUX</div>
         <div className="auth-title">Claim your $1,000,000</div>
         <div className="auth-sub">Build your fantasy Mint</div>
         {error && <div className="form-error">{error}</div>}

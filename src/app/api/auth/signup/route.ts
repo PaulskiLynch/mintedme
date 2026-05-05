@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
         toUserId:    user.id,
         amount:      1000000,
         type:        'starting_bonus',
-        description: 'Welcome to MintedMe — your $1,000,000 starting balance.',
+        description: 'Welcome to MilliBux — your $1,000,000 starting balance.',
       },
     })
 

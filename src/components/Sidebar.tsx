@@ -25,7 +25,7 @@ export default function Sidebar({ username, balance, isAdmin = false, unreadCoun
     <>
       {/* Desktop sidebar */}
       <aside className="sidebar">
-        <div className="sidebar-logo">MINTED</div>
+        <div className="sidebar-logo">MILLIBUX</div>
 
         <div className="sidebar-user">
           <div className="sidebar-username">@{username}</div>
@@ -64,7 +64,7 @@ export default function Sidebar({ username, balance, isAdmin = false, unreadCoun
 
       {/* Mobile top bar */}
       <div className="mobile-topbar">
-        <span className="mobile-logo">MINTED</span>
+        <span className="mobile-logo">MILLIBUX</span>
         <span className="mobile-balance">${Number(balance).toLocaleString()}</span>
       </div>
 

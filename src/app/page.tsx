@@ -15,7 +15,7 @@ export default async function LandingPage() {
 
   return (
     <div className="landing">
-      <div className="landing-logo">MINTED</div>
+      <div className="landing-logo">MILLIBUX</div>
 
       <h1 className="landing-h1">
         What will a million<br />make you?
