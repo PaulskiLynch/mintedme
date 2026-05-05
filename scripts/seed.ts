@@ -14,6 +14,7 @@ function rarityFor(benchmark: number): string {
   if (benchmark >= 2_000_000)  return 'Legendary'
   if (benchmark >= 500_000)    return 'Exotic'
   if (benchmark >= 100_000)    return 'Rare'
+  if (benchmark >= 65_000)     return 'Premium'
   return 'Common'
 }
 
@@ -23,6 +24,7 @@ function supplyFor(rarity: string): number {
     case 'Legendary': return 3
     case 'Exotic':    return 5
     case 'Rare':      return 7
+    case 'Premium':   return 8
     default:          return 10
   }
 }

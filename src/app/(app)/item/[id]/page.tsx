@@ -76,10 +76,6 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
           {item.description && (
             <p style={{ marginTop: 16, color: 'var(--muted)', fontSize: 14, lineHeight: 1.6 }}>{item.description}</p>
           )}
-          {item.inspirationName && (
-            <p style={{ marginTop: 8, color: 'var(--muted)', fontSize: 12 }}>Inspired by: {item.inspirationName}</p>
-          )}
-
           {/* Performance stats */}
           {(item.horsepower || item.topSpeed || item.zeroToHundred) && (
             <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>

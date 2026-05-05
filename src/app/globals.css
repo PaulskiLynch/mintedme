@@ -204,11 +204,12 @@ input, textarea, select { font-family: inherit; }
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.class-essential { background: #2a2a2a; color: #aaa; }
-.class-premium   { background: #252530; color: #aab; }
-.class-elite     { background: #2a2415; color: var(--gold); }
-.class-grail     { background: #2a1e00; color: var(--gold); border: 1px solid var(--gold-dim); }
-.class-unique    { background: #1a1500; color: var(--gold); border: 1px solid var(--gold); }
+.class-common    { background: #2a2a2a; color: #888; }
+.class-premium   { background: #1a2a1e; color: #6db87a; }
+.class-rare      { background: #162028; color: #4ab8d8; }
+.class-exotic    { background: #1e1528; color: #b07fef; }
+.class-legendary { background: #2a1e00; color: #e0a030; border: 1px solid #e0a03044; }
+.class-mythic    { background: #2a1010; color: #e05a5a; border: 1px solid #e05a5a44; }
 
 /* ── Feed ─────────────────────────────────────── */
 .feed-event {

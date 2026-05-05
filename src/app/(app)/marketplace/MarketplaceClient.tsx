@@ -23,6 +23,9 @@ interface Item {
   totalSupply: number
   minimumBid: string
   benchmarkPrice: string
+  horsepower: number | null
+  topSpeed: number | null
+  zeroToHundred: string | null
   isOfficial: boolean
   editions: Edition[]
 }
@@ -38,6 +41,7 @@ interface Props {
 
 const RARITY_COLOURS: Record<string, string> = {
   Common:    '#888',
+  Premium:   '#6db87a',
   Rare:      '#4ab8d8',
   Exotic:    '#b07fef',
   Legendary: '#e0a030',
@@ -126,6 +130,13 @@ export default function MarketplaceClient({ items, categories, currentCategory, 
                     <div className="item-card-price">{fmt(item.benchmarkPrice)}</div>
                     {lastSold && (
                       <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 2 }}>Last sold {fmt(lastSold)}</div>
+                    )}
+                    {(item.horsepower || item.topSpeed || item.zeroToHundred) && (
+                      <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4, display: 'flex', gap: 8 }}>
+                        {item.horsepower && <span>{item.horsepower.toLocaleString()}hp</span>}
+                        {item.topSpeed && <span>{item.topSpeed}km/h</span>}
+                        {item.zeroToHundred && <span>{Number(item.zeroToHundred).toFixed(1)}s</span>}
+                      </div>
                     )}
                     <div className="item-card-edition">
                       {auctionEdition

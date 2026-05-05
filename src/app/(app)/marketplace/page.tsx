@@ -46,6 +46,9 @@ export default async function MarketplacePage({
         ...i,
         minimumBid:     i.minimumBid.toString(),
         benchmarkPrice: i.benchmarkPrice.toString(),
+        horsepower:    i.horsepower    ?? null,
+        topSpeed:      i.topSpeed      ?? null,
+        zeroToHundred: i.zeroToHundred?.toString() ?? null,
         editions: i.editions.map((e: typeof i.editions[0]) => ({
           ...e,
           listedPrice:   e.listedPrice?.toString()   ?? null,
