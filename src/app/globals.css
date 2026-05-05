@@ -92,7 +92,7 @@ input, textarea, select { font-family: inherit; }
   margin-left: 220px;
   flex: 1;
   padding: 32px;
-  max-width: calc(100vw - 220px);
+  max-width: 960px;
   overflow-x: hidden;
 }
 
