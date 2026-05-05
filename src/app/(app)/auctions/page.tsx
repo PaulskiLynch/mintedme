@@ -70,7 +70,10 @@ export default async function AuctionsPage() {
                         <span style={{ fontSize: 10, fontWeight: 800, color: colour, flexShrink: 0, marginLeft: 6 }}>{a.rarityTier.toUpperCase()}</span>
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--gold)', fontWeight: 700 }}>
-                        Min ${Number(a.minimumBid).toLocaleString()}
+                        {a.edition.lastSalePrice
+                          ? <>Last sold ${Number(a.edition.lastSalePrice).toLocaleString()}</>
+                          : <span style={{ color: 'var(--muted)', fontWeight: 400 }}>No sale history</span>
+                        }
                         <span style={{ color: 'var(--muted)', fontWeight: 400 }}> · {a._count.bids} bid{a._count.bids !== 1 ? 's' : ''}</span>
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>

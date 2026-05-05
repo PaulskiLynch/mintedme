@@ -66,6 +66,7 @@ export default async function AuctionPage({ params }: { params: Promise<{ id: st
         endsAt={auction.endsAt.toISOString()}
         sellerId={auction.sellerId}
         bidCount={auction._count.bids}
+        lastSalePrice={auction.edition.lastSalePrice?.toString() ?? null}
         winnerName={isSettled ? (auction.currentWinner?.username ?? null) : null}
         winningBid={isSettled ? (auction.winningBid?.toString() ?? null) : null}
         luckyUndervalueWin={isSettled ? auction.luckyUndervalueWin : false}

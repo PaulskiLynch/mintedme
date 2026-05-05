@@ -22,6 +22,7 @@ interface Item {
   imageUrl: string | null
   totalSupply: number
   minimumBid: string
+  benchmarkPrice: string
   isOfficial: boolean
   editions: Edition[]
 }
@@ -103,9 +104,9 @@ export default function MarketplaceClient({ items, categories, currentCategory, 
             const listedEdition  = item.editions.find(e => e.isListed)
             const auctionEdition = item.editions.find(e => e.isInAuction)
             const availableCount = item.editions.filter(e => !e.currentOwnerId).length
-            const price          = listedEdition?.listedPrice ?? item.minimumBid
             const colour         = RARITY_COLOURS[item.rarityTier] ?? 'var(--muted)'
             const editionId      = listedEdition?.id ?? auctionEdition?.id ?? item.editions[0]?.id
+            const lastSold       = listedEdition?.lastSalePrice ?? auctionEdition?.lastSalePrice ?? item.editions.find(e => e.lastSalePrice)?.lastSalePrice ?? null
 
             return (
               <Link key={item.id} href={editionId ? `/item/${editionId}` : '#'} style={{ textDecoration: 'none' }}>
@@ -121,7 +122,11 @@ export default function MarketplaceClient({ items, categories, currentCategory, 
                       <div className="item-card-name">{item.name}</div>
                       <span style={{ fontSize: 10, fontWeight: 800, color: colour, flexShrink: 0, marginLeft: 6 }}>{item.rarityTier.toUpperCase()}</span>
                     </div>
-                    <div className="item-card-price">{fmt(price)}</div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginBottom: 1 }}>TRUE VALUE</div>
+                    <div className="item-card-price">{fmt(item.benchmarkPrice)}</div>
+                    {lastSold && (
+                      <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 2 }}>Last sold {fmt(lastSold)}</div>
+                    )}
                     <div className="item-card-edition">
                       {auctionEdition
                         ? <span style={{ color: '#ff6b35' }}>Live auction</span>

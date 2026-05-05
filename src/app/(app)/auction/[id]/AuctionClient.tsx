@@ -20,6 +20,7 @@ interface Props {
   rarityTier:        string
   status:            string
   minimumBid:        string
+  lastSalePrice:     string | null
   endsAt:            string
   sellerId:          string
   bidCount:          number
@@ -62,7 +63,7 @@ function timeAgo(iso: string) {
 
 export default function AuctionClient({
   auctionId, itemName, editionNum, imageUrl, editionId, rarityTier,
-  status: initStatus, minimumBid, endsAt, sellerId, bidCount: initBidCount,
+  status: initStatus, minimumBid, lastSalePrice, endsAt, sellerId, bidCount: initBidCount,
   winnerName: initWinner, winningBid: initWinningBid, luckyUndervalueWin: initLucky,
   myBid: initMyBid, userId, availableBalance, userUsername, isSeller, initialMessages,
 }: Props) {
@@ -221,10 +222,12 @@ export default function AuctionClient({
 
             {/* Public stats */}
             <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginBottom: 2 }}>MIN BID</div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--gold)' }}>${Number(minimumBid).toLocaleString()}</div>
-              </div>
+              {lastSalePrice && (
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginBottom: 2 }}>LAST SOLD</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--gold)' }}>${Number(lastSalePrice).toLocaleString()}</div>
+                </div>
+              )}
               <div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginBottom: 2 }}>BIDS</div>
                 <div style={{ fontSize: 20, fontWeight: 900 }}>{liveBidCount}</div>
@@ -268,7 +271,7 @@ export default function AuctionClient({
               <form onSubmit={handleBid} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div>
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>
-                    {myBid ? 'Update your bid' : 'Place a sealed bid'} · Min: <strong style={{ color: 'var(--white)' }}>${Number(minimumBid).toLocaleString()}</strong>
+                    {myBid ? 'Update your bid' : 'Place a sealed bid'}
                     {userId && <> · Available: <strong style={{ color: 'var(--white)' }}>${available.toLocaleString()}</strong></>}
                   </div>
                   <input
