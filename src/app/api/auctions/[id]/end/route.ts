@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
 
+// ISO week number helper
+function isoWeek(d: Date): string {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+  date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7))
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1))
+  const week = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+  return `${date.getUTCFullYear()}-W${week}`
+}
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -14,76 +23,142 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         where: { id },
         include: { edition: { include: { item: true } } },
       })
-      if (!auction) throw new Error('Auction not found')
-      if (auction.status !== 'active') throw new Error('Auction already ended')
+      if (!auction)                          throw new Error('Auction not found')
+      if (auction.status === 'settled')      throw new Error('Already settled')
+      if (auction.status === 'ended')        throw new Error('Already ended — awaiting settlement')
 
       const isExpired = auction.endsAt < new Date()
       const isSeller  = auction.sellerId === session.user.id
-      if (!isExpired && !isSeller) throw new Error('Auction has not ended yet')
+      const isAdmin   = (await tx.user.findUnique({ where: { id: session.user.id }, select: { isAdmin: true } }))?.isAdmin ?? false
 
-      if (!auction.currentWinnerId || !auction.currentBid) {
-        // No bids — cancel, restore, charge 2% listing fee on starting bid
-        const listingBase = Number(auction.startingBid ?? auction.edition.item.referencePrice ?? 0)
-        const listingFee  = Math.floor(listingBase * 0.02)
+      if (!isExpired && !isSeller && !isAdmin) throw new Error('Auction has not ended yet')
 
-        await tx.auction.update({ where: { id }, data: { status: 'cancelled' } })
-        await tx.itemEdition.update({ where: { id: auction.editionId }, data: { isInAuction: false } })
-
-        if (listingFee > 0) {
-          await tx.user.update({ where: { id: auction.sellerId }, data: { balance: { decrement: listingFee } } })
-          await tx.transaction.create({
-            data: { fromUserId: auction.sellerId, editionId: auction.editionId, amount: listingFee, type: 'fee', description: `Auction listing fee (no sale): ${auction.edition.item.name}` },
-          })
-        }
-        return { ok: true, result: 'no_bids', listingFee }
-      }
-
-      const winnerId = auction.currentWinnerId
-      const sellerId = auction.sellerId
-      const price    = Number(auction.currentBid)
-
-      const winner = await tx.user.findUnique({ where: { id: winnerId } })
-      if (!winner) throw new Error('Winner not found')
-      if (Number(winner.balance) < price) throw new Error('Winner has insufficient balance')
-
-      // 5% platform fee on sale, then 20% creator royalty on remainder
-      const platformFee = Math.floor(price * 0.05)
-      const afterFee    = price - platformFee
-      const creatorId   = auction.edition.item.creatorId
-      const creatorPct  = creatorId && creatorId !== sellerId ? 0.2 : 0
-      const creatorCut  = Math.floor(afterFee * creatorPct)
-      const sellerGets  = afterFee - creatorCut
-
-      await tx.user.update({ where: { id: winnerId }, data: { balance: { decrement: price } } })
-      await tx.user.update({ where: { id: sellerId }, data: { balance: { increment: sellerGets } } })
-      if (creatorId && creatorCut > 0) {
-        await tx.user.update({ where: { id: creatorId }, data: { balance: { increment: creatorCut } } })
-        await tx.transaction.create({ data: { toUserId: creatorId, editionId: auction.editionId, amount: creatorCut, type: 'creator_earning' } })
-      }
-      await tx.transaction.create({
-        data: { fromUserId: winnerId, editionId: auction.editionId, amount: platformFee, type: 'fee', description: `Auction platform fee: ${auction.edition.item.name}` },
+      // Get all active bids, highest first
+      const bids = await tx.bid.findMany({
+        where:   { auctionId: id, status: 'active', amount: { gte: auction.minimumBid } },
+        orderBy: { amount: 'desc' },
+        include: { user: { select: { id: true, balance: true, lockedBalance: true, isFrozen: true } } },
       })
 
+      if (bids.length === 0) {
+        // No valid bids — mark ended, release any locked funds
+        await tx.auction.update({ where: { id }, data: { status: 'settled' } })
+        await tx.itemEdition.update({ where: { id: auction.editionId }, data: { isInAuction: false } })
+        await tx.bid.updateMany({ where: { auctionId: id }, data: { status: 'lost' } })
+        return { ok: true, result: 'no_bids' }
+      }
+
+      const isLegendaryOrMythic = ['Legendary', 'Mythic'].includes(auction.rarityTier)
+      const week = isoWeek(new Date())
+
+      let winner = null
+      for (const bid of bids) {
+        if (bid.user.isFrozen) continue
+
+        if (isLegendaryOrMythic) {
+          // Check win cap: 1 Legendary/Mythic win per ISO week
+          const weeklyWin = await tx.auction.findFirst({
+            where: {
+              currentWinnerId: bid.userId,
+              status:          'settled',
+              rarityTier:      { in: ['Legendary', 'Mythic'] },
+              endsAt:          {
+                gte: new Date(`${week.replace('W', '')}-Mon`), // approximate
+              },
+            },
+          })
+          // Simpler: check transactions this ISO week
+          const weekStart = new Date()
+          weekStart.setUTCDate(weekStart.getUTCDate() - weekStart.getUTCDay() + 1) // Monday
+          weekStart.setUTCHours(0, 0, 0, 0)
+
+          const alreadyWon = await tx.auction.count({
+            where: {
+              currentWinnerId: bid.userId,
+              status:          'settled',
+              rarityTier:      { in: ['Legendary', 'Mythic'] },
+              endsAt:          { gte: weekStart },
+            },
+          })
+          if (alreadyWon >= 1) continue
+        }
+
+        winner = bid
+        break
+      }
+
+      if (!winner) {
+        // All top bidders hit the weekly cap — no winner
+        await tx.auction.update({ where: { id }, data: { status: 'settled' } })
+        await tx.itemEdition.update({ where: { id: auction.editionId }, data: { isInAuction: false } })
+        for (const bid of bids) {
+          await tx.bid.update({ where: { id: bid.id }, data: { status: 'lost' } })
+          await tx.user.update({ where: { id: bid.userId }, data: { lockedBalance: { decrement: Number(bid.amount) } } })
+        }
+        return { ok: true, result: 'no_eligible_winner' }
+      }
+
+      const price      = Number(winner.amount)
+      const sellerId   = auction.sellerId
+      const winnerId   = winner.userId
+      const benchmark  = Number(auction.benchmarkPrice)
+      const isLucky    = price < benchmark
+
+      // Charge winner
+      await tx.user.update({
+        where: { id: winnerId },
+        data: {
+          balance:       { decrement: price },
+          lockedBalance: { decrement: price },
+        },
+      })
+
+      // Pay seller (5% platform fee)
+      const platformFee = Math.floor(price * 0.05)
+      const sellerGets  = price - platformFee
+      await tx.user.update({ where: { id: sellerId }, data: { balance: { increment: sellerGets } } })
+
+      // Transfer edition
       await tx.itemEdition.update({
         where: { id: auction.editionId },
-        data: { currentOwnerId: winnerId, lastSalePrice: price, lastSaleDate: new Date(), isInAuction: false, isListed: false, listedPrice: null },
+        data:  { currentOwnerId: winnerId, lastSalePrice: price, lastSaleDate: new Date(), isInAuction: false, isListed: false },
       })
-      await tx.auction.update({ where: { id }, data: { status: 'ended' } })
 
+      // Settle auction
+      await tx.auction.update({
+        where: { id },
+        data:  { status: 'settled', currentWinnerId: winnerId, currentBid: price, winningBid: price, luckyUndervalueWin: isLucky },
+      })
+
+      // Mark bids
+      await tx.bid.update({ where: { id: winner.id }, data: { status: 'won' } })
+      for (const bid of bids.filter(b => b.id !== winner!.id)) {
+        await tx.bid.update({ where: { id: bid.id }, data: { status: 'lost' } })
+        await tx.user.update({ where: { id: bid.userId }, data: { lockedBalance: { decrement: Number(bid.amount) } } })
+      }
+
+      // Records
       await tx.ownership.updateMany({ where: { editionId: auction.editionId, endedAt: null }, data: { endedAt: new Date() } })
-      await tx.ownership.create({ data: { editionId: auction.editionId, ownerId: winnerId, purchasePrice: price, transferType: 'auction' } })
+      await tx.ownership.create({ data: { editionId: auction.editionId, ownerId: winnerId, purchasePrice: price, transferType: 'auction_win' } })
       await tx.priceHistory.create({ data: { editionId: auction.editionId, price, transactionType: 'auction' } })
-      await tx.transaction.create({ data: { fromUserId: winnerId, toUserId: sellerId, editionId: auction.editionId, amount: price, type: 'auction_sale', description: `Won auction: ${auction.edition.item.name}` } })
-      await tx.feedEvent.create({ data: { eventType: 'buy', userId: winnerId, targetUserId: sellerId, editionId: auction.editionId, amount: price } })
+      await tx.transaction.create({
+        data: { fromUserId: winnerId, toUserId: sellerId, editionId: auction.editionId, amount: price, type: 'auction_win', description: `Won auction: ${auction.edition.item.name}` },
+      })
+      await tx.feedEvent.create({
+        data: {
+          eventType: 'auction_end', userId: winnerId, editionId: auction.editionId, amount: price,
+          metadata: { luckyUndervalueWin: isLucky, rarityTier: auction.rarityTier },
+        },
+      })
 
       await tx.notification.create({
-        data: { userId: winnerId, type: 'auction_won', message: `You won the auction for ${auction.edition.item.name}! $${price.toLocaleString()}`, actionUrl: `/item/${auction.editionId}` },
+        data: { userId: winnerId, type: 'auction_won', message: `You won the ${auction.edition.item.name} for $${price.toLocaleString()}${isLucky ? ' — lucky undervalue win!' : ''}`, actionUrl: `/item/${auction.editionId}` },
       })
       await tx.notification.create({
-        data: { userId: sellerId, type: 'item_sold', message: `Your ${auction.edition.item.name} sold at auction for $${price.toLocaleString()}`, actionUrl: `/item/${auction.editionId}` },
+        data: { userId: sellerId, type: 'item_sold', message: `Your ${auction.edition.item.name} sold for $${price.toLocaleString()}`, actionUrl: `/item/${auction.editionId}` },
       })
 
-      return { ok: true, result: 'sold', winnerId, price, platformFee, sellerGets }
+      return { ok: true, result: 'sold', winnerId, price, sellerGets, platformFee, luckyUndervalueWin: isLucky }
     })
     return NextResponse.json(result)
   } catch (err: unknown) {

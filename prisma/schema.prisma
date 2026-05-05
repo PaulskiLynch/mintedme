@@ -15,9 +15,10 @@ model User {
   avatarUrl     String?
   tagline       String?
   balance       Decimal  @default(1000000.00) @db.Decimal(12, 2)
-  mintValue     Decimal  @default(0) @db.Decimal(12, 2)
-  netWorth      Decimal  @default(0) @db.Decimal(12, 2)
-  prestigeScore Decimal  @default(0) @db.Decimal(10, 2)
+  lockedBalance Decimal  @default(0)          @db.Decimal(12, 2)
+  mintValue     Decimal  @default(0)          @db.Decimal(12, 2)
+  netWorth      Decimal  @default(0)          @db.Decimal(12, 2)
+  prestigeScore Decimal  @default(0)          @db.Decimal(10, 2)
   isEstablished Boolean  @default(false)
   isAdmin       Boolean  @default(false)
   isFrozen      Boolean  @default(false)
@@ -41,7 +42,6 @@ model User {
   auctionsAsSeller   Auction[]          @relation("AuctionSeller")
   auctionWins        Auction[]          @relation("AuctionWinner")
   bids               Bid[]
-  maxBids            MaxBid[]
   auctionMessages    AuctionMessage[]
   followers          Follow[]           @relation("Following")
   following          Follow[]           @relation("Follower")
@@ -54,24 +54,22 @@ model User {
 
 model Item {
   id               String   @id @default(uuid())
-  name             String
+  name             String                             // fictional MilliBux name
+  inspirationName  String?                            // real-world inspiration (admin reference)
   description      String?
-  category         String   // cars, yachts, watches, art, fashion, jets, mansions, collectibles, businesses
-  class            String   // essential, premium, elite, grail, unique
-  imageUrl         String
+  category         String   @default("cars")
+  rarityTier       String                             // Common | Rare | Exotic | Legendary | Mythic
+  imageUrl         String?
   totalSupply      Int
-  referencePrice   Decimal? @db.Decimal(12, 2)
-  minPriceBand     Decimal? @db.Decimal(12, 2)
-  maxPriceBand     Decimal? @db.Decimal(12, 2)
-  hasOwnershipCost Boolean  @default(false)
-  ownershipCostPct Decimal? @db.Decimal(5, 4)
+  benchmarkPrice   Decimal  @db.Decimal(12, 2)        // internal/admin-only
+  minimumBid       Decimal  @db.Decimal(12, 2)        // public (10% of benchmark)
   hasIncome        Boolean  @default(false)
   incomePerView    Decimal? @db.Decimal(10, 2)
   creatorId        String?
   isOfficial       Boolean  @default(true)
   isApproved       Boolean  @default(true)
   isFrozen         Boolean  @default(false)
-  reportCount      Int      @default(0)
+  itemStatus       String   @default("active")        // draft | active | retired
   createdAt        DateTime @default(now())
 
   creator  User?         @relation("ItemCreator", fields: [creatorId], references: [id])
@@ -156,34 +154,38 @@ model Transaction {
   offerId     String?  @unique
   auctionId   String?
   amount      Decimal  @db.Decimal(12, 2)
-  type        String   // purchase, sale, auction_win, creator_earning, ownership_cost, starting_bonus
+  type        String   // purchase, sale, auction_win, income, refund
   description String?
   createdAt   DateTime @default(now())
 
   fromUser User?        @relation("TransactionFrom", fields: [fromUserId], references: [id])
-  toUser   User?        @relation("TransactionTo", fields: [toUserId], references: [id])
+  toUser   User?        @relation("TransactionTo",   fields: [toUserId],   references: [id])
   edition  ItemEdition? @relation(fields: [editionId], references: [id])
-  offer    Offer?       @relation(fields: [offerId], references: [id])
+  offer    Offer?       @relation(fields: [offerId],   references: [id])
 
   @@map("transactions")
 }
 
 model Auction {
-  id              String   @id @default(uuid())
-  editionId       String
-  sellerId        String
-  startingBid     Decimal  @db.Decimal(12, 2)
-  currentBid      Decimal? @db.Decimal(12, 2)
-  currentWinnerId String?
-  status          String   @default("active") // active, ended, cancelled
-  endsAt          DateTime
-  createdAt       DateTime @default(now())
+  id                 String   @id @default(uuid())
+  editionId          String
+  sellerId           String
+  minimumBid         Decimal  @db.Decimal(12, 2)   // public
+  benchmarkPrice     Decimal  @db.Decimal(12, 2)   // admin-only
+  rarityTier         String                         // denormalised for settlement logic
+  currentBid         Decimal? @db.Decimal(12, 2)   // internal — highest bid so far
+  currentWinnerId    String?                        // internal — resolved at settlement
+  winningBid         Decimal? @db.Decimal(12, 2)   // set at settlement
+  luckyUndervalueWin Boolean  @default(false)
+  status             String   @default("scheduled") // scheduled | active | ended | settled
+  startsAt           DateTime?
+  endsAt             DateTime
+  createdAt          DateTime @default(now())
 
-  edition       ItemEdition      @relation(fields: [editionId], references: [id])
-  seller        User             @relation("AuctionSeller", fields: [sellerId], references: [id])
-  currentWinner User?            @relation("AuctionWinner", fields: [currentWinnerId], references: [id])
+  edition       ItemEdition      @relation(fields: [editionId],       references: [id])
+  seller        User             @relation("AuctionSeller",  fields: [sellerId],         references: [id])
+  currentWinner User?            @relation("AuctionWinner",  fields: [currentWinnerId],  references: [id])
   bids          Bid[]
-  maxBids       MaxBid[]
   messages      AuctionMessage[]
 
   @@map("auctions")
@@ -194,18 +196,20 @@ model Bid {
   auctionId String
   userId    String
   amount    Decimal  @db.Decimal(12, 2)
-  isWinning Boolean  @default(false)
+  status    String   @default("active") // active | won | lost | refunded | invalid
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   auction Auction @relation(fields: [auctionId], references: [id])
-  user    User    @relation(fields: [userId], references: [id])
+  user    User    @relation(fields: [userId],    references: [id])
 
+  @@unique([auctionId, userId])   // one sealed bid per user per auction
   @@map("bids")
 }
 
 model FeedEvent {
   id           String   @id @default(uuid())
-  eventType    String   // buy, sell, offer, accept, create_item, auction_start, auction_end
+  eventType    String   // buy, sell, offer, accept, auction_start, auction_end, achievement, income, market_event, post
   userId       String?
   targetUserId String?
   editionId    String?
@@ -214,7 +218,7 @@ model FeedEvent {
   isVisible    Boolean  @default(true)
   createdAt    DateTime @default(now())
 
-  user       User?        @relation("FeedActor", fields: [userId], references: [id])
+  user       User?        @relation("FeedActor",  fields: [userId],       references: [id])
   targetUser User?        @relation("FeedTarget", fields: [targetUserId], references: [id])
   edition    ItemEdition? @relation(fields: [editionId], references: [id])
   likes      FeedLike[]
@@ -243,7 +247,7 @@ model WatchedItem {
   editionId String
   createdAt DateTime @default(now())
 
-  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId],    references: [id], onDelete: Cascade)
   edition ItemEdition @relation(fields: [editionId], references: [id], onDelete: Cascade)
 
   @@id([userId, editionId])
@@ -302,7 +306,7 @@ model Follow {
 model FeedLike {
   userId      String
   feedEventId String
-  type        String   @default("like")  // like, flex, smart, risky, watch
+  type        String   @default("like")
   createdAt   DateTime @default(now())
 
   user      User      @relation(fields: [userId],      references: [id], onDelete: Cascade)
@@ -325,20 +329,6 @@ model FeedComment {
   @@map("feed_comments")
 }
 
-model MaxBid {
-  id        String   @id @default(uuid())
-  auctionId String
-  userId    String
-  maxAmount Decimal  @db.Decimal(12, 2)
-  createdAt DateTime @default(now())
-
-  auction Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id])
-
-  @@unique([auctionId, userId])
-  @@map("max_bids")
-}
-
 model AuctionMessage {
   id        String   @id @default(uuid())
   auctionId String
@@ -347,7 +337,7 @@ model AuctionMessage {
   createdAt DateTime @default(now())
 
   auction Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id])
+  user    User    @relation(fields: [userId],    references: [id])
 
   @@map("auction_messages")
 }
