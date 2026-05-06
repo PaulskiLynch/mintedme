@@ -4,7 +4,7 @@ import MarketplaceClient from './MarketplaceClient'
 
 export const dynamic = 'force-dynamic'
 
-const CATEGORIES = ['All', 'Cars']
+const CATEGORIES = ['All', 'Cars', 'Businesses']
 
 export default async function MarketplacePage({
   searchParams,

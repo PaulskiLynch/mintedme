@@ -64,6 +64,45 @@ const CARS = [
   { name: 'Tempestia V12',         inspiration: 'Pagani Zonda',             benchmark: 5_000_000,  hp: 740,   topSpeed: 355, z100: 3.1,  image: '/items/tempestia-v12.png' },
 ]
 
+const BUSINESSES: Array<{
+  name: string; businessType: string; businessRiskTier: string; benchmark: number; image: string | null
+}> = [
+  // Safe
+  { name: 'Grind & Go Café Chain',      businessType: 'cafe_chain',             businessRiskTier: 'safe',     benchmark: 250_000,    image: null },
+  { name: 'IronCore Gym Group',         businessType: 'boutique_gym',           businessRiskTier: 'safe',     benchmark: 350_000,    image: null },
+  { name: 'ShineStar Car Wash Network', businessType: 'car_wash_network',       businessRiskTier: 'safe',     benchmark: 180_000,    image: null },
+  { name: 'LockBox Storage Portfolio',  businessType: 'storage_unit_portfolio', businessRiskTier: 'safe',     benchmark: 400_000,    image: null },
+  { name: 'VendVault Machine Route',    businessType: 'vending_machine_route',  businessRiskTier: 'safe',     benchmark: 120_000,    image: null },
+  { name: 'StreetEats Truck Fleet',     businessType: 'food_truck_fleet',       businessRiskTier: 'safe',     benchmark: 200_000,    image: null },
+  { name: 'Blade & Brass Barber Lounge',businessType: 'luxury_barber_lounge',   businessRiskTier: 'safe',     benchmark: 300_000,    image: null },
+  // Growth
+  { name: 'HeatWave Sneaker Store',     businessType: 'sneaker_resale_store',   businessRiskTier: 'growth',   benchmark: 500_000,    image: null },
+  { name: 'The Vault Boutique Hotel',   businessType: 'boutique_hotel',         businessRiskTier: 'growth',   benchmark: 1_200_000,  image: null },
+  { name: 'Skyline Rooftop Restaurant', businessType: 'rooftop_restaurant',     businessRiskTier: 'growth',   benchmark: 800_000,    image: null },
+  { name: 'Neon District Nightclub',    businessType: 'nightclub_venue',        businessRiskTier: 'growth',   benchmark: 900_000,    image: null },
+  { name: 'Black Shield Security Firm', businessType: 'private_security_firm',  businessRiskTier: 'growth',   benchmark: 650_000,    image: null },
+  { name: 'Pulse Digital Media Studio', businessType: 'digital_media_studio',   businessRiskTier: 'growth',   benchmark: 750_000,    image: null },
+  { name: 'Apex Event Production Co.',  businessType: 'event_production_co',    businessRiskTier: 'growth',   benchmark: 600_000,    image: null },
+  { name: 'Prestige Luxury Rental Agency',businessType:'luxury_rental_agency',  businessRiskTier: 'growth',   benchmark: 1_000_000,  image: null },
+  // Risky
+  { name: 'Apex Supercar Rental Club',  businessType: 'supercar_rental_club',   businessRiskTier: 'risky',    benchmark: 2_500_000,  image: null },
+  { name: 'GOLD CHAIN Music Label',     businessType: 'music_label',            businessRiskTier: 'risky',    benchmark: 3_000_000,  image: null },
+  { name: 'Reel One Indie Film Studio', businessType: 'indie_film_studio',      businessRiskTier: 'risky',    benchmark: 1_800_000,  image: null },
+  { name: 'MARQ Fashion Label',         businessType: 'fashion_label',          businessRiskTier: 'risky',    benchmark: 2_200_000,  image: null },
+  { name: 'NovaSpark Tech Startup',     businessType: 'tech_startup',           businessRiskTier: 'risky',    benchmark: 4_000_000,  image: null },
+  { name: 'Vortex Esports Team',        businessType: 'esports_team',           businessRiskTier: 'risky',    benchmark: 1_500_000,  image: null },
+  { name: 'Cipher Crypto Trading Desk', businessType: 'crypto_trading_desk',    businessRiskTier: 'risky',    benchmark: 5_000_000,  image: null },
+  { name: 'Starmaker Talent Agency',    businessType: 'talent_mgmt_agency',     businessRiskTier: 'risky',    benchmark: 2_000_000,  image: null },
+  // Prestige
+  { name: 'The Meridian Art Gallery',   businessType: 'art_gallery',            businessRiskTier: 'prestige', benchmark: 6_000_000,  image: null },
+  { name: 'Calibre Watch Boutique',     businessType: 'luxury_watch_boutique',  businessRiskTier: 'prestige', benchmark: 8_000_000,  image: null },
+  { name: 'The Obsidian Members Club',  businessType: 'private_members_club',   businessRiskTier: 'prestige', benchmark: 12_000_000, image: null },
+  { name: 'Aurore Vineyard Estate',     businessType: 'vineyard_estate',        businessRiskTier: 'prestige', benchmark: 7_500_000,  image: null },
+  { name: 'Azure Yacht Charter Brand',  businessType: 'yacht_charter_brand',    businessRiskTier: 'prestige', benchmark: 10_000_000, image: null },
+  { name: 'Gavel & Co. Auction House',  businessType: 'boutique_auction_house', businessRiskTier: 'prestige', benchmark: 5_000_000,  image: null },
+  { name: 'Meridian Global Media House',businessType: 'global_media_house',     businessRiskTier: 'prestige', benchmark: 20_000_000, image: null },
+]
+
 async function main() {
   console.log('Seeding MilliBux cars...')
 
@@ -116,6 +155,30 @@ async function main() {
     itemIds[car.name] = item.id
   }
   console.log(`  ✓ ${CARS.length} cars seeded`)
+
+  // ── Business items ────────────────────────────────────────────────────────────
+  console.log('Seeding businesses...')
+  for (const biz of BUSINESSES) {
+    const existing = await prisma.item.findFirst({ where: { name: biz.name } })
+    if (existing) continue
+    const minimumBid = Math.round(biz.benchmark * 0.10)
+    await prisma.item.create({
+      data: {
+        name:            biz.name,
+        category:        'businesses',
+        rarityTier:      'Common',
+        imageUrl:        biz.image ?? undefined,
+        totalSupply:     3,
+        benchmarkPrice:  biz.benchmark,
+        minimumBid,
+        businessType:    biz.businessType,
+        businessRiskTier:biz.businessRiskTier,
+        isApproved:      true,
+        itemStatus:      'active',
+      },
+    })
+  }
+  console.log(`  ✓ ${BUSINESSES.length} businesses seeded`)
 
   // ── Give each demo user 1–2 cars ──────────────────────────────────────────────
   const assignments: Array<{ car: string; owner: string; price: number }> = [
