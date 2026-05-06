@@ -4,6 +4,7 @@ import { settleAuction } from '@/lib/auction'
 import { monthlyUpkeep, UPKEEP_CYCLE_DAYS } from '@/lib/upkeep'
 import { JOB_BY_CODE, slotsForJob } from '@/lib/jobs'
 import { businessNetIncome } from '@/lib/business'
+import { monthlyPropertyUpkeep, monthlyPropertyAppreciation } from '@/lib/property'
 
 const MIN_LIVE    = 2
 const DURATION_MS = 3 * 24 * 60 * 60 * 1000
@@ -345,5 +346,99 @@ export async function GET(req: NextRequest) {
   }
   log.push(`business income: paid ${incomesPaid}`)
 
-  return NextResponse.json({ ok: true, log, created: created.length, upkeepCharged, upkeepDebted, liquidated, salaryPaid, incomesPaid, auctionIds: created })
+  // 6. Charge monthly upkeep for owned properties (non-rent-free)
+  const duePropertyEditions = await prisma.itemEdition.findMany({
+    where: {
+      currentOwnerId: { not: null },
+      isFrozen: false,
+      item: { propertyTier: { not: null } },
+      OR: [
+        { lastUpkeepAt: null, lastSaleDate: { lte: cutoff } },
+        { lastUpkeepAt: { lte: cutoff } },
+      ],
+    },
+    include: {
+      item:         { select: { benchmarkPrice: true, propertyTier: true, name: true } },
+      currentOwner: { select: { id: true, balance: true } },
+    },
+    take: 500,
+  })
+
+  let propertyUpkeepCharged = 0
+  let propertyUpkeepDebted  = 0
+  for (const edition of duePropertyEditions) {
+    if (!edition.currentOwner || !edition.item.propertyTier) continue
+    const cost = monthlyPropertyUpkeep(edition.item.propertyTier, Number(edition.item.benchmarkPrice))
+    if (cost === 0) {
+      // rent_free — just reset the clock
+      await prisma.itemEdition.update({ where: { id: edition.id }, data: { lastUpkeepAt: new Date() } })
+      continue
+    }
+    const canPay = Number(edition.currentOwner.balance) >= cost
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.itemEdition.update({ where: { id: edition.id }, data: { lastUpkeepAt: new Date() } })
+        if (canPay) {
+          await tx.user.update({ where: { id: edition.currentOwnerId! }, data: { balance: { decrement: cost } } })
+          await tx.transaction.create({
+            data: { fromUserId: edition.currentOwnerId, amount: cost, type: 'upkeep', description: `Property upkeep: ${edition.item.name}` },
+          })
+        } else {
+          await tx.user.update({ where: { id: edition.currentOwnerId! }, data: { debtAmount: { increment: cost } } })
+          await tx.transaction.create({
+            data: { fromUserId: edition.currentOwnerId, amount: cost, type: 'upkeep_debt', description: `Property upkeep debt: ${edition.item.name}` },
+          })
+          await tx.notification.create({
+            data: {
+              userId:    edition.currentOwnerId!,
+              type:      'upkeep_missed',
+              message:   `Couldn't charge $${cost.toLocaleString()} property upkeep for ${edition.item.name} — debt recorded.`,
+              actionUrl: '/wallet',
+            },
+          })
+        }
+      })
+      if (canPay) propertyUpkeepCharged++; else propertyUpkeepDebted++
+    } catch (e) {
+      log.push(`property upkeep error ${edition.id}: ${e}`)
+    }
+  }
+  log.push(`property upkeep: charged ${propertyUpkeepCharged}, debted ${propertyUpkeepDebted}`)
+
+  // 7. Monthly appreciation — increases benchmarkPrice of owned property items
+  const appreciationCutoff = new Date(Date.now() - CYCLE_MS)
+  const duePropertyItems = await prisma.item.findMany({
+    where: {
+      propertyTier: { not: null },
+      OR: [
+        { lastAppreciatedAt: null },
+        { lastAppreciatedAt: { lte: appreciationCutoff } },
+      ],
+      editions: { some: { currentOwnerId: { not: null } } },
+    },
+    select: { id: true, name: true, benchmarkPrice: true, propertyTier: true },
+  })
+
+  let appreciated = 0
+  for (const item of duePropertyItems) {
+    if (!item.propertyTier) continue
+    const gain = monthlyPropertyAppreciation(item.propertyTier, Number(item.benchmarkPrice))
+    if (gain <= 0) {
+      await prisma.item.update({ where: { id: item.id }, data: { lastAppreciatedAt: new Date() } })
+      continue
+    }
+    try {
+      await prisma.item.update({
+        where: { id: item.id },
+        data: { benchmarkPrice: { increment: gain }, lastAppreciatedAt: new Date() },
+      })
+      log.push(`appreciation: ${item.name} +$${gain.toLocaleString()}`)
+      appreciated++
+    } catch (e) {
+      log.push(`appreciation error ${item.id}: ${e}`)
+    }
+  }
+  log.push(`property appreciation: ${appreciated} item${appreciated !== 1 ? 's' : ''} updated`)
+
+  return NextResponse.json({ ok: true, log, created: created.length, upkeepCharged, upkeepDebted, liquidated, propertyUpkeepCharged, propertyUpkeepDebted, appreciated, salaryPaid, incomesPaid, auctionIds: created })
 }

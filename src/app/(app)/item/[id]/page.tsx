@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db'
 import { maxEditions } from '@/lib/supply'
 import { monthlyUpkeep, upkeepDaysRemaining } from '@/lib/upkeep'
 import { businessGrossIncome, businessUpkeepCost, businessNetIncome, businessIncomeDaysRemaining, TIER_LABELS } from '@/lib/business'
+import { PROPERTY_TIER_DEFS, monthlyPropertyUpkeep, monthlyPropertyAppreciation, monthlyPropertyNet } from '@/lib/property'
 import ItemActions from './ItemActions'
 import WishlistButton from './WishlistButton'
 
@@ -90,6 +91,12 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
   const bUpkeep = bTier ? businessUpkeepCost(bTier, Number(item.benchmarkPrice))   : 0
   const bNet    = bTier ? businessNetIncome(bTier, Number(item.benchmarkPrice))     : 0
   const bDays   = bTier ? businessIncomeDaysRemaining(edition.lastIncomeAt ?? null, edition.lastSaleDate ?? null, edition.createdAt) : 0
+
+  const pTier      = item.propertyTier ?? null
+  const pDef       = pTier ? PROPERTY_TIER_DEFS[pTier as keyof typeof PROPERTY_TIER_DEFS] : null
+  const pUpkeep    = pTier ? monthlyPropertyUpkeep(pTier, Number(item.benchmarkPrice))    : 0
+  const pAppreciation = pTier ? monthlyPropertyAppreciation(pTier, Number(item.benchmarkPrice)) : 0
+  const pNet       = pTier ? monthlyPropertyNet(pTier, Number(item.benchmarkPrice))       : 0
 
   const activeAuction = edition.isInAuction
     ? await prisma.auction.findFirst({
@@ -190,6 +197,11 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                   {TIER_LABELS[bTier as keyof typeof TIER_LABELS]} Business
                 </span>
               )}
+              {pDef && (
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', background: 'var(--bg3)', borderRadius: 4, padding: '2px 7px', letterSpacing: '0.05em' }}>
+                  {pDef.emoji} {pDef.label}
+                </span>
+              )}
             </div>
             <h1 style={{ fontSize: 22, fontWeight: 900, marginBottom: 4 }}>{item.name}</h1>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>
@@ -259,6 +271,11 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
               businessNet={bNet}
               businessDaysToIncome={bDays}
               discountPrice={discountPrice}
+              propertyTier={pTier}
+              propertyDef={pDef ? { label: pDef.label, emoji: pDef.emoji, prestige: pDef.prestige } : null}
+              propertyUpkeep={pUpkeep}
+              propertyAppreciation={pAppreciation}
+              propertyNet={pNet}
             />
 
             {!isOwner && (

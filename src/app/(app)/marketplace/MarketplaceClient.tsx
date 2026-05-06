@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { PROPERTY_TIER_DEFS, monthlyPropertyNet } from '@/lib/property'
 
 interface Edition {
   id: string
@@ -22,6 +22,7 @@ interface Item {
   rarityTier: string
   imageUrl: string | null
   businessRiskTier: string | null
+  propertyTier:     string | null
   totalSupply: number
   minimumBid: string
   benchmarkPrice: string
@@ -136,6 +137,16 @@ function MarketplaceCard({ item, userId }: { item: Item; userId: string | null }
         }
       </div>
 
+      {/* Property tier badge */}
+      {item.propertyTier && PROPERTY_TIER_DEFS[item.propertyTier as keyof typeof PROPERTY_TIER_DEFS] && (() => {
+        const def = PROPERTY_TIER_DEFS[item.propertyTier as keyof typeof PROPERTY_TIER_DEFS]
+        return (
+          <div style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(13,13,13,0.85)', border: '1px solid var(--border)', borderRadius: 6, padding: '2px 7px', fontSize: 10, fontWeight: 800, color: colour, letterSpacing: '0.05em' }}>
+            {def.emoji} {def.label.toUpperCase()}
+          </div>
+        )
+      })()}
+
       <div className="item-card-body">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
           <div className="item-card-name">{item.name}</div>
@@ -156,6 +167,19 @@ function MarketplaceCard({ item, userId }: { item: Item; userId: string | null }
         {lastSold && (
           <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 2 }}>Last sold {fmt(lastSold)}</div>
         )}
+
+        {/* Property monthly net */}
+        {item.propertyTier && (() => {
+          const net = monthlyPropertyNet(item.propertyTier, Number(item.benchmarkPrice))
+          if (item.propertyTier === 'rent_free') {
+            return <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>Free to own · No upkeep</div>
+          }
+          return (
+            <div style={{ fontSize: 11, color: net >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 700, marginBottom: 4 }}>
+              {net >= 0 ? '+' : '−'}${Math.abs(net).toLocaleString()}/mo net
+            </div>
+          )
+        })()}
 
         {(item.horsepower || item.topSpeed || item.zeroToHundred) && (
           <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4, display: 'flex', gap: 8 }}>
@@ -238,11 +262,11 @@ export default function MarketplaceClient({ items, categories, currentCategory, 
   return (
     <div>
       <div className="page-title">Marketplace</div>
-      <div className="page-sub">Browse and acquire collector cars</div>
+      <div className="page-sub">Cars, businesses, and property — buy, sell, auction.</div>
 
       <form onSubmit={handleSearch} style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 8 }}>
-          <input className="form-input" style={{ maxWidth: 360 }} placeholder="Search cars..." value={q} onChange={e => setQ(e.target.value)} />
+          <input className="form-input" style={{ maxWidth: 360 }} placeholder="Search assets..." value={q} onChange={e => setQ(e.target.value)} />
           <button className="btn btn-outline" type="submit">Search</button>
         </div>
       </form>
@@ -265,7 +289,7 @@ export default function MarketplaceClient({ items, categories, currentCategory, 
       </div>
 
       {items.length === 0 ? (
-        <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--muted)', fontWeight: 700 }}>No cars found.</div>
+        <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--muted)', fontWeight: 700 }}>No assets found.</div>
       ) : (
         <div className="items-grid">
           {items.map(item => (

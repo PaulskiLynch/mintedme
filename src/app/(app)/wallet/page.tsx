@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { monthlyUpkeep } from '@/lib/upkeep'
 import { businessNetIncome } from '@/lib/business'
+import { monthlyPropertyUpkeep, monthlyPropertyAppreciation } from '@/lib/property'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,6 +52,7 @@ export default async function WalletPage() {
                 benchmarkPrice:  true,
                 minimumBid:      true,
                 businessRiskTier: true,
+                propertyTier:    true,
               },
             },
           },
@@ -83,10 +85,13 @@ export default async function WalletPage() {
   const debt      = Number(user.debtAmount)
 
   // Monthly cash flow
-  const carEditions = user.ownedEditions.filter(e => !e.item.businessRiskTier)
-  const bizEditions = user.ownedEditions.filter(e =>  e.item.businessRiskTier)
-  const monthlyCost   = carEditions.reduce((s, e) => s + monthlyUpkeep(e.item.rarityTier, Number(e.item.benchmarkPrice)), 0)
-  const monthlyIncome = bizEditions.reduce((s, e) => s + businessNetIncome(e.item.businessRiskTier!, Number(e.item.benchmarkPrice)), 0)
+  const carEditions      = user.ownedEditions.filter(e => !e.item.businessRiskTier && !e.item.propertyTier)
+  const bizEditions      = user.ownedEditions.filter(e =>  e.item.businessRiskTier)
+  const propEditions     = user.ownedEditions.filter(e =>  e.item.propertyTier)
+  const monthlyCost      = carEditions.reduce((s, e) => s + monthlyUpkeep(e.item.rarityTier, Number(e.item.benchmarkPrice)), 0)
+                         + propEditions.reduce((s, e) => s + monthlyPropertyUpkeep(e.item.propertyTier!, Number(e.item.benchmarkPrice)), 0)
+  const monthlyIncome    = bizEditions.reduce((s, e) => s + businessNetIncome(e.item.businessRiskTier!, Number(e.item.benchmarkPrice)), 0)
+  const monthlyPaperGain = propEditions.reduce((s, e) => s + monthlyPropertyAppreciation(e.item.propertyTier!, Number(e.item.benchmarkPrice)), 0)
   const monthlySalary = jobHolding?.monthlySalary ?? 0
   const monthlyNet    = monthlyIncome + monthlySalary - monthlyCost
 
@@ -145,10 +150,22 @@ export default async function WalletPage() {
               <span style={{ fontWeight: 700, color: 'var(--green)' }}>+${monthlyIncome.toLocaleString()}</span>
             </div>
           )}
-          {monthlyCost > 0 && (
+          {carEditions.length > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
               <span style={{ color: 'var(--muted)' }}>Car upkeep ({carEditions.length} car{carEditions.length !== 1 ? 's' : ''})</span>
-              <span style={{ fontWeight: 700, color: 'var(--red)' }}>−${monthlyCost.toLocaleString()}</span>
+              <span style={{ fontWeight: 700, color: 'var(--red)' }}>−${carEditions.reduce((s, e) => s + monthlyUpkeep(e.item.rarityTier, Number(e.item.benchmarkPrice)), 0).toLocaleString()}</span>
+            </div>
+          )}
+          {propEditions.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+              <span style={{ color: 'var(--muted)' }}>Property upkeep ({propEditions.length} propert{propEditions.length !== 1 ? 'ies' : 'y'})</span>
+              <span style={{ fontWeight: 700, color: 'var(--red)' }}>−${propEditions.reduce((s, e) => s + monthlyPropertyUpkeep(e.item.propertyTier!, Number(e.item.benchmarkPrice)), 0).toLocaleString()}</span>
+            </div>
+          )}
+          {monthlyPaperGain > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+              <span style={{ color: 'var(--muted)' }}>Property appreciation (paper gain)</span>
+              <span style={{ fontWeight: 700, color: '#6db87a' }}>+${monthlyPaperGain.toLocaleString()}</span>
             </div>
           )}
           {(monthlyCost > 0 || monthlyIncome > 0 || monthlySalary > 0) && (

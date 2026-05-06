@@ -4,7 +4,7 @@ import MarketplaceClient from './MarketplaceClient'
 
 export const dynamic = 'force-dynamic'
 
-const CATEGORIES = ['All', 'Cars', 'Businesses']
+const CATEGORIES = ['All', 'Cars', 'Businesses', 'Properties']
 
 export default async function MarketplacePage({
   searchParams,
@@ -48,6 +48,7 @@ export default async function MarketplacePage({
         minimumBid:      i.minimumBid.toString(),
         benchmarkPrice:  i.benchmarkPrice.toString(),
         businessRiskTier:i.businessRiskTier ?? null,
+        propertyTier:   i.propertyTier    ?? null,
         horsepower:     i.horsepower    ?? null,
         topSpeed:       i.topSpeed      ?? null,
         zeroToHundred:  i.zeroToHundred?.toString() ?? null,

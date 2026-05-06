@@ -39,6 +39,11 @@ interface Props {
   businessNet:      number
   businessDaysToIncome: number
   discountPrice:    number | null
+  propertyTier:     string | null
+  propertyDef:      { label: string; emoji: string; prestige: string } | null
+  propertyUpkeep:   number
+  propertyAppreciation: number
+  propertyNet:      number
 }
 
 function timeAgo(iso: string | null): string | null {
@@ -62,6 +67,7 @@ export default function ItemActions({
   watcherCount, pendingOfferCount, trendPct,
   businessRiskTier, businessGross, businessUpkeep, businessNet, businessDaysToIncome,
   discountPrice,
+  propertyTier, propertyDef, propertyUpkeep, propertyAppreciation, propertyNet,
 }: Props) {
   const router = useRouter()
   const [busy, setBusy]               = useState(false)
@@ -192,8 +198,10 @@ export default function ItemActions({
           </div>
         )}
 
-        {/* Business income panel — owner view */}
-        {businessRiskTier ? (
+        {/* Property / Business / Car panel — owner view */}
+        {propertyDef ? (
+          <PropertyPanel def={propertyDef} upkeep={propertyUpkeep} appreciation={propertyAppreciation} net={propertyNet} />
+        ) : businessRiskTier ? (
           <BusinessIncomePanel gross={businessGross} upkeep={businessUpkeep} net={businessNet} daysToIncome={businessDaysToIncome} />
         ) : monthlyUpkeep > 0 && (() => {
           const overdue = daysUntilCharge < 0
@@ -325,9 +333,12 @@ export default function ItemActions({
 
         <PriceContext benchmark={benchmark} lastSalePrice={lastSalePrice} topOffer={topOffer} trendPct={trendPct} demand={demand} />
 
-        {businessRiskTier && (
-          <BusinessIncomePanel gross={businessGross} upkeep={businessUpkeep} net={businessNet} daysToIncome={businessDaysToIncome} />
-        )}
+        {propertyDef
+          ? <PropertyPanel def={propertyDef} upkeep={propertyUpkeep} appreciation={propertyAppreciation} net={propertyNet} />
+          : businessRiskTier
+          ? <BusinessIncomePanel gross={businessGross} upkeep={businessUpkeep} net={businessNet} daysToIncome={businessDaysToIncome} />
+          : null
+        }
 
         <button onClick={() => setShowReport(true)} style={{ marginTop: 12, background: 'none', border: 'none', color: 'var(--muted)', fontSize: 12, cursor: 'pointer', padding: 0 }}>
           Report this item
@@ -415,8 +426,10 @@ export default function ItemActions({
         </div>
       )}
 
-      {/* Business income or car upkeep — context for potential buyers */}
-      {businessRiskTier ? (
+      {/* Property / Business / Car upkeep — context for potential buyers */}
+      {propertyDef ? (
+        <PropertyPanel def={propertyDef} upkeep={propertyUpkeep} appreciation={propertyAppreciation} net={propertyNet} />
+      ) : businessRiskTier ? (
         <BusinessIncomePanel gross={businessGross} upkeep={businessUpkeep} net={businessNet} daysToIncome={businessDaysToIncome} />
       ) : monthlyUpkeep > 0 && (
         <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
@@ -525,6 +538,53 @@ function BusinessIncomePanel({ gross, upkeep, net, daysToIncome }: {
       </div>
       <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
         {daysToIncome === 0 ? 'Payout due today' : `Next payout in ${daysToIncome} day${daysToIncome !== 1 ? 's' : ''}`}
+      </div>
+    </div>
+  )
+}
+
+function PropertyPanel({ def, upkeep, appreciation, net }: {
+  def: { label: string; emoji: string; prestige: string }
+  upkeep: number
+  appreciation: number
+  net: number
+}) {
+  const isRentFree = upkeep === 0 && appreciation === 0
+  if (isRentFree) {
+    return (
+      <div style={{ marginTop: 16, padding: '14px 16px', borderRadius: 8, background: 'var(--bg3)', border: '1px solid var(--border)' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.08em', marginBottom: 8 }}>{def.emoji} {def.label.toUpperCase()}</div>
+        <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.5 }}>
+          Free to own. No upkeep, no appreciation — but at least you have a roof over your head.<br />
+          <span style={{ color: '#888', fontStyle: 'italic' }}>Prestige: {def.prestige}</span>
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div style={{ marginTop: 16, padding: '14px 16px', borderRadius: 8, background: 'var(--bg3)', border: '1px solid var(--border)' }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.08em', marginBottom: 10 }}>{def.emoji} PROPERTY ECONOMICS</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+          <span style={{ color: 'var(--muted)' }}>Monthly appreciation</span>
+          <span style={{ fontWeight: 700, color: 'var(--green)' }}>+${appreciation.toLocaleString()}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+          <span style={{ color: 'var(--muted)' }}>Monthly upkeep</span>
+          <span style={{ fontWeight: 700, color: 'var(--red)' }}>−${upkeep.toLocaleString()}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, borderTop: '1px solid var(--border)', paddingTop: 6, marginTop: 2 }}>
+          <span style={{ fontWeight: 700 }}>Net / month</span>
+          <span style={{ fontWeight: 900, color: net >= 0 ? 'var(--green)' : 'var(--red)' }}>
+            {net >= 0 ? '+' : '−'}${Math.abs(net).toLocaleString()}
+          </span>
+        </div>
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
+        Appreciation grows the asset's value, not your cash balance. Sell to realise gains.
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+        Prestige: <span style={{ color: 'var(--gold)', fontWeight: 700 }}>{def.prestige}</span>
       </div>
     </div>
   )

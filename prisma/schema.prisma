@@ -118,6 +118,8 @@ model Item {
   incomePerView    Decimal? @db.Decimal(10, 2)
   businessType     String?                            // code from BUSINESS_TYPES (null = not a business)
   businessRiskTier String?                            // safe | growth | risky | prestige
+  propertyTier     String?                            // rent_free | apartment | townhouse | villa | mansion | penthouse | private_island
+  lastAppreciatedAt DateTime?                         // last time this property's benchmarkPrice was increased
   creatorId        String?
   isOfficial       Boolean  @default(true)
   isApproved       Boolean  @default(true)
