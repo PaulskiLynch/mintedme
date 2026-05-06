@@ -25,7 +25,10 @@ interface UserProfile  { username: string; tagline: string | null; avatarUrl: st
 interface Comment      { id: string; message: string; createdAt: string; user: { username: string; avatarUrl: string | null } }
 interface InventoryItem { editionId: string; itemName: string; imageUrl: string | null; isListed: boolean; listedPrice: string | null; lastSalePrice: string | null; minimumBid: string | null }
 interface ClassStats   { onlineCount: number; topPlayerUsername: string | null; hotCategory: string | null }
-interface ChallengeProgress { carCount: number; hasWonAuction: boolean; hasBusiness: boolean; cashOk: boolean }
+interface ClientChallenge {
+  code: string; label: string; icon: string; desc: string; reward: number
+  done: boolean; claimed: boolean; progress: string | null
+}
 
 interface Props {
   userId: string; userProfile: UserProfile
@@ -34,7 +37,7 @@ interface Props {
   reactionsByEventId: Record<string, string>
   myRank: number; totalPlayers: number
   classStats: ClassStats
-  challengeProgress: ChallengeProgress
+  challenges: ClientChallenge[]
 }
 
 const ALL_CATEGORIES = ['Cars', 'Yachts', 'Watches', 'Art', 'Fashion', 'Jets', 'Mansions', 'Collectibles', 'Businesses']
@@ -253,23 +256,41 @@ function Module({ title, badge, collapsed, onToggle, children }: { title: string
 
 // ─── Challenge cards ──────────────────────────────────────────────────────────
 
-function ChallengeCards({ progress }: { progress: ChallengeProgress }) {
-  const challenges = [
-    { icon: '🏎', label: 'Own 3 cars',      done: progress.carCount >= 3,   sub: `${progress.carCount}/3`            },
-    { icon: '🏆', label: 'Win an auction',  done: progress.hasWonAuction,   sub: progress.hasWonAuction ? '✓' : '—' },
-    { icon: '💰', label: '$500k cash',      done: progress.cashOk,          sub: progress.cashOk ? '✓' : '—'        },
-    { icon: '🏢', label: 'Own a business',  done: progress.hasBusiness,     sub: progress.hasBusiness ? '✓' : '—'   },
-    { icon: '🔄', label: 'Flip for profit', done: false,                    sub: '—'                                 },
-  ]
+function ChallengeCards({ challenges }: { challenges: ClientChallenge[] }) {
   return (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--muted)', marginBottom: 10 }}>Challenges</div>
+      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--muted)', marginBottom: 10 }}>
+        Challenges · {challenges.filter(c => c.claimed).length}/{challenges.length} complete
+      </div>
       <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
         {challenges.map(c => (
-          <div key={c.label} style={{ flexShrink: 0, background: c.done ? '#1e2a10' : 'var(--bg2)', border: `1px solid ${c.done ? 'var(--green)' : 'var(--border)'}`, borderRadius: 10, padding: '10px 14px', minWidth: 110, textAlign: 'center' }}>
-            <div style={{ fontSize: 22, marginBottom: 4 }}>{c.icon}</div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: c.done ? 'var(--green)' : 'var(--white)', marginBottom: 3, lineHeight: 1.3 }}>{c.label}</div>
-            <div style={{ fontSize: 13, fontWeight: 900, color: c.done ? 'var(--green)' : 'var(--muted)' }}>{c.sub}</div>
+          <div key={c.code} style={{
+            flexShrink: 0, minWidth: 120, textAlign: 'center', borderRadius: 10, padding: '12px 14px',
+            background: c.claimed ? '#1e2a10' : c.done ? '#1a2400' : 'var(--bg2)',
+            border: `1px solid ${c.claimed ? 'var(--green)' : c.done ? '#5a8a00' : 'var(--border)'}`,
+          }}>
+            <div style={{ fontSize: 24, marginBottom: 4 }}>{c.icon}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: c.claimed ? 'var(--green)' : 'var(--white)', marginBottom: 3, lineHeight: 1.3 }}>{c.label}</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6, lineHeight: 1.3 }}>{c.desc}</div>
+            {c.progress && !c.claimed && (
+              <div style={{ marginBottom: 6 }}>
+                <div style={{ background: 'var(--bg3)', borderRadius: 4, height: 4, overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', borderRadius: 4, background: 'var(--gold)',
+                    width: (() => {
+                      const [cur, max] = c.progress.split('/').map(Number)
+                      return `${Math.round((cur / max) * 100)}%`
+                    })(),
+                  }} />
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>{c.progress}</div>
+              </div>
+            )}
+            {c.claimed ? (
+              <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--green)' }}>CLAIMED ✓</div>
+            ) : (
+              <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--gold)' }}>+${c.reward.toLocaleString()}</div>
+            )}
           </div>
         ))}
       </div>
@@ -633,7 +654,7 @@ function QuickSellModal({ onClose }: { onClose: () => void }) {
 export default function FeedClient({
   userId, userProfile, initialEvents, initialWatching, initialBids,
   initialAuctions, initialFriends, initialInterests,
-  reactionsByEventId, myRank, totalPlayers, classStats, challengeProgress,
+  reactionsByEventId, myRank, totalPlayers, classStats, challenges,
 }: Props) {
   const [events,        setEvents]        = useState(initialEvents)
   const [auctions,      setAuctions]      = useState(initialAuctions)
@@ -712,7 +733,7 @@ export default function FeedClient({
         </div>
 
         {/* Challenge cards */}
-        <ChallengeCards progress={challengeProgress} />
+        <ChallengeCards challenges={challenges} />
 
         {/* Category filter */}
         <div className="interest-chips" style={{ marginBottom: 20 }}>

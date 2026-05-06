@@ -3,6 +3,9 @@ import Link from 'next/link'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
 import { businessNetIncome, TIER_LABELS } from '@/lib/business'
+import { monthlyPropertyUpkeep } from '@/lib/property'
+import { monthlyAircraftUpkeep } from '@/lib/aircraft'
+import { monthlyUpkeep } from '@/lib/upkeep'
 import { JOB_BY_CODE } from '@/lib/jobs'
 import FollowButton from './FollowButton'
 
@@ -18,7 +21,7 @@ export default async function MintProfilePage({ params }: { params: Promise<{ us
       ownedEditions: {
         where:   { isFrozen: false },
         include: {
-          item: { select: { id: true, name: true, category: true, rarityTier: true, imageUrl: true, businessRiskTier: true, benchmarkPrice: true } },
+          item: { select: { id: true, name: true, category: true, rarityTier: true, imageUrl: true, businessRiskTier: true, propertyTier: true, aircraftType: true, benchmarkPrice: true } },
           _count: { select: { offers: { where: { status: 'pending' } } } },
         },
         orderBy: { lastSalePrice: 'desc' },
@@ -163,17 +166,46 @@ export default async function MintProfilePage({ params }: { params: Promise<{ us
               <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--muted)', marginBottom: 12 }}>{cat}</div>
               <div className="items-grid">
                 {editions.map(e => {
+                  const bench = Number(e.item.benchmarkPrice)
                   const bNet = e.item.businessRiskTier
-                    ? businessNetIncome(e.item.businessRiskTier, Number(e.item.benchmarkPrice))
-                    : 0
+                    ? businessNetIncome(e.item.businessRiskTier, bench) : 0
+                  const pUpkeep = e.item.propertyTier
+                    ? monthlyPropertyUpkeep(e.item.propertyTier, bench) : 0
+                  const aUpkeep = e.item.aircraftType
+                    ? monthlyAircraftUpkeep(e.item.aircraftType, bench) : 0
+                  const carUpkeep = (!e.item.businessRiskTier && !e.item.propertyTier && !e.item.aircraftType)
+                    ? monthlyUpkeep(e.item.rarityTier, bench) : 0
+
+                  let subLine: { text: string; colour: string }
+                  if (bNet > 0) {
+                    subLine = { text: `+$${bNet.toLocaleString()}/mo`, colour: 'var(--green)' }
+                  } else if (e.item.propertyTier) {
+                    subLine = pUpkeep > 0
+                      ? { text: `−$${pUpkeep.toLocaleString()}/mo upkeep`, colour: 'var(--red)' }
+                      : { text: 'No upkeep', colour: 'var(--muted)' }
+                  } else if (aUpkeep > 0) {
+                    subLine = { text: `−$${aUpkeep.toLocaleString()}/mo upkeep`, colour: 'var(--red)' }
+                  } else if (carUpkeep > 0) {
+                    subLine = { text: `−$${carUpkeep.toLocaleString()}/mo upkeep`, colour: 'var(--red)' }
+                  } else {
+                    const price = e.isListed && e.listedPrice ? Number(e.listedPrice) : Number(e.lastSalePrice ?? 0)
+                    subLine = price > 0
+                      ? { text: `$${price.toLocaleString()}`, colour: 'var(--white)' }
+                      : { text: '—', colour: 'var(--muted)' }
+                  }
+
+                  let badgeTop = 6
                   return (
                     <Link key={e.id} href={`/item/${e.id}`} style={{ textDecoration: 'none' }}>
                       <div className={`item-card tier-${e.item.rarityTier.toLowerCase()}`} style={{ position: 'relative' }}>
-                        {isOwn && e._count.offers > 0 && (
-                          <span style={{ position: 'absolute', top: 6, right: 6, background: 'var(--gold)', color: '#000', fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 4, zIndex: 2 }}>OFFER</span>
-                        )}
+                        {isOwn && e._count.offers > 0 && (() => { badgeTop = 6; return (
+                          <span style={{ position: 'absolute', top: badgeTop, right: 6, background: 'var(--gold)', color: '#000', fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 4, zIndex: 2 }}>OFFER</span>
+                        ) })()}
+                        {e.isListed && (() => { const t = isOwn && e._count.offers > 0 ? 26 : 6; return (
+                          <span style={{ position: 'absolute', top: t, right: 6, background: '#1a3a10', color: 'var(--green)', fontSize: 9, fontWeight: 800, padding: '2px 5px', borderRadius: 4, zIndex: 2 }}>LISTED</span>
+                        ) })()}
                         {e.item.businessRiskTier && (
-                          <span style={{ position: 'absolute', top: isOwn && e._count.offers > 0 ? 28 : 6, right: 6, background: '#1e2a15', color: 'var(--green)', fontSize: 9, fontWeight: 800, padding: '2px 5px', borderRadius: 4, zIndex: 2 }}>
+                          <span style={{ position: 'absolute', top: 6, left: 6, background: '#1e2a15', color: 'var(--green)', fontSize: 9, fontWeight: 800, padding: '2px 5px', borderRadius: 4, zIndex: 2 }}>
                             {TIER_LABELS[e.item.businessRiskTier as keyof typeof TIER_LABELS]?.toUpperCase()}
                           </span>
                         )}
@@ -185,11 +217,7 @@ export default async function MintProfilePage({ params }: { params: Promise<{ us
                         </div>
                         <div className="item-card-body">
                           <div className="item-card-name">{e.item.name}</div>
-                          {bNet > 0 ? (
-                            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--green)' }}>+${bNet.toLocaleString()}/mo</div>
-                          ) : (
-                            <div className="item-card-price">{e.lastSalePrice ? '$' + Number(e.lastSalePrice).toLocaleString() : '—'}</div>
-                          )}
+                          <div style={{ fontSize: 12, fontWeight: 700, color: subLine.colour }}>{subLine.text}</div>
                         </div>
                       </div>
                     </Link>

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
 import FeedClient from './FeedClient'
+import { CHALLENGES, type ChallengeData } from '@/lib/challenges'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,7 +21,8 @@ export default async function FeedPage() {
   const [
     events, userFull, watchedItems, activeBidAuctions, liveAuctions,
     followingUsers, myReactions, allUsers, onlineCount,
-    recentEventCategories, challengeEditions, hasWonAuction,
+    recentEventCategories, ownedEditions, auctionWinCount,
+    completedChallenges, endedOwnerships,
   ] = await Promise.all([
     prisma.feedEvent.findMany({
       where: { isVisible: true },
@@ -72,39 +74,118 @@ export default async function FeedPage() {
       where: { userId: session.user.id },
       select: { feedEventId: true, type: true },
     }),
-    // All users sorted by balance for rank calculation
     prisma.user.findMany({
       select: { id: true, balance: true },
       orderBy: { balance: 'desc' },
     }),
-    // Online player count (active last 5 min)
     prisma.user.count({
       where: { lastSeenAt: { gte: new Date(Date.now() - 5 * 60 * 1000) } },
     }),
-    // Recent feed events for hot-category calc
     prisma.feedEvent.findMany({
       where: { createdAt: { gte: new Date(Date.now() - 24 * 3600 * 1000) }, isVisible: true, editionId: { not: null } },
       include: { edition: { include: { item: { select: { category: true } } } } },
       take: 200,
     }),
-    // Challenge: owned editions by category
+    // All owned editions with category
     prisma.itemEdition.findMany({
-      where: { currentOwnerId: session.user.id },
+      where: { currentOwnerId: session.user.id, isFrozen: false },
       include: { item: { select: { category: true } } },
     }),
-    // Challenge: has won an auction?
+    // Auction wins
     prisma.ownership.count({
       where: { ownerId: session.user.id, transferType: 'auction_win' },
+    }),
+    // Already claimed challenges
+    prisma.userChallenge.findMany({
+      where: { userId: session.user.id },
+      select: { code: true },
+    }),
+    // Ended ownerships for flip detection
+    prisma.ownership.findMany({
+      where: { ownerId: session.user.id, endedAt: { not: null } },
+      select: { editionId: true, purchasePrice: true, endedAt: true },
     }),
   ])
 
   if (!userFull) redirect('/login')
 
+  // ── Challenge data ────────────────────────────────────────────────────────
+  const cats = ownedEditions.map((e: { item: { category: string } }) => e.item.category)
+  const carCount      = cats.filter((c: string) => c === 'cars').length
+  const bizCount      = cats.filter((c: string) => c === 'businesses').length
+  const propCount     = cats.filter((c: string) => c === 'properties').length
+  const aircraftCount = cats.filter((c: string) => c === 'aircraft').length
+  const categoryCount = new Set(cats).size
+
+  // Flip for profit: find an ended ownership where the next buyer paid more
+  let hasFlippedForProfit = false
+  if (endedOwnerships.length > 0) {
+    const editionIds = endedOwnerships.map((o: { editionId: string }) => o.editionId)
+    const nextOwnerships = await prisma.ownership.findMany({
+      where: { editionId: { in: editionIds }, ownerId: { not: session.user.id } },
+      select: { editionId: true, purchasePrice: true, purchaseDate: true },
+    })
+    for (const sold of endedOwnerships) {
+      if (!sold.purchasePrice) continue
+      const next = nextOwnerships
+        .filter((n: { editionId: string; purchaseDate: Date }) => n.editionId === sold.editionId && n.purchaseDate >= sold.endedAt!)
+        .sort((a: { purchaseDate: Date }, b: { purchaseDate: Date }) => a.purchaseDate.getTime() - b.purchaseDate.getTime())[0]
+      if (next?.purchasePrice && Number(next.purchasePrice) > Number(sold.purchasePrice)) {
+        hasFlippedForProfit = true
+        break
+      }
+    }
+  }
+
+  const challengeData: ChallengeData = {
+    carCount, bizCount, propCount, aircraftCount,
+    hasWonAuction: auctionWinCount > 0,
+    cashBalance: Number(userFull.balance),
+    hasFlippedForProfit,
+    categoryCount,
+  }
+
+  // ── Auto-award newly completed challenges ─────────────────────────────────
+  const claimedCodes = new Set(completedChallenges.map((c: { code: string }) => c.code))
+  const newlyCompleted = CHALLENGES.filter(c => c.met(challengeData) && !claimedCodes.has(c.code))
+
+  for (const ch of newlyCompleted) {
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.userChallenge.create({
+          data: { userId: session.user.id, code: ch.code, reward: ch.reward },
+        })
+        await tx.user.update({
+          where: { id: session.user.id },
+          data: { balance: { increment: ch.reward } },
+        })
+        await tx.transaction.create({
+          data: {
+            toUserId:    session.user.id,
+            amount:      ch.reward,
+            type:        'admin_adjustment',
+            description: `Challenge reward: ${ch.label}`,
+          },
+        })
+        await tx.notification.create({
+          data: {
+            userId:    session.user.id,
+            type:      'challenge_complete',
+            message:   `${ch.icon} Challenge complete: "${ch.label}" — $${ch.reward.toLocaleString()} added to your balance!`,
+            actionUrl: '/feed',
+          },
+        })
+      })
+      claimedCodes.add(ch.code)
+    } catch {
+      // unique constraint = already claimed in a race, ignore
+    }
+  }
+
   // ── Rank ──────────────────────────────────────────────────────────────────
   const myRank       = allUsers.findIndex((u: { id: string }) => u.id === session.user.id) + 1
   const totalPlayers = allUsers.length
 
-  // ── Class stats ───────────────────────────────────────────────────────────
   const topPlayer = allUsers[0]?.id !== session.user.id
     ? await prisma.user.findUnique({ where: { id: allUsers[0]?.id }, select: { username: true } })
     : userFull
@@ -116,12 +197,7 @@ export default async function FeedPage() {
   }
   const hotCategory = Object.entries(catCounts).sort(([, a], [, b]) => b - a)[0]?.[0] ?? null
 
-  // ── Challenge progress ────────────────────────────────────────────────────
-  const carCount    = challengeEditions.filter((e: { item: { category: string } }) => e.item.category === 'cars').length
-  const hasBusiness = challengeEditions.some((e: { item: { category: string } }) => e.item.category === 'businesses')
-  const cashOk      = Number(userFull.balance) >= 500_000
-
-  // ── Serialise events ──────────────────────────────────────────────────────
+  // ── Serialise ─────────────────────────────────────────────────────────────
   const serialisedEvents = events.map((e: typeof events[0]) => ({
     id:           e.id,
     eventType:    e.eventType,
@@ -186,6 +262,18 @@ export default async function FeedPage() {
   const reactionsByEventId: Record<string, string> = {}
   for (const r of myReactions) reactionsByEventId[r.feedEventId] = r.type
 
+  // Pass challenges with completion state to client
+  const challengesForClient = CHALLENGES.map(ch => ({
+    code:     ch.code,
+    label:    ch.label,
+    icon:     ch.icon,
+    desc:     ch.desc,
+    reward:   ch.reward,
+    done:     ch.met(challengeData),
+    claimed:  claimedCodes.has(ch.code),
+    progress: ch.progress?.(challengeData) ?? null,
+  }))
+
   return (
     <FeedClient
       userId={session.user.id}
@@ -207,7 +295,7 @@ export default async function FeedPage() {
       myRank={myRank}
       totalPlayers={totalPlayers}
       classStats={{ onlineCount, topPlayerUsername: topPlayer?.username ?? null, hotCategory }}
-      challengeProgress={{ carCount, hasWonAuction: hasWonAuction > 0, hasBusiness, cashOk }}
+      challenges={challengesForClient}
     />
   )
 }

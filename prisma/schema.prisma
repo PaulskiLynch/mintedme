@@ -39,6 +39,7 @@ model User {
   createdItems       Item[]             @relation("ItemCreator")
   submissions        CreatorSubmission[]
   ownerships         Ownership[]
+  challenges         UserChallenge[]
   interests          Json?
   lastSeenAt         DateTime?
 
@@ -181,6 +182,19 @@ model Ownership {
   owner   User        @relation(fields: [ownerId], references: [id])
 
   @@map("ownerships")
+}
+
+model UserChallenge {
+  id          String   @id @default(uuid())
+  userId      String
+  code        String
+  reward      Int
+  completedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, code])
+  @@map("user_challenges")
 }
 
 model Offer {

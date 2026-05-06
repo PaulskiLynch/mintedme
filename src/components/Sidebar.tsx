@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { signOut } from 'next-auth/react'
 
 interface Props {
   username: string
@@ -21,6 +22,7 @@ const NAV = [
   { href: '/inbox',         label: 'Inbox',          icon: '✉' },
   { href: '/notifications', label: 'Notifications',  icon: '🔔' },
   { href: '/suggestions',   label: 'Suggest',        icon: '💡' },
+  { href: '/admin',         label: 'Admin',          icon: '★' },
 ]
 
 const MOBILE_NAV_PRIMARY = [
@@ -38,6 +40,7 @@ const MOBILE_NAV_MORE = [
   { href: '/suggestions',   label: 'Suggest',        icon: '💡' },
   { href: '/wallet',        label: 'Wallet',         icon: '◉' },
   { href: '/settings',      label: 'Settings',       icon: '⚙' },
+  { href: '/admin',         label: 'Admin',          icon: '★' },
 ]
 
 export default function Sidebar({ username, balance, isAdmin = false, unreadCount = 0 }: Props) {
@@ -62,7 +65,16 @@ export default function Sidebar({ username, balance, isAdmin = false, unreadCoun
         </Link>
 
         <div className="sidebar-user">
-          <div className="sidebar-username">@{username}</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="sidebar-username">@{username}</div>
+            <button
+              onClick={() => signOut({ callbackUrl: '/login' })}
+              style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 11, cursor: 'pointer', padding: '2px 0', fontWeight: 600, letterSpacing: '0.04em' }}
+              title="Sign out"
+            >
+              out ↩
+            </button>
+          </div>
           <div className="sidebar-balance">${Number(balance).toLocaleString()}</div>
         </div>
 
@@ -87,12 +99,6 @@ export default function Sidebar({ username, balance, isAdmin = false, unreadCoun
             <span style={{ fontSize: 16 }}>⚙</span>
             Settings
           </Link>
-          {isAdmin && (
-            <Link href="/admin" className="nav-link" style={{ color: 'var(--gold)' }}>
-              <span style={{ fontSize: 16 }}>★</span>
-              Admin
-            </Link>
-          )}
         </div>
       </aside>
 
@@ -168,20 +174,6 @@ export default function Sidebar({ username, balance, isAdmin = false, unreadCoun
                   )}
                 </button>
               ))}
-              {isAdmin && (
-                <button
-                  onClick={() => navTo('/admin')}
-                  style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    gap: 4, padding: '12px 4px', border: 'none', borderRadius: 10, cursor: 'pointer',
-                    background: path.startsWith('/admin') ? 'var(--bg3)' : 'transparent',
-                    color: 'var(--gold)',
-                  }}
-                >
-                  <span style={{ fontSize: 22 }}>★</span>
-                  <span style={{ fontSize: 10, fontWeight: 600 }}>Admin</span>
-                </button>
-              )}
             </div>
           </div>
         </>
