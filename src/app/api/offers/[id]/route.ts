@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
+import { availableBalance } from '@/lib/balance'
 
 // Accept or decline an offer
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -28,7 +29,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
         const buyer = await tx.user.findUnique({ where: { id: buyerId } })
         if (!buyer) throw new Error('Buyer not found')
-        if (Number(buyer.balance) < price) throw new Error('Buyer has insufficient balance')
+        if (availableBalance(buyer) < price) throw new Error('Buyer has insufficient available balance')
 
         const creatorId  = offer.edition.item.creatorId
         const creatorPct = creatorId && creatorId !== sellerId ? 0.2 : 0

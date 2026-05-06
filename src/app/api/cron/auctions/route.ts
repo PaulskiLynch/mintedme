@@ -6,6 +6,7 @@ import { JOB_BY_CODE, slotsForJob } from '@/lib/jobs'
 import { businessNetIncome } from '@/lib/business'
 import { monthlyPropertyUpkeep, monthlyPropertyAppreciation } from '@/lib/property'
 import { monthlyAircraftUpkeep } from '@/lib/aircraft'
+import { availableBalance } from '@/lib/balance'
 
 const DURATION_MS        = 3 * 24 * 60 * 60 * 1000   // user auction duration
 const SYSTEM_DURATION_MS = 24 * 60 * 60 * 1000        // system auction duration (24h)
@@ -59,7 +60,7 @@ export async function GET(req: NextRequest) {
     },
     include: {
       item:         { select: { benchmarkPrice: true, rarityTier: true, name: true, aircraftType: true } },
-      currentOwner: { select: { id: true, balance: true } },
+      currentOwner: { select: { id: true, balance: true, lockedBalance: true } },
     },
     take: 200,
   })
@@ -71,7 +72,7 @@ export async function GET(req: NextRequest) {
     const cost = edition.item.aircraftType
       ? monthlyAircraftUpkeep(edition.item.aircraftType, Number(edition.item.benchmarkPrice))
       : monthlyUpkeep(edition.item.rarityTier, Number(edition.item.benchmarkPrice))
-    const canPay = Number(edition.currentOwner.balance) >= cost
+    const canPay = availableBalance(edition.currentOwner) >= cost
     try {
       await prisma.$transaction(async (tx) => {
         await tx.itemEdition.update({ where: { id: edition.id }, data: { lastUpkeepAt: new Date() } })
@@ -381,7 +382,7 @@ export async function GET(req: NextRequest) {
     },
     include: {
       item:         { select: { benchmarkPrice: true, propertyTier: true, name: true } },
-      currentOwner: { select: { id: true, balance: true } },
+      currentOwner: { select: { id: true, balance: true, lockedBalance: true } },
     },
     take: 500,
   })
@@ -396,7 +397,7 @@ export async function GET(req: NextRequest) {
       await prisma.itemEdition.update({ where: { id: edition.id }, data: { lastUpkeepAt: new Date() } })
       continue
     }
-    const canPay = Number(edition.currentOwner.balance) >= cost
+    const canPay = availableBalance(edition.currentOwner) >= cost
     try {
       await prisma.$transaction(async (tx) => {
         await tx.itemEdition.update({ where: { id: edition.id }, data: { lastUpkeepAt: new Date() } })

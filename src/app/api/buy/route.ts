@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
 import { maxEditions } from '@/lib/supply'
 import { snapshotRanks } from '@/lib/ranks'
+import { availableBalance } from '@/lib/balance'
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -77,7 +78,7 @@ export async function POST(req: NextRequest) {
 
       const buyer = await tx.user.findUnique({ where: { id: buyerId } })
       if (!buyer) throw new Error('Buyer not found')
-      if (Number(buyer.balance) < price) throw new Error('Insufficient balance')
+      if (availableBalance(buyer) < price) throw new Error('Insufficient available balance')
 
       const sellerId  = edition.currentOwnerId ?? null
       const creatorId = edition.item.creatorId ?? null

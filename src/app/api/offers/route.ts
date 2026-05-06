@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
+import { availableBalance } from '@/lib/balance'
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -21,11 +22,11 @@ export async function POST(req: NextRequest) {
       const buyer = await tx.user.findUnique({ where: { id: buyerId } })
       if (!buyer) throw new Error('Not found')
 
-      // Check reserved balance (existing active offers)
+      // Available = total minus bid locks minus funds reserved in other pending offers
       const activeOffers = await tx.offer.aggregate({ where: { buyerId, status: 'pending' }, _sum: { amount: true } })
-      const reserved   = Number(activeOffers._sum.amount ?? 0)
-      const available  = Number(buyer.balance) - reserved
-      if (available < amount) throw new Error(`Insufficient available balance. You have $${available.toLocaleString()} available ($${Number(buyer.balance).toLocaleString()} - $${reserved.toLocaleString()} reserved in other offers).`)
+      const reservedOffers = Number(activeOffers._sum.amount ?? 0)
+      const available      = availableBalance(buyer) - reservedOffers
+      if (available < amount) throw new Error(`Insufficient available balance. You have $${available.toLocaleString()} spendable after bid holds and pending offers.`)
 
       const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000)
       const offer = await tx.offer.create({

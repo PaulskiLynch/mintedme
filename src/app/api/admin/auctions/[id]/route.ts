@@ -52,11 +52,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!auction) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     await prisma.$transaction([
-      // Refund each active bid
+      // Refund each active bid: return to spendable balance and release the lock
       ...auction.bids.map(bid =>
         prisma.user.update({
           where: { id: bid.userId },
-          data:  { balance: { increment: bid.amount } },
+          data:  { lockedBalance: { decrement: bid.amount } },
         })
       ),
       // Mark bids as refunded
