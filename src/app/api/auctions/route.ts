@@ -2,33 +2,45 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
 
+const DURATION_MS = 3 * 24 * 60 * 60 * 1000  // always 3 days
+
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { editionId, minimumBid, durationHours } = await req.json()
-  if (!editionId || !minimumBid || minimumBid <= 0) return NextResponse.json({ error: 'Invalid parameters' }, { status: 400 })
-  const hours = [1, 6, 12, 24, 48, 72].includes(Number(durationHours)) ? Number(durationHours) : 24
+  const { editionId, startingBid } = await req.json()
+  if (!editionId) return NextResponse.json({ error: 'editionId required' }, { status: 400 })
 
   try {
     const result = await prisma.$transaction(async (tx) => {
       const edition = await tx.itemEdition.findUnique({
         where: { id: editionId },
-        include: { item: { select: { benchmarkPrice: true, rarityTier: true, minimumBid: true, name: true } } },
+        include: { item: { select: { benchmarkPrice: true, rarityTier: true, minimumBid: true, name: true, id: true } } },
       })
-      if (!edition) throw new Error('Edition not found')
+      if (!edition)                                   throw new Error('Edition not found')
       if (edition.currentOwnerId !== session.user.id) throw new Error('Not your item')
-      if (edition.isInAuction) throw new Error('Already in auction')
-      if (edition.isFrozen) throw new Error('Item is frozen')
+      if (edition.isInAuction)                        throw new Error('Already in auction')
+      if (edition.isFrozen)                           throw new Error('Item is frozen')
 
-      const endsAt = new Date(Date.now() + hours * 60 * 60 * 1000)
+      const benchmark  = Number(edition.item.benchmarkPrice)
+      const defaultBid = Math.round(benchmark * 0.10)
+      const minBid     = Math.max(defaultBid, Number(edition.item.minimumBid))
+      const resolvedStartingBid = startingBid && Number(startingBid) > 0
+        ? Math.max(Number(startingBid), 1)
+        : minBid
+
+      const now    = new Date()
+      const endsAt = new Date(now.getTime() + DURATION_MS)
+
       const auction = await tx.auction.create({
         data: {
           editionId,
           sellerId:       session.user.id,
-          minimumBid:     Math.max(Number(minimumBid), Number(edition.item.minimumBid)),
-          benchmarkPrice: Number(edition.item.benchmarkPrice),
+          minimumBid:     resolvedStartingBid,
+          benchmarkPrice: benchmark,
           rarityTier:     edition.item.rarityTier,
+          status:         'active',
+          startsAt:       now,
           endsAt,
         },
       })
@@ -38,9 +50,9 @@ export async function POST(req: NextRequest) {
         data: { isInAuction: true, isListed: false, listedPrice: null },
       })
 
-      // Notify users who have this item on their wishlist
+      // Notify wishlist followers
       const wishlisters = await tx.wishlist.findMany({
-        where: { itemId: edition.itemId, userId: { not: session.user.id } },
+        where: { itemId: edition.item.id, userId: { not: session.user.id } },
         select: { userId: true },
       })
       if (wishlisters.length > 0) {

@@ -24,7 +24,8 @@ interface Props {
   benchmarkPrice:   string
   lastSalePrice:    string | null
   topOffer:         string | null
-  weeklyUpkeep:     number
+  monthlyUpkeep:    number
+  daysUntilCharge:  number
   supplyLocked:     boolean
   availableNow:     number
   alreadyClaimed:   number
@@ -32,6 +33,11 @@ interface Props {
   watcherCount:     number
   pendingOfferCount: number
   trendPct:         number | null
+  businessRiskTier: string | null
+  businessGross:    number
+  businessUpkeep:   number
+  businessNet:      number
+  businessDaysToIncome: number
 }
 
 function timeAgo(iso: string | null): string | null {
@@ -50,9 +56,10 @@ export default function ItemActions({
   userId, userBalance, currentOwnerId,
   ownerUsername, ownerLastSeenAt, ownerRareCount,
   minimumBid, benchmarkPrice, lastSalePrice, topOffer,
-  weeklyUpkeep, supplyLocked,
+  monthlyUpkeep, daysUntilCharge, supplyLocked,
   availableNow, alreadyClaimed, totalEver,
   watcherCount, pendingOfferCount, trendPct,
+  businessRiskTier, businessGross, businessUpkeep, businessNet, businessDaysToIncome,
 }: Props) {
   const router = useRouter()
   const [busy, setBusy]               = useState(false)
@@ -65,11 +72,11 @@ export default function ItemActions({
   const [showNote, setShowNote]       = useState(false)
 
   // Owner action state
-  const [showList, setShowList]       = useState(false)
-  const [showAuction, setShowAuction] = useState(false)
-  const [listPrice, setListPrice]     = useState(listedPrice ?? '')
-  const [startBid, setStartBid]       = useState(minimumBid ?? '')
-  const [durationHours, setDurationHours] = useState('24')
+  const [showList, setShowList]           = useState(false)
+  const [showAuction, setShowAuction]     = useState(false)
+  const [listPrice, setListPrice]         = useState(listedPrice ?? '')
+  const [bidOption, setBidOption]         = useState<'10pct' | '25pct' | 'custom'>('10pct')
+  const [customBidValue, setCustomBidValue] = useState('')
 
   // Report state
   const [showReport, setShowReport]   = useState(false)
@@ -86,10 +93,13 @@ export default function ItemActions({
                : (watcherCount + pendingOfferCount * 2) >= 2 ? 'Medium'
                : 'Normal'
 
-  const supplyLine = availableNow > 0
+  const isUnique   = rarityTier === 'Custom' || rarityTier === 'Banger'
+  const supplyLine = isUnique
+    ? '1 of 1 · Unique edition'
+    : availableNow > 0
     ? `${availableNow} available now · ${totalEver} total ever`
     : `${totalEver} total ever`
-  const claimedLine = alreadyClaimed > 0 ? `${alreadyClaimed} already claimed` : null
+  const claimedLine = isUnique ? null : alreadyClaimed > 0 ? `${alreadyClaimed} already claimed` : null
 
   async function handleBuy() {
     if (!userId) { router.push('/login'); return }
@@ -134,7 +144,10 @@ export default function ItemActions({
   async function handleStartAuction(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true); setError('')
-    const res = await fetch('/api/auctions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ editionId, startingBid: Number(startBid), durationHours: Number(durationHours) }) })
+    const bid10 = Math.round(benchmark * 0.10)
+    const bid25 = Math.round(benchmark * 0.25)
+    const startingBid = bidOption === '10pct' ? bid10 : bidOption === '25pct' ? bid25 : Number(customBidValue)
+    const res = await fetch('/api/auctions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ editionId, startingBid }) })
     const json = await res.json()
     if (res.ok) { router.push(`/auction/${json.auctionId}`) } else { setError(json.error || 'Failed'); setBusy(false) }
   }
@@ -177,6 +190,28 @@ export default function ItemActions({
           </div>
         )}
 
+        {/* Business income panel — owner view */}
+        {businessRiskTier ? (
+          <BusinessIncomePanel gross={businessGross} upkeep={businessUpkeep} net={businessNet} daysToIncome={businessDaysToIncome} />
+        ) : monthlyUpkeep > 0 && (() => {
+          const overdue = daysUntilCharge < 0
+          return (
+            <div style={{ marginTop: 16, padding: '12px 14px', borderRadius: 8, background: overdue ? '#2a1010' : 'var(--bg3)', border: `1px solid ${overdue ? 'var(--red)44' : 'transparent'}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.06em' }}>MONTHLY UPKEEP</span>
+                <span style={{ fontSize: 15, fontWeight: 900, color: overdue ? 'var(--red)' : 'var(--gold)' }}>
+                  ${monthlyUpkeep.toLocaleString()}
+                </span>
+              </div>
+              <div style={{ fontSize: 11, color: overdue ? 'var(--red)' : 'var(--muted)', marginTop: 4 }}>
+                {overdue
+                  ? `Overdue by ${Math.abs(daysUntilCharge)} day${Math.abs(daysUntilCharge) !== 1 ? 's' : ''}`
+                  : `Next charge in ${daysUntilCharge} day${daysUntilCharge !== 1 ? 's' : ''}`}
+              </div>
+            </div>
+          )
+        })()}
+
         <button onClick={() => setShowReport(true)} style={{ marginTop: 16, background: 'none', border: 'none', color: 'var(--muted)', fontSize: 12, cursor: 'pointer', padding: 0 }}>
           Report this item
         </button>
@@ -203,36 +238,45 @@ export default function ItemActions({
         )}
 
         {/* Auction modal */}
-        {showAuction && (
-          <div className="overlay" onClick={e => { if (e.target === e.currentTarget) setShowAuction(false) }}>
-            <div className="modal">
-              <div className="modal-title">Start Auction</div>
-              <div className="modal-sub">{itemName}</div>
-              <form onSubmit={handleStartAuction}>
-                <div className="form-group">
-                  <label className="form-label">Starting bid (USD)</label>
-                  <input className="form-input" type="number" min="1" value={startBid} onChange={e => setStartBid(e.target.value)} required autoFocus />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Duration</label>
-                  <select className="form-input" value={durationHours} onChange={e => setDurationHours(e.target.value)}>
-                    <option value="1">1 hour</option>
-                    <option value="6">6 hours</option>
-                    <option value="12">12 hours</option>
-                    <option value="24">24 hours</option>
-                    <option value="48">48 hours</option>
-                    <option value="72">72 hours</option>
-                  </select>
-                </div>
-                {error && <div className="form-error">{error}</div>}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn btn-gold" type="submit" disabled={busy || !startBid}>{busy ? 'Starting...' : 'Start auction'}</button>
-                  <button className="btn btn-ghost" type="button" onClick={() => setShowAuction(false)}>Cancel</button>
-                </div>
-              </form>
+        {showAuction && (() => {
+          const bid10 = Math.round(benchmark * 0.10)
+          const bid25 = Math.round(benchmark * 0.25)
+          const canSubmit = bidOption !== 'custom' || (Number(customBidValue) > 0)
+          return (
+            <div className="overlay" onClick={e => { if (e.target === e.currentTarget) setShowAuction(false) }}>
+              <div className="modal">
+                <div className="modal-title">Start Auction</div>
+                <div className="modal-sub">{itemName} · 3-day auction</div>
+                <form onSubmit={handleStartAuction}>
+                  <div className="form-group">
+                    <label className="form-label">Starting bid</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {[
+                        { key: '10pct', label: `10% of true value`, value: `$${bid10.toLocaleString()}` },
+                        { key: '25pct', label: `25% of true value`, value: `$${bid25.toLocaleString()}` },
+                        { key: 'custom', label: 'Custom amount', value: '' },
+                      ].map(opt => (
+                        <label key={opt.key} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '8px 12px', borderRadius: 6, background: bidOption === opt.key ? 'var(--bg3)' : 'transparent', border: `1px solid ${bidOption === opt.key ? 'var(--gold-dim)' : 'transparent'}` }}>
+                          <input type="radio" name="bidOption" value={opt.key} checked={bidOption === opt.key} onChange={() => setBidOption(opt.key as typeof bidOption)} />
+                          <span style={{ flex: 1, fontSize: 14 }}>{opt.label}</span>
+                          {opt.value && <span style={{ color: 'var(--gold)', fontWeight: 700, fontSize: 14 }}>{opt.value}</span>}
+                        </label>
+                      ))}
+                      {bidOption === 'custom' && (
+                        <input className="form-input" type="number" min="1" value={customBidValue} onChange={e => setCustomBidValue(e.target.value)} placeholder="Enter amount" autoFocus required />
+                      )}
+                    </div>
+                  </div>
+                  {error && <div className="form-error">{error}</div>}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                    <button className="btn btn-gold" type="submit" disabled={busy || !canSubmit}>{busy ? 'Starting...' : 'Start 3-day auction'}</button>
+                    <button className="btn btn-ghost" type="button" onClick={() => setShowAuction(false)}>Cancel</button>
+                  </div>
+                </form>
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {showReport && <ReportModal editionId={editionId} onClose={() => setShowReport(false)} />}
       </div>
@@ -267,6 +311,10 @@ export default function ItemActions({
         )}
 
         <PriceContext benchmark={benchmark} lastSalePrice={lastSalePrice} topOffer={topOffer} trendPct={trendPct} demand={demand} />
+
+        {businessRiskTier && (
+          <BusinessIncomePanel gross={businessGross} upkeep={businessUpkeep} net={businessNet} daysToIncome={businessDaysToIncome} />
+        )}
 
         <button onClick={() => setShowReport(true)} style={{ marginTop: 12, background: 'none', border: 'none', color: 'var(--muted)', fontSize: 12, cursor: 'pointer', padding: 0 }}>
           Report this item
@@ -354,10 +402,15 @@ export default function ItemActions({
         </div>
       )}
 
-      {/* Upkeep warning */}
-      {weeklyUpkeep > 0 && (
-        <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 14, fontSize: 12, color: '#e0a030' }}>
-          Ownership cost: ${weeklyUpkeep.toLocaleString()}/week
+      {/* Business income or car upkeep — context for potential buyers */}
+      {businessRiskTier ? (
+        <BusinessIncomePanel gross={businessGross} upkeep={businessUpkeep} net={businessNet} daysToIncome={businessDaysToIncome} />
+      ) : monthlyUpkeep > 0 && (
+        <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+            <span style={{ color: 'var(--muted)' }}>Monthly upkeep</span>
+            <span style={{ fontWeight: 700, color: '#e0a030' }}>${monthlyUpkeep.toLocaleString()}</span>
+          </div>
         </div>
       )}
 
@@ -432,6 +485,33 @@ function PriceContext({ benchmark, lastSalePrice, topOffer, trendPct, demand }: 
             <span style={{ fontWeight: 700, color: 'var(--green)' }}>${Number(topOffer).toLocaleString()}</span>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+function BusinessIncomePanel({ gross, upkeep, net, daysToIncome }: {
+  gross: number; upkeep: number; net: number; daysToIncome: number
+}) {
+  return (
+    <div style={{ marginTop: 16, padding: '14px 16px', borderRadius: 8, background: 'var(--bg3)', border: '1px solid #2a3a2a' }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.08em', marginBottom: 10 }}>MONTHLY INCOME</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+          <span style={{ color: 'var(--muted)' }}>Gross income</span>
+          <span style={{ fontWeight: 700, color: 'var(--green)' }}>+${gross.toLocaleString()}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+          <span style={{ color: 'var(--muted)' }}>Upkeep</span>
+          <span style={{ fontWeight: 700, color: 'var(--red)' }}>−${upkeep.toLocaleString()}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, borderTop: '1px solid var(--border)', paddingTop: 6, marginTop: 2 }}>
+          <span style={{ fontWeight: 700 }}>Net profit</span>
+          <span style={{ fontWeight: 900, color: 'var(--gold)' }}>+${net.toLocaleString()}/mo</span>
+        </div>
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
+        {daysToIncome === 0 ? 'Payout due today' : `Next payout in ${daysToIncome} day${daysToIncome !== 1 ? 's' : ''}`}
       </div>
     </div>
   )

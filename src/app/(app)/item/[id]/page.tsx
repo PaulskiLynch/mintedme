@@ -3,15 +3,12 @@ import Link from 'next/link'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
 import { maxEditions } from '@/lib/supply'
+import { monthlyUpkeep, upkeepDaysRemaining } from '@/lib/upkeep'
+import { businessGrossIncome, businessUpkeepCost, businessNetIncome, businessIncomeDaysRemaining, TIER_LABELS } from '@/lib/business'
 import ItemActions from './ItemActions'
 import WishlistButton from './WishlistButton'
 
 export const dynamic = 'force-dynamic'
-
-function weeklyUpkeep(rarityTier: string, benchmarkPrice: number): number {
-  const rates: Record<string, number> = { Exotic: 0.001, Legendary: 0.0025, Mythic: 0.003 }
-  return Math.round(benchmarkPrice * (rates[rarityTier] ?? 0))
-}
 
 export default async function ItemPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -66,15 +63,26 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
     prisma.user.count(),
     prisma.itemEdition.count({ where: { itemId: item.id } }),
   ])
-  const allowedEditions = Math.min(item.totalSupply, maxEditions(item.rarityTier, userCount))
-  const supplyLocked    = !!edition.currentOwnerId && mintedCount >= allowedEditions
-  const availableNow    = Math.max(0, allowedEditions - claimedCount)
-  const upkeep          = weeklyUpkeep(item.rarityTier, Number(item.benchmarkPrice))
+  const allowedEditions  = Math.min(item.totalSupply, maxEditions(item.rarityTier, userCount))
+  const supplyLocked     = !!edition.currentOwnerId && mintedCount >= allowedEditions
+  const availableNow     = Math.max(0, allowedEditions - claimedCount)
+  const upkeep           = monthlyUpkeep(item.rarityTier, Number(item.benchmarkPrice))
+  const daysUntilCharge  = upkeepDaysRemaining(
+    edition.lastUpkeepAt ?? null,
+    edition.lastSaleDate ?? null,
+    edition.createdAt,
+  )
 
   // Trend: % diff between benchmark and last sale price
   const trendPct = edition.lastSalePrice
     ? Number((((Number(item.benchmarkPrice) - Number(edition.lastSalePrice)) / Number(edition.lastSalePrice)) * 100).toFixed(1))
     : null
+
+  const bTier = item.businessRiskTier ?? null
+  const bGross  = bTier ? businessGrossIncome(bTier, Number(item.benchmarkPrice))  : 0
+  const bUpkeep = bTier ? businessUpkeepCost(bTier, Number(item.benchmarkPrice))   : 0
+  const bNet    = bTier ? businessNetIncome(bTier, Number(item.benchmarkPrice))     : 0
+  const bDays   = bTier ? businessIncomeDaysRemaining(edition.lastIncomeAt ?? null, edition.lastSaleDate ?? null, edition.createdAt) : 0
 
   const activeAuction = edition.isInAuction
     ? await prisma.auction.findFirst({
@@ -154,10 +162,17 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
               <span className={`class-badge class-${item.rarityTier.toLowerCase()}`}>{item.rarityTier}</span>
               <span style={{ fontSize: 12, color: 'var(--muted)' }}>{item.category}</span>
+              {bTier && (
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', background: 'var(--bg3)', borderRadius: 4, padding: '2px 7px', letterSpacing: '0.05em' }}>
+                  {TIER_LABELS[bTier as keyof typeof TIER_LABELS]} Business
+                </span>
+              )}
             </div>
             <h1 style={{ fontSize: 22, fontWeight: 900, marginBottom: 4 }}>{item.name}</h1>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>
-              Edition #{edition.editionNumber} of {item.totalSupply}
+              {(item.rarityTier === 'Custom' || item.rarityTier === 'Banger')
+                ? '1 of 1 · Unique edition'
+                : `Edition #${edition.editionNumber} of ${item.totalSupply}`}
             </div>
 
             {edition.isListed && edition.listedPrice ? (
@@ -206,7 +221,8 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
               benchmarkPrice={item.benchmarkPrice.toString()}
               lastSalePrice={edition.lastSalePrice?.toString() ?? null}
               topOffer={topOffer}
-              weeklyUpkeep={upkeep}
+              monthlyUpkeep={upkeep}
+              daysUntilCharge={daysUntilCharge}
               supplyLocked={supplyLocked}
               availableNow={availableNow}
               alreadyClaimed={claimedCount}
@@ -214,6 +230,11 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
               watcherCount={wishlistCount}
               pendingOfferCount={edition.offers.length}
               trendPct={trendPct}
+              businessRiskTier={bTier}
+              businessGross={bGross}
+              businessUpkeep={bUpkeep}
+              businessNet={bNet}
+              businessDaysToIncome={bDays}
             />
 
             {!isOwner && (

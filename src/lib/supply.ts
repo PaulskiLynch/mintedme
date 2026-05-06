@@ -1,11 +1,14 @@
 export function maxEditions(rarityTier: string, userCount: number): number {
-  switch (rarityTier) {
-    case 'Mythic':    return 1
-    case 'Legendary': return Math.min(3,  1 + Math.floor(userCount / 200))
-    case 'Exotic':    return Math.min(5,  2 + Math.floor(userCount / 100))
-    case 'Rare':      return Math.min(7,  3 + Math.floor(userCount / 50))
-    case 'Premium':   return Math.min(8,  4 + Math.floor(userCount / 30))
-    case 'Common':    return Math.min(10, 5 + Math.floor(userCount / 20))
-    default:          return 1
+  if (rarityTier === 'Custom' || rarityTier === 'Banger') return 1
+  const active = Math.max(userCount, 1000)
+  const config: Record<string, [number, number]> = {
+    Mythic:    [0.001, 1],
+    Legendary: [0.003, 3],
+    Exotic:    [0.005, 5],
+    Rare:      [0.007, 7],
+    Premium:   [0.008, 8],
+    Common:    [0.010, 10],
   }
+  const [rate, min] = config[rarityTier] ?? [0.001, 1]
+  return Math.max(min, Math.floor(active * rate))
 }

@@ -48,6 +48,8 @@ const RARITY_COLOURS: Record<string, string> = {
   Exotic:    '#b07fef',
   Legendary: '#e0a030',
   Mythic:    '#e05a5a',
+  Custom:    '#d0d0d0',
+  Banger:    '#ff6b35',
 }
 
 function fmt(n: string | null) {
@@ -148,7 +150,9 @@ function MarketplaceCard({ item, userId }: { item: Item; userId: string | null }
         {/* Availability / scarcity */}
         <div className="item-card-edition">
           {auctionEdition
-            ? <span style={{ color: '#ff6b35', fontWeight: 700 }}>Live auction</span>
+            ? <span style={{ color: colour, fontWeight: 700 }}>Live auction</span>
+            : (item.rarityTier === 'Custom' || item.rarityTier === 'Banger')
+            ? <span style={{ color: colour, fontWeight: 700 }}>1 of 1 · Unique edition</span>
             : scarcity
             ? <span style={{ color: scarcity.urgent ? 'var(--red)' : 'var(--muted)', fontWeight: scarcity.urgent ? 700 : 400 }}>{scarcity.text}</span>
             : availableCount > 0

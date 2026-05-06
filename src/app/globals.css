@@ -210,6 +210,8 @@ input, textarea, select { font-family: inherit; }
 .class-exotic    { background: #1e1528; color: #b07fef; }
 .class-legendary { background: #2a1e00; color: #e0a030; border: 1px solid #e0a03044; }
 .class-mythic    { background: #2a1010; color: #e05a5a; border: 1px solid #e05a5a44; }
+.class-custom    { background: #202020; color: #d0d0d0; border: 1px solid #d0d0d044; }
+.class-banger    { background: #2a1a10; color: #ff6b35; border: 1px solid #ff6b3544; }
 
 /* ── Feed ─────────────────────────────────────── */
 .feed-event {

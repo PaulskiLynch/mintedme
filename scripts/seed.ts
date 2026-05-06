@@ -20,6 +20,8 @@ function rarityFor(benchmark: number): string {
 
 function supplyFor(rarity: string): number {
   switch (rarity) {
+    case 'Custom':
+    case 'Banger':    return 1
     case 'Mythic':    return 1
     case 'Legendary': return 3
     case 'Exotic':    return 5

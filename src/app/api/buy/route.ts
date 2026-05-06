@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
 
       await tx.itemEdition.update({
         where: { id: editionId },
-        data: { currentOwnerId: buyerId, lastSalePrice: price, lastSaleDate: new Date(), isListed: false, listedPrice: null },
+        data: { currentOwnerId: buyerId, lastSalePrice: price, lastSaleDate: new Date(), isListed: false, listedPrice: null, lastUpkeepAt: new Date(), lastIncomeAt: new Date() },
       })
       await tx.offer.updateMany({ where: { editionId, status: 'pending' }, data: { status: 'expired' } })
 

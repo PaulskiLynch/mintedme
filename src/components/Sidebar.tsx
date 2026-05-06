@@ -14,6 +14,7 @@ const NAV = [
   { href: '/feed',          label: 'Feed',          icon: '◎' },
   { href: '/marketplace',   label: 'Market',         icon: '◈' },
   { href: '/auctions',      label: 'Auctions',       icon: '⏱' },
+  { href: '/jobs',          label: 'Jobs',           icon: '◑' },
   { href: '/leaderboard',   label: 'Leaderboard',    icon: '▲' },
   { href: '/mint',          label: 'My Mint',        icon: '◆' },
   { href: '/inbox',         label: 'Inbox',          icon: '✉' },
