@@ -45,12 +45,13 @@ export default async function MarketplacePage({
     <MarketplaceClient
       items={items.map((i: typeof items[0]) => ({
         ...i,
-        minimumBid:     i.minimumBid.toString(),
-        benchmarkPrice: i.benchmarkPrice.toString(),
-        horsepower:    i.horsepower    ?? null,
-        topSpeed:      i.topSpeed      ?? null,
-        zeroToHundred: i.zeroToHundred?.toString() ?? null,
-        watcherCount:  i._count.wishlistedBy,
+        minimumBid:      i.minimumBid.toString(),
+        benchmarkPrice:  i.benchmarkPrice.toString(),
+        businessRiskTier:i.businessRiskTier ?? null,
+        horsepower:     i.horsepower    ?? null,
+        topSpeed:       i.topSpeed      ?? null,
+        zeroToHundred:  i.zeroToHundred?.toString() ?? null,
+        watcherCount:   i._count.wishlistedBy,
         editions: i.editions.map((e: typeof i.editions[0]) => ({
           ...e,
           listedPrice:   e.listedPrice?.toString()   ?? null,

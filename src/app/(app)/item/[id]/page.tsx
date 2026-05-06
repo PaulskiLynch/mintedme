@@ -103,6 +103,22 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
           <div className="item-detail-img">
             {item.imageUrl
               ? <img src={item.imageUrl} alt={item.name} />
+              : item.businessRiskTier
+              ? (() => {
+                  const BIZ: Record<string, { bg: string; icon: string; label: string }> = {
+                    safe:     { bg: 'linear-gradient(135deg, #1a2e1a 0%, #0d1f0d 100%)', icon: '🏦', label: 'Safe'     },
+                    growth:   { bg: 'linear-gradient(135deg, #1a1f2e 0%, #0d1220 100%)', icon: '📈', label: 'Growth'   },
+                    risky:    { bg: 'linear-gradient(135deg, #2e1a10 0%, #200d08 100%)', icon: '🎲', label: 'Risky'    },
+                    prestige: { bg: 'linear-gradient(135deg, #2a1f0a 0%, #1c1408 100%)', icon: '👑', label: 'Prestige' },
+                  }
+                  const s = BIZ[item.businessRiskTier] ?? BIZ.safe
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', background: s.bg, gap: 12 }}>
+                      <div style={{ fontSize: 56 }}>{s.icon}</div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--gold)', letterSpacing: '0.12em' }}>{s.label.toUpperCase()} TIER BUSINESS</div>
+                    </div>
+                  )
+                })()
               : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)' }}>No image</div>
             }
           </div>
