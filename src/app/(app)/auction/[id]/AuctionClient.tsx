@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { bidIncrement } from '@/lib/auction'
+import { bidIncrement } from '@/lib/bidIncrement'
 
 interface ChatMessage {
   id: string
