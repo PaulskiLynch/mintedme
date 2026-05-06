@@ -11,7 +11,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const {
     name, inspirationName, description, category, rarityTier, imageUrl,
     totalSupply, benchmarkPrice, horsepower, topSpeed, zeroToHundred,
-    businessType, businessRiskTier, isOfficial, isApproved, isFrozen,
+    businessType, businessRiskTier, propertyTier, aircraftType,
+    isOfficial, isApproved, isFrozen, itemStatus,
   } = body
 
   const minimumBid = Math.round(Number(benchmarkPrice) * 0.10)
@@ -21,22 +22,25 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       where: { id },
       data: {
         name,
-        inspirationName: inspirationName || null,
-        description:     description     || null,
+        inspirationName:  inspirationName  || null,
+        description:      description      || null,
         category,
         rarityTier,
-        imageUrl:        imageUrl        || null,
-        totalSupply:     Number(totalSupply),
-        benchmarkPrice:  Number(benchmarkPrice),
+        imageUrl:         imageUrl         || null,
+        totalSupply:      Number(totalSupply),
+        benchmarkPrice:   Number(benchmarkPrice),
         minimumBid,
-        horsepower:      horsepower      ? Number(horsepower)      : null,
-        topSpeed:        topSpeed        ? Number(topSpeed)        : null,
-        zeroToHundred:   zeroToHundred   ? Number(zeroToHundred)   : null,
-        businessType:    businessType    || null,
-        businessRiskTier:businessRiskTier|| null,
-        isOfficial:      !!isOfficial,
-        isApproved:      !!isApproved,
-        isFrozen:        !!isFrozen,
+        horsepower:       horsepower       ? Number(horsepower)      : null,
+        topSpeed:         topSpeed         ? Number(topSpeed)        : null,
+        zeroToHundred:    zeroToHundred    ? Number(zeroToHundred)   : null,
+        businessType:     businessType     || null,
+        businessRiskTier: businessRiskTier || null,
+        propertyTier:     propertyTier     || null,
+        aircraftType:     aircraftType     || null,
+        isOfficial:       !!isOfficial,
+        isApproved:       !!isApproved,
+        isFrozen:         !!isFrozen,
+        itemStatus:       itemStatus       || 'active',
       },
     })
     return NextResponse.json({ ok: true })

@@ -1,9 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 
-const RARITY_TIERS = ['Common', 'Premium', 'Rare', 'Exotic', 'Legendary', 'Mythic', 'Custom', 'Banger']
+const RARITY_TIERS   = ['Common', 'Premium', 'Rare', 'Exotic', 'Legendary', 'Mythic', 'Custom', 'Banger']
+const CATEGORIES     = ['cars', 'businesses', 'properties', 'aircraft', 'yachts', 'watches', 'art', 'fashion', 'collectibles']
+const PROPERTY_TIERS = ['rent_free', 'apartment', 'townhouse', 'villa', 'mansion', 'penthouse', 'private_island']
+const AIRCRAFT_TYPES = ['prop_plane', 'light_jet', 'private_jet', 'heavy_jet', 'ultra_long_range', 'cargo_lux', 'helicopter', 'seaplane', 'supersonic']
+const ITEM_STATUSES  = ['active', 'draft', 'retired']
+
 const BIZ_TYPES = [
   { code: 'cafe_chain',              title: 'Café Chain'               },
   { code: 'boutique_gym',            title: 'Boutique Gym Group'       },
@@ -52,39 +57,67 @@ export interface ItemData {
   zeroToHundred:    string
   businessType:     string
   businessRiskTier: string
+  propertyTier:     string
+  aircraftType:     string
   isOfficial:       boolean
   isApproved:       boolean
   isFrozen:         boolean
+  itemStatus:       string
 }
 
 const DEFAULTS: ItemData = {
   name: '', inspirationName: '', description: '', category: 'cars',
   rarityTier: 'Common', imageUrl: '', totalSupply: 10, benchmarkPrice: 100000,
   horsepower: '', topSpeed: '', zeroToHundred: '', businessType: '',
-  businessRiskTier: 'safe', isOfficial: true, isApproved: true, isFrozen: false,
+  businessRiskTier: 'safe', propertyTier: '', aircraftType: '',
+  isOfficial: true, isApproved: true, isFrozen: false, itemStatus: 'active',
 }
 
-const inputStyle: React.CSSProperties = {
+const inp: React.CSSProperties = {
   width: '100%', padding: '8px 12px', background: 'var(--bg3)',
   border: '1px solid var(--border)', borderRadius: 6, color: 'var(--white)', fontSize: 13,
   boxSizing: 'border-box',
 }
-const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.06em', marginBottom: 4, display: 'block' }
-const groupStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4 }
+const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.06em', marginBottom: 4, display: 'block' }
+const grp: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4 }
 
 export default function ItemForm({ initial, isEdit }: { initial?: Partial<ItemData>; isEdit?: boolean }) {
-  const router = useRouter()
-  const [form, setForm] = useState<ItemData>({ ...DEFAULTS, ...initial })
-  const [seedEdition, setSeedEdition] = useState(!isEdit)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
+  const router   = useRouter()
+  const fileRef  = useRef<HTMLInputElement>(null)
+  const [form, setForm]         = useState<ItemData>({ ...DEFAULTS, ...initial })
+  const [seedEdition, setSeed]  = useState(!isEdit)
+  const [busy, setBusy]         = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError]       = useState('')
+  const [preview, setPreview]   = useState(initial?.imageUrl ?? '')
 
   function set(field: keyof ItemData, value: string | number | boolean) {
     setForm(f => ({ ...f, [field]: value }))
   }
 
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    setPreview(URL.createObjectURL(file))
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await fetch('/api/upload', { method: 'POST', body: fd })
+    const data = await res.json()
+    if (res.ok) {
+      set('imageUrl', data.url)
+      setPreview(data.url)
+    } else {
+      setError(data.error ?? 'Upload failed')
+    }
+    setUploading(false)
+  }
+
   const minimumBid = Math.round(Number(form.benchmarkPrice) * 0.10)
   const isBusiness = form.category === 'businesses'
+  const isProperty = form.category === 'properties'
+  const isAircraft = form.category === 'aircraft'
+  const isCar      = form.category === 'cars'
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -103,77 +136,99 @@ export default function ItemForm({ initial, isEdit }: { initial?: Partial<ItemDa
   }
 
   return (
-    <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 680 }}>
+    <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 700 }}>
+
+      {/* Image upload */}
+      <div style={grp}>
+        <label style={lbl}>IMAGE</label>
+        <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+          <div style={{ width: 100, height: 100, borderRadius: 8, background: 'var(--bg3)', border: '1px solid var(--border)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {preview
+              ? <img src={preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <span style={{ color: 'var(--muted)', fontSize: 11 }}>No image</span>
+            }
+          </div>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFileChange} />
+            <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+              style={{ ...inp, cursor: 'pointer', textAlign: 'center', color: uploading ? 'var(--muted)' : 'var(--gold)', fontWeight: 700 }}>
+              {uploading ? 'Uploading…' : '↑ Upload image'}
+            </button>
+            <input style={inp} value={form.imageUrl} onChange={e => { set('imageUrl', e.target.value); setPreview(e.target.value) }} placeholder="or paste URL: /items/… or https://…" />
+          </div>
+        </div>
+      </div>
 
       {/* Core */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <div style={{ ...groupStyle, gridColumn: '1 / -1' }}>
-          <label style={labelStyle}>NAME *</label>
-          <input style={inputStyle} value={form.name} onChange={e => set('name', e.target.value)} required placeholder="e.g. Rosso Strada V12" />
+        <div style={{ ...grp, gridColumn: '1 / -1' }}>
+          <label style={lbl}>NAME *</label>
+          <input style={inp} value={form.name} onChange={e => set('name', e.target.value)} required placeholder="e.g. Rosso Strada V12" />
         </div>
-        <div style={groupStyle}>
-          <label style={labelStyle}>INSPIRATION NAME</label>
-          <input style={inputStyle} value={form.inspirationName} onChange={e => set('inspirationName', e.target.value)} placeholder="Real-world reference (admin only)" />
+        <div style={grp}>
+          <label style={lbl}>INSPIRATION NAME</label>
+          <input style={inp} value={form.inspirationName} onChange={e => set('inspirationName', e.target.value)} placeholder="Real-world reference (admin only)" />
         </div>
-        <div style={groupStyle}>
-          <label style={labelStyle}>IMAGE URL</label>
-          <input style={inputStyle} value={form.imageUrl} onChange={e => set('imageUrl', e.target.value)} placeholder="/items/my-item.png" />
+        <div style={grp}>
+          <label style={lbl}>ITEM STATUS</label>
+          <select style={inp} value={form.itemStatus} onChange={e => set('itemStatus', e.target.value)}>
+            {ITEM_STATUSES.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+          </select>
         </div>
-        <div style={{ ...groupStyle, gridColumn: '1 / -1' }}>
-          <label style={labelStyle}>DESCRIPTION</label>
-          <textarea style={{ ...inputStyle, minHeight: 72, resize: 'vertical' }} value={form.description} onChange={e => set('description', e.target.value)} placeholder="Optional flavour text" />
+        <div style={{ ...grp, gridColumn: '1 / -1' }}>
+          <label style={lbl}>DESCRIPTION</label>
+          <textarea style={{ ...inp, minHeight: 72, resize: 'vertical' }} value={form.description} onChange={e => set('description', e.target.value)} placeholder="Optional flavour text" />
         </div>
       </div>
 
       {/* Classification */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-        <div style={groupStyle}>
-          <label style={labelStyle}>CATEGORY *</label>
-          <select style={inputStyle} value={form.category} onChange={e => set('category', e.target.value)}>
-            <option value="cars">Cars</option>
-            <option value="businesses">Businesses</option>
+        <div style={grp}>
+          <label style={lbl}>CATEGORY *</label>
+          <select style={inp} value={form.category} onChange={e => set('category', e.target.value)}>
+            {CATEGORIES.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
           </select>
         </div>
-        <div style={groupStyle}>
-          <label style={labelStyle}>RARITY TIER *</label>
-          <select style={inputStyle} value={form.rarityTier} onChange={e => set('rarityTier', e.target.value)}>
+        <div style={grp}>
+          <label style={lbl}>RARITY TIER *</label>
+          <select style={inp} value={form.rarityTier} onChange={e => set('rarityTier', e.target.value)}>
             {RARITY_TIERS.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
         </div>
-        <div style={groupStyle}>
-          <label style={labelStyle}>TOTAL SUPPLY *</label>
-          <input style={inputStyle} type="number" min={1} value={form.totalSupply} onChange={e => set('totalSupply', Number(e.target.value))} required />
+        <div style={grp}>
+          <label style={lbl}>TOTAL SUPPLY *</label>
+          <input style={inp} type="number" min={1} value={form.totalSupply} onChange={e => set('totalSupply', Number(e.target.value))} required />
         </div>
       </div>
 
       {/* Pricing */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <div style={groupStyle}>
-          <label style={labelStyle}>BENCHMARK PRICE *</label>
-          <input style={inputStyle} type="number" min={1} value={form.benchmarkPrice} onChange={e => set('benchmarkPrice', Number(e.target.value))} required />
+        <div style={grp}>
+          <label style={lbl}>BENCHMARK PRICE *</label>
+          <input style={inp} type="number" min={1} value={form.benchmarkPrice} onChange={e => set('benchmarkPrice', Number(e.target.value))} required />
         </div>
-        <div style={groupStyle}>
-          <label style={labelStyle}>MINIMUM BID (auto)</label>
-          <input style={{ ...inputStyle, opacity: 0.5 }} value={`$${minimumBid.toLocaleString()}`} readOnly />
+        <div style={grp}>
+          <label style={lbl}>MINIMUM BID (auto 10%)</label>
+          <input style={{ ...inp, opacity: 0.5 }} value={`$${minimumBid.toLocaleString()}`} readOnly />
         </div>
       </div>
 
       {/* Car stats */}
-      {!isBusiness && (
+      {isCar && (
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.1em', marginBottom: 12 }}>CAR STATS</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-            <div style={groupStyle}>
-              <label style={labelStyle}>HORSEPOWER (HP)</label>
-              <input style={inputStyle} type="number" min={0} value={form.horsepower} onChange={e => set('horsepower', e.target.value)} placeholder="e.g. 572" />
+            <div style={grp}>
+              <label style={lbl}>HORSEPOWER (HP)</label>
+              <input style={inp} type="number" min={0} value={form.horsepower} onChange={e => set('horsepower', e.target.value)} placeholder="e.g. 572" />
             </div>
-            <div style={groupStyle}>
-              <label style={labelStyle}>TOP SPEED (km/h)</label>
-              <input style={inputStyle} type="number" min={0} value={form.topSpeed} onChange={e => set('topSpeed', e.target.value)} placeholder="e.g. 320" />
+            <div style={grp}>
+              <label style={lbl}>TOP SPEED (km/h)</label>
+              <input style={inp} type="number" min={0} value={form.topSpeed} onChange={e => set('topSpeed', e.target.value)} placeholder="e.g. 320" />
             </div>
-            <div style={groupStyle}>
-              <label style={labelStyle}>0–100 KM/H (s)</label>
-              <input style={inputStyle} type="number" min={0} step={0.1} value={form.zeroToHundred} onChange={e => set('zeroToHundred', e.target.value)} placeholder="e.g. 2.9" />
+            <div style={grp}>
+              <label style={lbl}>0–100 KM/H (s)</label>
+              <input style={inp} type="number" min={0} step={0.1} value={form.zeroToHundred} onChange={e => set('zeroToHundred', e.target.value)} placeholder="e.g. 2.9" />
             </div>
           </div>
         </div>
@@ -184,16 +239,16 @@ export default function ItemForm({ initial, isEdit }: { initial?: Partial<ItemDa
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.1em', marginBottom: 12 }}>BUSINESS</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <div style={groupStyle}>
-              <label style={labelStyle}>BUSINESS TYPE</label>
-              <select style={inputStyle} value={form.businessType} onChange={e => set('businessType', e.target.value)}>
+            <div style={grp}>
+              <label style={lbl}>BUSINESS TYPE</label>
+              <select style={inp} value={form.businessType} onChange={e => set('businessType', e.target.value)}>
                 <option value="">— select —</option>
                 {BIZ_TYPES.map(b => <option key={b.code} value={b.code}>{b.title}</option>)}
               </select>
             </div>
-            <div style={groupStyle}>
-              <label style={labelStyle}>RISK TIER</label>
-              <select style={inputStyle} value={form.businessRiskTier} onChange={e => set('businessRiskTier', e.target.value)}>
+            <div style={grp}>
+              <label style={lbl}>RISK TIER</label>
+              <select style={inp} value={form.businessRiskTier} onChange={e => set('businessRiskTier', e.target.value)}>
                 <option value="safe">Safe</option>
                 <option value="growth">Growth</option>
                 <option value="risky">Risky</option>
@@ -204,13 +259,41 @@ export default function ItemForm({ initial, isEdit }: { initial?: Partial<ItemDa
         </div>
       )}
 
+      {/* Property fields */}
+      {isProperty && (
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.1em', marginBottom: 12 }}>PROPERTY</div>
+          <div style={grp}>
+            <label style={lbl}>PROPERTY TIER</label>
+            <select style={inp} value={form.propertyTier} onChange={e => set('propertyTier', e.target.value)}>
+              <option value="">— select —</option>
+              {PROPERTY_TIERS.map(t => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* Aircraft fields */}
+      {isAircraft && (
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.1em', marginBottom: 12 }}>AIRCRAFT</div>
+          <div style={grp}>
+            <label style={lbl}>AIRCRAFT TYPE</label>
+            <select style={inp} value={form.aircraftType} onChange={e => set('aircraftType', e.target.value)}>
+              <option value="">— select —</option>
+              {AIRCRAFT_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
+            </select>
+          </div>
+        </div>
+      )}
+
       {/* Flags */}
       <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-        {[
-          { field: 'isOfficial' as const,  label: 'Official item'     },
-          { field: 'isApproved' as const,  label: 'Approved'          },
-          { field: 'isFrozen'   as const,  label: 'Frozen'            },
-        ].map(({ field, label }) => (
+        {([
+          { field: 'isOfficial' as const,  label: 'Official item' },
+          { field: 'isApproved' as const,  label: 'Approved'      },
+          { field: 'isFrozen'   as const,  label: 'Frozen'        },
+        ]).map(({ field, label }) => (
           <label key={field} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
             <input type="checkbox" checked={form[field] as boolean} onChange={e => set(field, e.target.checked)} />
             {label}
@@ -218,7 +301,7 @@ export default function ItemForm({ initial, isEdit }: { initial?: Partial<ItemDa
         ))}
         {!isEdit && (
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-            <input type="checkbox" checked={seedEdition} onChange={e => setSeedEdition(e.target.checked)} />
+            <input type="checkbox" checked={seedEdition} onChange={e => setSeed(e.target.checked)} />
             Seed edition #1 immediately
           </label>
         )}
@@ -227,8 +310,8 @@ export default function ItemForm({ initial, isEdit }: { initial?: Partial<ItemDa
       {error && <div style={{ color: 'var(--red)', fontSize: 13 }}>{error}</div>}
 
       <div style={{ display: 'flex', gap: 10 }}>
-        <button type="submit" disabled={busy}
-          style={{ padding: '10px 28px', background: 'var(--gold)', color: '#000', fontWeight: 900, fontSize: 13, borderRadius: 6, border: 'none', cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1 }}>
+        <button type="submit" disabled={busy || uploading}
+          style={{ padding: '10px 28px', background: 'var(--gold)', color: '#000', fontWeight: 900, fontSize: 13, borderRadius: 6, border: 'none', cursor: busy ? 'not-allowed' : 'pointer', opacity: (busy || uploading) ? 0.6 : 1 }}>
           {busy ? '...' : isEdit ? 'Save changes' : 'Create item'}
         </button>
         <button type="button" onClick={() => router.back()}

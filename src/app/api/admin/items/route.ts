@@ -10,7 +10,8 @@ export async function POST(req: NextRequest) {
   const {
     name, inspirationName, description, category, rarityTier, imageUrl,
     totalSupply, benchmarkPrice, horsepower, topSpeed, zeroToHundred,
-    businessType, businessRiskTier, isOfficial, seedEdition,
+    businessType, businessRiskTier, propertyTier, aircraftType,
+    isOfficial, isApproved, itemStatus, seedEdition,
   } = body
 
   if (!name || !category || !rarityTier || !totalSupply || !benchmarkPrice) {
@@ -23,22 +24,24 @@ export async function POST(req: NextRequest) {
     const item = await prisma.item.create({
       data: {
         name,
-        inspirationName: inspirationName || null,
-        description:     description     || null,
+        inspirationName:  inspirationName  || null,
+        description:      description      || null,
         category,
         rarityTier,
-        imageUrl:        imageUrl        || null,
-        totalSupply:     Number(totalSupply),
-        benchmarkPrice:  Number(benchmarkPrice),
+        imageUrl:         imageUrl         || null,
+        totalSupply:      Number(totalSupply),
+        benchmarkPrice:   Number(benchmarkPrice),
         minimumBid,
-        horsepower:      horsepower      ? Number(horsepower)      : null,
-        topSpeed:        topSpeed        ? Number(topSpeed)        : null,
-        zeroToHundred:   zeroToHundred   ? Number(zeroToHundred)   : null,
-        businessType:    businessType    || null,
-        businessRiskTier:businessRiskTier|| null,
-        isOfficial:      !!isOfficial,
-        isApproved:      true,
-        itemStatus:      'active',
+        horsepower:       horsepower       ? Number(horsepower)    : null,
+        topSpeed:         topSpeed         ? Number(topSpeed)      : null,
+        zeroToHundred:    zeroToHundred    ? Number(zeroToHundred) : null,
+        businessType:     businessType     || null,
+        businessRiskTier: businessRiskTier || null,
+        propertyTier:     propertyTier     || null,
+        aircraftType:     aircraftType     || null,
+        isOfficial:       !!isOfficial,
+        isApproved:       isApproved !== false,
+        itemStatus:       itemStatus        || 'active',
       },
     })
 
