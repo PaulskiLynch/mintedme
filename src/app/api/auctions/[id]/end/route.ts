@@ -13,8 +13,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     where: { id },
     select: { status: true, sellerId: true, endsAt: true },
   })
-  if (!auction)                    return NextResponse.json({ error: 'Auction not found' }, { status: 404 })
-  if (auction.status === 'settled') return NextResponse.json({ ok: true, result: 'already_settled' })
+  if (!auction) return NextResponse.json({ error: 'Auction not found' }, { status: 404 })
+  if (auction.status === 'settled' || auction.status === 'settling') {
+    return NextResponse.json({ ok: true, result: 'already_settled' })
+  }
 
   const isExpired = auction.endsAt < new Date()
   const isSeller  = auction.sellerId === session.user.id

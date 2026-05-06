@@ -55,9 +55,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         const delta = amount - alreadyLocked
         await tx.bid.update({ where: { id: existingBid.id }, data: { amount, status: 'active' } })
         await tx.user.update({ where: { id: session.user.id }, data: { lockedBalance: { increment: delta } } })
+        await tx.transaction.create({
+          data: { fromUserId: session.user.id, amount: delta, type: 'auction_bid_increase',
+            description: `Bid increased to $${amount.toLocaleString()} on auction ${id}` },
+        })
       } else {
         await tx.bid.create({ data: { auctionId: id, userId: session.user.id, amount, status: 'active' } })
         await tx.user.update({ where: { id: session.user.id }, data: { lockedBalance: { increment: amount } } })
+        await tx.transaction.create({
+          data: { fromUserId: session.user.id, amount, type: 'auction_bid_lock',
+            description: `Bid locked: $${amount.toLocaleString()} on auction ${id}` },
+        })
       }
 
       // Update live current bid + winner

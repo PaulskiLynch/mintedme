@@ -24,13 +24,18 @@ export interface AdminAuction {
   createdAt:             string
 }
 
-const STATUS_TABS = ['all', 'scheduled', 'active', 'ended', 'settled'] as const
+const STATUS_TABS = ['all', 'scheduled', 'active', 'settling', 'settled', 'ended_no_sale', 'cancelled', 'failed', 'reversed', 'ended'] as const
 
 const STATUS_COLOUR: Record<string, string> = {
-  scheduled: 'var(--muted)',
-  active:    'var(--green)',
-  ended:     '#f59e0b',
-  settled:   'var(--gold)',
+  scheduled:    'var(--muted)',
+  active:       'var(--green)',
+  settling:     '#60a5fa',   // blue — in progress
+  settled:      'var(--gold)',
+  ended_no_sale:'#94a3b8',   // grey — no sale
+  cancelled:    'var(--red)',
+  failed:       '#ef4444',   // red
+  reversed:     '#f59e0b',   // amber
+  ended:        '#94a3b8',   // legacy — treat as ended_no_sale
 }
 
 const inp: React.CSSProperties = {
@@ -231,8 +236,8 @@ export default function AdminAuctionsClient({ auctions }: { auctions: AdminAucti
                         </button>
                       )}
 
-                      {/* Cancel — scheduled or active */}
-                      {(a.status === 'scheduled' || a.status === 'active') && (
+                      {/* Cancel — scheduled, active, or settling */}
+                      {(a.status === 'scheduled' || a.status === 'active' || a.status === 'settling') && (
                         <button onClick={() => { if (confirm(`Cancel auction for "${a.itemName} #${a.editionNumber}"? All ${a.bidCount} bids will be refunded.`)) doAction(a.id, 'cancel') }}
                           disabled={busy === a.id + 'cancel'}
                           style={{ padding: '3px 10px', fontSize: 11, fontWeight: 700, borderRadius: 4,

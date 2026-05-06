@@ -36,55 +36,43 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!auction) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     await prisma.auction.update({
       where: { id },
-      data: {
-        status:   'active',
-        startsAt: auction.startsAt ?? new Date(),
-      },
+      data: { status: 'active', startsAt: auction.startsAt ?? new Date() },
     })
     return NextResponse.json({ ok: true })
   }
 
   if (action === 'cancel') {
     const auction = await prisma.auction.findUnique({
-      where: { id },
-      include: { bids: { where: { status: 'active' } } },
+      where:   { id },
+      include: { bids: { where: { status: 'active' } }, edition: { include: { item: { select: { name: true } } } } },
     })
     if (!auction) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
+    // Release each active bid: decrement lock + create ledger record
+    const releaseOps = auction.bids.flatMap(bid => [
+      prisma.user.update({
+        where: { id: bid.userId },
+        data:  { lockedBalance: { decrement: bid.amount } },
+      }),
+      prisma.transaction.create({
+        data: { toUserId: bid.userId, amount: bid.amount, type: 'auction_cancel_release',
+          description: `Auction cancelled by admin: ${auction.edition.item.name} — bid released` },
+      }),
+    ])
+
     await prisma.$transaction([
-      // Refund each active bid: return to spendable balance and release the lock
-      ...auction.bids.map(bid =>
-        prisma.user.update({
-          where: { id: bid.userId },
-          data:  { lockedBalance: { decrement: bid.amount } },
-        })
-      ),
-      // Mark bids as refunded
-      prisma.bid.updateMany({
-        where: { auctionId: id, status: 'active' },
-        data:  { status: 'refunded' },
-      }),
-      // Release edition from auction
-      prisma.itemEdition.update({
-        where: { id: auction.editionId },
-        data:  { isInAuction: false },
-      }),
-      // End the auction
-      prisma.auction.update({
-        where: { id },
-        data:  { status: 'ended' },
-      }),
+      ...releaseOps,
+      prisma.bid.updateMany({ where: { auctionId: id, status: 'active' }, data: { status: 'refunded' } }),
+      prisma.itemEdition.update({ where: { id: auction.editionId }, data: { isInAuction: false } }),
+      prisma.auction.update({ where: { id }, data: { status: 'cancelled' } }),
     ])
     return NextResponse.json({ ok: true })
   }
 
   if (action === 'reverse') {
     const auction = await prisma.auction.findUnique({
-      where: { id },
-      include: {
-        bids:    { where: { status: 'won' } },
-        edition: true,
-      },
+      where:   { id },
+      include: { bids: { where: { status: 'won' } }, edition: { include: { item: { select: { name: true } } } } },
     })
     if (!auction) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     if (auction.status !== 'settled') {
@@ -94,35 +82,38 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const winBid    = auction.bids[0]
     const winAmount = auction.winningBid ?? winBid?.amount
 
-    // Build ops array — typed as Prisma interactive transactions don't support dynamic push,
-    // so we collect conditionally then spread into $transaction.
     const editionOp = prisma.itemEdition.update({
       where: { id: auction.editionId },
       data:  { currentOwnerId: auction.sellerId ?? null, isInAuction: false, isListed: false },
     })
     const auctionOp = prisma.auction.update({
       where: { id },
-      data:  { status: 'ended', winningBid: null, currentWinnerId: null },
+      data:  { status: 'reversed', winningBid: null, currentWinnerId: null },
+    })
+    // Ownership: close current (winner's) ownership record, re-open seller's
+    const ownershipCloseOp = prisma.ownership.updateMany({
+      where: { editionId: auction.editionId, endedAt: null },
+      data:  { endedAt: new Date() },
     })
 
     const winnerRefundOps = winBid && winAmount ? [
       prisma.user.update({ where: { id: winBid.userId }, data: { balance: { increment: winAmount } } }),
       prisma.bid.update({ where: { id: winBid.id }, data: { status: 'refunded' } }),
       prisma.transaction.create({
-        data: { toUserId: winBid.userId, amount: winAmount, type: 'admin_adjustment',
-          description: `Admin reversal: auction ${id} refunded to winner` },
+        data: { toUserId: winBid.userId, amount: winAmount, type: 'reversal',
+          description: `Admin reversal: ${auction.edition.item.name} — winner refunded` },
       }),
     ] : []
 
     const sellerClawbackOps = !auction.isSystemAuction && auction.sellerId && winAmount ? [
       prisma.user.update({ where: { id: auction.sellerId }, data: { balance: { decrement: winAmount } } }),
       prisma.transaction.create({
-        data: { fromUserId: auction.sellerId, amount: winAmount, type: 'admin_adjustment',
-          description: `Admin reversal: auction ${id} proceeds clawed back` },
+        data: { fromUserId: auction.sellerId, amount: winAmount, type: 'reversal',
+          description: `Admin reversal: ${auction.edition.item.name} — proceeds clawed back` },
       }),
     ] : []
 
-    await prisma.$transaction([editionOp, auctionOp, ...winnerRefundOps, ...sellerClawbackOps])
+    await prisma.$transaction([editionOp, auctionOp, ownershipCloseOp, ...winnerRefundOps, ...sellerClawbackOps])
     return NextResponse.json({ ok: true })
   }
 
