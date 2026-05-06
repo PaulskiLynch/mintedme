@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
 
 interface Item {
   id:           string
@@ -92,6 +91,10 @@ export default function AdminItemsClient({ items: initial }: { items: Item[] }) 
 
             {/* Actions */}
             <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+              <button onClick={() => router.push(`/admin/items/${item.id}/edit`)}
+                style={{ padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, background: 'var(--bg3)', color: 'var(--white)', border: '1px solid var(--border)', cursor: 'pointer' }}>
+                Edit
+              </button>
               {!item.isApproved ? (
                 <>
                   <button onClick={() => action(item.id, 'approve')} disabled={!!busy}

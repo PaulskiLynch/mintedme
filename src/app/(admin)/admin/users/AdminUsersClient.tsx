@@ -22,6 +22,10 @@ export default function AdminUsersClient({ users: initial }: { users: User[] }) 
   const [filter, setFilter] = useState<'all' | 'frozen' | 'admin'>('all')
   const [search, setSearch] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
+  const [balModal, setBalModal] = useState<User | null>(null)
+  const [balAmount, setBalAmount] = useState('')
+  const [balBusy, setBalBusy] = useState(false)
+  const [balError, setBalError] = useState('')
 
   const filtered = users.filter(u => {
     const matchesSearch = !search || u.username.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase())
@@ -51,8 +55,53 @@ export default function AdminUsersClient({ users: initial }: { users: User[] }) 
     setBusy(null)
   }
 
+  async function adjustBalance(e: React.FormEvent) {
+    e.preventDefault()
+    if (!balModal) return
+    const delta = Number(balAmount)
+    if (isNaN(delta) || delta === 0) { setBalError('Enter a non-zero amount'); return }
+    setBalBusy(true); setBalError('')
+    const res = await fetch(`/api/admin/users/${balModal.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'adjust_balance', delta }),
+    })
+    const data = await res.json()
+    if (!res.ok) { setBalError(data.error ?? 'Failed'); setBalBusy(false); return }
+    setUsers(prev => prev.map(u => u.id === balModal.id ? { ...u, balance: data.balance } : u))
+    setBalModal(null); setBalAmount(''); setBalBusy(false)
+    router.refresh()
+  }
+
   return (
     <div>
+      {/* Balance modal */}
+      {balModal && (
+        <div className="overlay" onClick={e => { if (e.target === e.currentTarget) setBalModal(null) }}>
+          <div className="modal">
+            <div className="modal-title">Adjust Balance</div>
+            <div className="modal-sub">@{balModal.username} · current: ${Number(balModal.balance).toLocaleString()}</div>
+            <form onSubmit={adjustBalance} style={{ marginTop: 20 }}>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>Use positive to add, negative to deduct.</div>
+              <input
+                className="form-input"
+                type="number"
+                placeholder="e.g. 50000 or -10000"
+                value={balAmount}
+                onChange={e => setBalAmount(e.target.value)}
+                autoFocus
+                required
+              />
+              {balError && <div style={{ color: 'var(--red)', fontSize: 12, marginTop: 6 }}>{balError}</div>}
+              <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                <button type="submit" disabled={balBusy} className="btn btn-gold">{balBusy ? '...' : 'Apply'}</button>
+                <button type="button" className="btn btn-ghost" onClick={() => setBalModal(null)}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
         <input
           value={search}
@@ -85,7 +134,13 @@ export default function AdminUsersClient({ users: initial }: { users: User[] }) 
                   <div style={{ fontSize: 11, color: 'var(--muted)' }}>{new Date(u.createdAt).toLocaleDateString()}</div>
                 </td>
                 <td style={{ padding: '12px 16px', color: 'var(--muted)' }}>{u.email}</td>
-                <td style={{ padding: '12px 16px', color: 'var(--gold)', fontWeight: 700 }}>${Number(u.balance).toLocaleString()}</td>
+                <td style={{ padding: '12px 16px' }}>
+                  <div style={{ color: 'var(--gold)', fontWeight: 700 }}>${Number(u.balance).toLocaleString()}</div>
+                  <button onClick={() => { setBalModal(u); setBalAmount(''); setBalError('') }}
+                    style={{ marginTop: 3, padding: '2px 8px', fontSize: 10, fontWeight: 700, background: 'var(--bg3)', color: 'var(--muted)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer' }}>
+                    Adjust
+                  </button>
+                </td>
                 <td style={{ padding: '12px 16px', color: 'var(--muted)' }}>{u.editionCount}</td>
                 <td style={{ padding: '12px 16px', color: 'var(--muted)' }}>{u.txnCount}</td>
                 <td style={{ padding: '12px 16px' }}>
