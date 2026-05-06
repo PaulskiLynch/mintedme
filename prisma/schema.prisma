@@ -124,9 +124,10 @@ model Item {
   itemStatus       String   @default("active")        // draft | active | retired
   createdAt        DateTime @default(now())
 
-  creator   User?      @relation("ItemCreator", fields: [creatorId], references: [id])
-  editions  ItemEdition[]
+  creator     User?      @relation("ItemCreator", fields: [creatorId], references: [id])
+  editions     ItemEdition[]
   wishlistedBy Wishlist[]
+  suggestions  CreatorSubmission[] @relation("ItemSuggestion")
 
   @@map("items")
 }
@@ -323,21 +324,21 @@ model Wishlist {
 }
 
 model CreatorSubmission {
-  id                   String    @id @default(uuid())
-  creatorId            String
-  itemName             String
-  category             String
-  imageUrl             String
-  description          String?
-  requestedPrice       Decimal?  @db.Decimal(12, 2)
-  requestedEditionSize Int?
-  status               String    @default("pending") // pending, approved, rejected
-  adminNotes           String?
-  reviewedBy           String?
-  createdAt            DateTime  @default(now())
-  reviewedAt           DateTime?
+  id           String    @id @default(uuid())
+  creatorId    String
+  itemName     String
+  category     String
+  description  String?
+  status       String    @default("pending") // pending, approved, rejected
+  adminNotes   String?
+  reviewedBy   String?
+  linkedItemId String?   // item created from this suggestion
+  discountUsed Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  reviewedAt   DateTime?
 
-  creator User @relation(fields: [creatorId], references: [id])
+  creator     User  @relation(fields: [creatorId], references: [id])
+  linkedItem  Item? @relation("ItemSuggestion", fields: [linkedItemId], references: [id])
 
   @@map("creator_submissions")
 }

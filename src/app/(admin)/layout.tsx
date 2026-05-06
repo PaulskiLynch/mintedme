@@ -20,6 +20,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           { href: '/admin/items/new',   label: '+ New Item'   },
           { href: '/admin/users',       label: 'Users'        },
           { href: '/admin/transactions',label: 'Transactions' },
+          { href: '/admin/suggestions', label: 'Suggestions'  },
           { href: '/admin/cron',        label: 'Cron Runner'  },
         ].map(({ href, label }) => (
           <Link key={href} href={href} style={{ display: 'block', padding: '10px 20px', fontSize: 13, fontWeight: 600, color: 'var(--white)', textDecoration: 'none' }}

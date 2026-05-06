@@ -41,7 +41,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
   const item    = edition.item
   const isOwner = session?.user?.id === edition.currentOwnerId
 
-  const [userData, wishlistEntry, ownerRareCount, wishlistCount, claimedCount] = await Promise.all([
+  const [userData, wishlistEntry, ownerRareCount, wishlistCount, claimedCount, mySuggestion] = await Promise.all([
     session?.user?.id
       ? prisma.user.findUnique({ where: { id: session.user.id }, select: { balance: true } })
       : null,
@@ -55,7 +55,14 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
       : Promise.resolve(0),
     prisma.wishlist.count({ where: { itemId: item.id } }),
     prisma.itemEdition.count({ where: { itemId: item.id, currentOwnerId: { not: null } } }),
+    session?.user?.id
+      ? prisma.creatorSubmission.findFirst({
+          where: { creatorId: session.user.id, linkedItemId: item.id, status: 'approved', discountUsed: false },
+        })
+      : Promise.resolve(null),
   ])
+
+  const discountPrice = mySuggestion ? Math.round(Number(item.benchmarkPrice) * 0.5) : null
 
   const topOffer = edition.offers[0]?.amount?.toString() ?? null
 
@@ -251,6 +258,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
               businessUpkeep={bUpkeep}
               businessNet={bNet}
               businessDaysToIncome={bDays}
+              discountPrice={discountPrice}
             />
 
             {!isOwner && (

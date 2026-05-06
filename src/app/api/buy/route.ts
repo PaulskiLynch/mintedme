@@ -59,7 +59,21 @@ export async function POST(req: NextRequest) {
 
       const isPrimarySale = !edition.currentOwnerId
       if (!isPrimarySale && (!edition.isListed || !edition.listedPrice)) throw new Error('Item is not listed for sale')
-      const price = isPrimarySale ? Number(edition.item.benchmarkPrice) : Number(edition.listedPrice)
+
+      let price: number
+      if (isPrimarySale) {
+        const suggestion = await tx.creatorSubmission.findFirst({
+          where: { creatorId: buyerId, linkedItemId: edition.item.id, status: 'approved', discountUsed: false },
+        })
+        if (suggestion) {
+          price = Math.round(Number(edition.item.benchmarkPrice) * 0.5)
+          await tx.creatorSubmission.update({ where: { id: suggestion.id }, data: { discountUsed: true } })
+        } else {
+          price = Number(edition.item.benchmarkPrice)
+        }
+      } else {
+        price = Number(edition.listedPrice!)
+      }
 
       const buyer = await tx.user.findUnique({ where: { id: buyerId } })
       if (!buyer) throw new Error('Buyer not found')

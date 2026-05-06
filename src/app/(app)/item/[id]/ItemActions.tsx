@@ -38,6 +38,7 @@ interface Props {
   businessUpkeep:   number
   businessNet:      number
   businessDaysToIncome: number
+  discountPrice:    number | null
 }
 
 function timeAgo(iso: string | null): string | null {
@@ -60,6 +61,7 @@ export default function ItemActions({
   availableNow, alreadyClaimed, totalEver,
   watcherCount, pendingOfferCount, trendPct,
   businessRiskTier, businessGross, businessUpkeep, businessNet, businessDaysToIncome,
+  discountPrice,
 }: Props) {
   const router = useRouter()
   const [busy, setBusy]               = useState(false)
@@ -295,10 +297,21 @@ export default function ItemActions({
         {claimedLine && <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>{claimedLine}</div>}
         {!claimedLine && <div style={{ marginBottom: 12 }} />}
 
+        {discountPrice !== null && (
+          <div style={{ marginBottom: 12, padding: '10px 14px', background: '#0d2010', border: '1px solid #1a4020', borderRadius: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)', marginBottom: 2 }}>🎉 Your suggestion made it in!</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>You get 50% off as the suggester</div>
+          </div>
+        )}
+
         {supplyLocked ? (
           <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '14px 16px', fontSize: 13, color: 'var(--muted)', textAlign: 'center', marginBottom: 12 }}>
             Supply locked — unlocks as more users join
           </div>
+        ) : discountPrice !== null ? (
+          <button className="btn btn-gold btn-full btn-lg" onClick={handleBuy} disabled={busy || !userId || balance < discountPrice} style={{ marginBottom: 12 }}>
+            {busy ? 'Buying...' : `Claim at $${discountPrice.toLocaleString()} (50% off)`}
+          </button>
         ) : (
           <button className="btn btn-gold btn-full btn-lg" onClick={handleBuy} disabled={busy || !userId || balance < benchmark} style={{ marginBottom: 12 }}>
             {busy ? 'Buying...' : `Buy now — $${benchmark.toLocaleString()}`}
@@ -306,7 +319,7 @@ export default function ItemActions({
         )}
 
         {!userId && <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginBottom: 12 }}>Sign in to buy</div>}
-        {userId && benchmark > 0 && balance < benchmark && !supplyLocked && (
+        {userId && (discountPrice ?? benchmark) > 0 && balance < (discountPrice ?? benchmark) && !supplyLocked && (
           <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 12 }}>Insufficient balance (you have ${balance.toLocaleString()})</div>
         )}
 

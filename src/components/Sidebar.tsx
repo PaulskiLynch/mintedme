@@ -19,6 +19,7 @@ const NAV = [
   { href: '/mint',          label: 'My Mint',        icon: '◆' },
   { href: '/inbox',         label: 'Inbox',          icon: '✉' },
   { href: '/notifications', label: 'Notifications',  icon: '🔔' },
+  { href: '/suggestions',   label: 'Suggest',        icon: '💡' },
 ]
 
 const MOBILE_NAV = [
