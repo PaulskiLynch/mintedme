@@ -4,7 +4,7 @@ import MarketplaceClient from './MarketplaceClient'
 
 export const dynamic = 'force-dynamic'
 
-const CATEGORIES = ['All', 'Cars', 'Businesses', 'Properties']
+const CATEGORIES = ['All', 'Cars', 'Aircraft', 'Businesses', 'Properties']
 
 export default async function MarketplacePage({
   searchParams,
@@ -38,7 +38,7 @@ export default async function MarketplacePage({
       },
       _count: { select: { wishlistedBy: true } },
     },
-    take: 100,
+    take: 500,
   })
 
   return (

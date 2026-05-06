@@ -22,12 +22,12 @@ const PROPERTIES: Array<{
   benchmarkPrice: number
   totalSupply: number
 }> = [
-  // ── Rent-Free (funny tier — no upkeep, no appreciation, maximum shame) ──────
-  { name: 'Wooden Shack',              propertyTier: 'rent_free', benchmarkPrice: 250,        totalSupply: 9999 },
-  { name: 'One-Man Tent',              propertyTier: 'rent_free', benchmarkPrice: 500,        totalSupply: 9999 },
-  { name: 'Hammock Between Two Trees', propertyTier: 'rent_free', benchmarkPrice: 1000,       totalSupply: 9999 },
-  { name: 'Two-Man Caravan',           propertyTier: 'rent_free', benchmarkPrice: 3000,       totalSupply: 9999 },
-  { name: 'Converted Outhouse',        propertyTier: 'rent_free', benchmarkPrice: 8000,       totalSupply: 9999 },
+  // ── Rent-Free (collectible shame tier — 3 editions each, ~1 per 100 players) ──
+  { name: 'Wooden Shack',              propertyTier: 'rent_free', benchmarkPrice: 250,        totalSupply: 3 },
+  { name: 'One-Man Tent',              propertyTier: 'rent_free', benchmarkPrice: 500,        totalSupply: 3 },
+  { name: 'Hammock Between Two Trees', propertyTier: 'rent_free', benchmarkPrice: 1000,       totalSupply: 3 },
+  { name: 'Two-Man Caravan',           propertyTier: 'rent_free', benchmarkPrice: 3000,       totalSupply: 3 },
+  { name: 'Converted Outhouse',        propertyTier: 'rent_free', benchmarkPrice: 8000,       totalSupply: 3 },
 
   // ── Apartments — Common — 6 editions each (120 total per 1k players) ─────────
   { name: 'Metro Starter Loft',        propertyTier: 'apartment', benchmarkPrice: 75000,      totalSupply: 6 },

@@ -5,6 +5,7 @@ import { monthlyUpkeep, UPKEEP_CYCLE_DAYS } from '@/lib/upkeep'
 import { JOB_BY_CODE, slotsForJob } from '@/lib/jobs'
 import { businessNetIncome } from '@/lib/business'
 import { monthlyPropertyUpkeep, monthlyPropertyAppreciation } from '@/lib/property'
+import { monthlyAircraftUpkeep } from '@/lib/aircraft'
 
 const MIN_LIVE    = 2
 const DURATION_MS = 3 * 24 * 60 * 60 * 1000
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest) {
       ],
     },
     include: {
-      item:         { select: { benchmarkPrice: true, rarityTier: true, name: true } },
+      item:         { select: { benchmarkPrice: true, rarityTier: true, name: true, aircraftType: true } },
       currentOwner: { select: { id: true, balance: true } },
     },
     take: 200,
@@ -58,7 +59,9 @@ export async function GET(req: NextRequest) {
   let upkeepDebted  = 0
   for (const edition of dueEditions) {
     if (!edition.currentOwner) continue
-    const cost = monthlyUpkeep(edition.item.rarityTier, Number(edition.item.benchmarkPrice))
+    const cost = edition.item.aircraftType
+      ? monthlyAircraftUpkeep(edition.item.aircraftType, Number(edition.item.benchmarkPrice))
+      : monthlyUpkeep(edition.item.rarityTier, Number(edition.item.benchmarkPrice))
     const canPay = Number(edition.currentOwner.balance) >= cost
     try {
       await prisma.$transaction(async (tx) => {

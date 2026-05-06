@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { monthlyUpkeep } from '@/lib/upkeep'
 import { businessNetIncome } from '@/lib/business'
 import { monthlyPropertyUpkeep, monthlyPropertyAppreciation } from '@/lib/property'
+import { monthlyAircraftUpkeep } from '@/lib/aircraft'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,6 +54,7 @@ export default async function WalletPage() {
                 minimumBid:      true,
                 businessRiskTier: true,
                 propertyTier:    true,
+                aircraftType:    true,
               },
             },
           },
@@ -85,11 +87,13 @@ export default async function WalletPage() {
   const debt      = Number(user.debtAmount)
 
   // Monthly cash flow
-  const carEditions      = user.ownedEditions.filter(e => !e.item.businessRiskTier && !e.item.propertyTier)
+  const carEditions      = user.ownedEditions.filter(e => !e.item.businessRiskTier && !e.item.propertyTier && !e.item.aircraftType)
   const bizEditions      = user.ownedEditions.filter(e =>  e.item.businessRiskTier)
   const propEditions     = user.ownedEditions.filter(e =>  e.item.propertyTier)
+  const aircraftEditions = user.ownedEditions.filter(e =>  e.item.aircraftType)
   const monthlyCost      = carEditions.reduce((s, e) => s + monthlyUpkeep(e.item.rarityTier, Number(e.item.benchmarkPrice)), 0)
                          + propEditions.reduce((s, e) => s + monthlyPropertyUpkeep(e.item.propertyTier!, Number(e.item.benchmarkPrice)), 0)
+                         + aircraftEditions.reduce((s, e) => s + monthlyAircraftUpkeep(e.item.aircraftType!, Number(e.item.benchmarkPrice)), 0)
   const monthlyIncome    = bizEditions.reduce((s, e) => s + businessNetIncome(e.item.businessRiskTier!, Number(e.item.benchmarkPrice)), 0)
   const monthlyPaperGain = propEditions.reduce((s, e) => s + monthlyPropertyAppreciation(e.item.propertyTier!, Number(e.item.benchmarkPrice)), 0)
   const monthlySalary = jobHolding?.monthlySalary ?? 0
@@ -160,6 +164,12 @@ export default async function WalletPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
               <span style={{ color: 'var(--muted)' }}>Property upkeep ({propEditions.length} propert{propEditions.length !== 1 ? 'ies' : 'y'})</span>
               <span style={{ fontWeight: 700, color: 'var(--red)' }}>−${propEditions.reduce((s, e) => s + monthlyPropertyUpkeep(e.item.propertyTier!, Number(e.item.benchmarkPrice)), 0).toLocaleString()}</span>
+            </div>
+          )}
+          {aircraftEditions.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+              <span style={{ color: 'var(--muted)' }}>Aircraft upkeep ({aircraftEditions.length} aircraft)</span>
+              <span style={{ fontWeight: 700, color: 'var(--red)' }}>−${aircraftEditions.reduce((s, e) => s + monthlyAircraftUpkeep(e.item.aircraftType!, Number(e.item.benchmarkPrice)), 0).toLocaleString()}</span>
             </div>
           )}
           {monthlyPaperGain > 0 && (

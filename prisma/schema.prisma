@@ -120,6 +120,7 @@ model Item {
   businessRiskTier String?                            // safe | growth | risky | prestige
   propertyTier     String?                            // rent_free | apartment | townhouse | villa | mansion | penthouse | private_island
   lastAppreciatedAt DateTime?                         // last time this property's benchmarkPrice was increased
+  aircraftType     String?                            // prop_plane | light_jet | private_jet | … (see lib/aircraft.ts)
   creatorId        String?
   isOfficial       Boolean  @default(true)
   isApproved       Boolean  @default(true)
