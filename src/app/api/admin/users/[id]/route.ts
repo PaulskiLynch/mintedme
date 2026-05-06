@@ -36,10 +36,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!session?.user?.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { id } = await params
-  const { action } = await req.json()
+  const body = await req.json()
+  const { action } = body
 
   if (action === 'adjust_balance') {
-    const { delta } = await req.json().catch(() => ({})) as { delta?: number }
+    const { delta } = body as { delta?: number }
     if (typeof delta !== 'number' || isNaN(delta)) {
       return NextResponse.json({ error: 'Invalid delta' }, { status: 400 })
     }
