@@ -3,6 +3,9 @@ import Link from 'next/link'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
 import AuctionClient from './AuctionClient'
+import { monthlyUpkeep } from '@/lib/upkeep'
+import { monthlyPropertyUpkeep } from '@/lib/property'
+import { monthlyAircraftUpkeep } from '@/lib/aircraft'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,7 +17,7 @@ export default async function AuctionPage({ params }: { params: Promise<{ id: st
     prisma.auction.findUnique({
       where: { id },
       include: {
-        edition: { include: { item: { select: { name: true, imageUrl: true, rarityTier: true } } } },
+        edition: { include: { item: { select: { name: true, imageUrl: true, rarityTier: true, benchmarkPrice: true, propertyTier: true, aircraftType: true, businessRiskTier: true } } } },
         seller:  { select: { id: true, username: true } },
         currentWinner: { select: { username: true } },
         _count:  { select: { bids: true } },
@@ -43,6 +46,16 @@ export default async function AuctionPage({ params }: { params: Promise<{ id: st
   const isSeller   = session?.user?.id === auction.sellerId
   const isSettled  = auction.status === 'settled'
   const available  = userData ? Number(userData.balance) - Number(userData.lockedBalance) : 0
+
+  const item           = auction.edition.item
+  const benchmarkNum   = Number(auction.benchmarkPrice)
+  const monthlyUpkeepCost = item.propertyTier
+    ? monthlyPropertyUpkeep(item.propertyTier, benchmarkNum)
+    : item.aircraftType
+    ? monthlyAircraftUpkeep(item.aircraftType, benchmarkNum)
+    : item.businessRiskTier
+    ? 0  // businesses generate income, not upkeep cost
+    : monthlyUpkeep(item.rarityTier, benchmarkNum)
 
   return (
     <div>
@@ -81,6 +94,7 @@ export default async function AuctionPage({ params }: { params: Promise<{ id: st
         availableBalance={available.toString()}
         userUsername={userData?.username ?? null}
         isSeller={isSeller}
+        monthlyUpkeepCost={monthlyUpkeepCost}
         initialMessages={initialMessages.map((m: typeof initialMessages[0]) => ({
           id: m.id, message: m.message, createdAt: m.createdAt.toISOString(), user: m.user,
         }))}

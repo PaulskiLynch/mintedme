@@ -38,6 +38,7 @@ interface Props {
   availableBalance:   string
   userUsername:       string | null
   isSeller:           boolean
+  monthlyUpkeepCost:  number
   initialMessages:    ChatMessage[]
 }
 
@@ -81,7 +82,7 @@ export default function AuctionClient({
   sellerId, isSystemAuction, bidCount: initBidCount, watcherCount,
   lastSalePrice, winnerName: initWinner, winningBid: initWinningBid,
   luckyUndervalueWin: initLucky, myBid: initMyBid,
-  userId, availableBalance, userUsername, isSeller, initialMessages,
+  userId, availableBalance, userUsername, isSeller, monthlyUpkeepCost, initialMessages,
 }: Props) {
   const router    = useRouter()
 
@@ -320,7 +321,7 @@ export default function AuctionClient({
                     )}
                     {userUsername === winnerName && (
                       <div style={{ marginTop: 10 }}>
-                        <Link href={`/item/${editionId}`} className="btn btn-gold btn-sm">View your car →</Link>
+                        <Link href={`/item/${editionId}`} className="btn btn-gold btn-sm">View your asset →</Link>
                       </div>
                     )}
                   </>
@@ -366,6 +367,15 @@ export default function AuctionClient({
                     />
                   </div>
                 </div>
+
+                {/* Upkeep affordability warning */}
+                {monthlyUpkeepCost > 0 && (
+                  <div style={{ fontSize: 11, padding: '8px 10px', background: '#1a1800', border: '1px solid #4a3a00', borderRadius: 6, color: '#c8a832', lineHeight: 1.5 }}>
+                    ⚠ This asset costs <strong>${monthlyUpkeepCost.toLocaleString()}/month</strong> to maintain.
+                    Make sure you can cover ongoing upkeep after winning.
+                  </div>
+                )}
+
                 {error  && <div className="form-error">{error}</div>}
                 {bidMsg && <div style={{ fontSize: 12, color: 'var(--green)', padding: '6px 10px', background: '#1e2a15', borderRadius: 6 }}>{bidMsg}</div>}
                 <button
@@ -384,7 +394,16 @@ export default function AuctionClient({
 
             {isActive && isSeller && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ fontSize: 13, color: 'var(--muted)' }}>You are the seller. Auction closes in {countdown.d > 0 ? `${countdown.d}d` : `${countdown.h}h ${countdown.m}m`}.</div>
+                <div style={{ fontSize: 13, color: 'var(--muted)' }}>
+                  You are the seller. Auction closes in {countdown.d > 0 ? `${countdown.d}d` : `${countdown.h}h ${countdown.m}m`}.
+                </div>
+                {currentBidNum !== null && (
+                  <div style={{ fontSize: 12, padding: '8px 10px', background: 'var(--bg3)', borderRadius: 6, lineHeight: 1.6 }}>
+                    Current bid: <strong>{fmt(currentBidNum)}</strong><br />
+                    <span style={{ color: 'var(--muted)' }}>5% platform fee: <span style={{ color: 'var(--red)' }}>−{fmt(Math.round(currentBidNum * 0.05))}</span></span><br />
+                    <span>You&apos;d receive: <strong style={{ color: 'var(--green)' }}>{fmt(Math.round(currentBidNum * 0.95))}</strong></span>
+                  </div>
+                )}
                 <button className="btn btn-danger btn-full" onClick={settle} disabled={busy}>End auction early</button>
               </div>
             )}

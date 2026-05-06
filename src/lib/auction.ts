@@ -3,6 +3,7 @@ export { bidIncrement } from './bidIncrement'
 
 const STEAL_THRESHOLD    = 0.80   // price < 80% of benchmark
 const OVERPAID_THRESHOLD = 1.20   // price > 120% of benchmark
+export const PLATFORM_FEE_RATE = 0.05  // 5% commission on user-initiated auction sales
 
 export async function settleAuction(auctionId: string) {
   return prisma.$transaction(async (tx) => {
@@ -79,7 +80,18 @@ export async function settleAuction(auctionId: string) {
         },
       })
     } else if (auction.sellerId && !auction.isSystemAuction) {
-      await tx.user.update({ where: { id: auction.sellerId }, data: { balance: { increment: price } } })
+      const fee      = Math.round(price * PLATFORM_FEE_RATE)
+      const proceeds = price - fee
+      await tx.user.update({ where: { id: auction.sellerId }, data: { balance: { increment: proceeds } } })
+      await tx.transaction.create({
+        data: {
+          toUserId:    auction.sellerId,
+          editionId:   auction.editionId,
+          amount:      proceeds,
+          type:        'auction_sale',
+          description: `Auction sale (5% fee deducted): ${auction.edition.item.name}`,
+        },
+      })
     }
 
     // Unlock all losing bids
@@ -134,13 +146,15 @@ export async function settleAuction(auctionId: string) {
         actionUrl: `/item/${auction.editionId}`,
       },
     })
-    if (auction.sellerId) {
+    if (auction.sellerId && !auction.isSystemAuction) {
+      const proceeds = Math.round(price * (1 - PLATFORM_FEE_RATE))
+      const fee      = price - proceeds
       await tx.notification.create({
         data: {
           userId:    auction.sellerId,
           type:      'item_sold',
-          message:   `Your ${auction.edition.item.name} sold for $${price.toLocaleString()} in auction`,
-          actionUrl: `/item/${auction.editionId}`,
+          message:   `Your ${auction.edition.item.name} sold for $${price.toLocaleString()} — you received $${proceeds.toLocaleString()} after $${fee.toLocaleString()} platform fee.`,
+          actionUrl: '/wallet',
         },
       })
     }

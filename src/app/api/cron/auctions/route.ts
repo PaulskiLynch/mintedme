@@ -7,8 +7,17 @@ import { businessNetIncome } from '@/lib/business'
 import { monthlyPropertyUpkeep, monthlyPropertyAppreciation } from '@/lib/property'
 import { monthlyAircraftUpkeep } from '@/lib/aircraft'
 
-const MIN_LIVE    = 2
-const DURATION_MS = 3 * 24 * 60 * 60 * 1000
+const DURATION_MS        = 3 * 24 * 60 * 60 * 1000   // user auction duration
+const SYSTEM_DURATION_MS = 24 * 60 * 60 * 1000        // system auction duration (24h)
+const ROTATION_WINDOW_MS = 7  * 24 * 60 * 60 * 1000   // skip items auctioned within 7 days
+
+// Target concurrent system auctions per rarity group
+const SYSTEM_SLOTS: Array<{ rarities: string[]; count: number }> = [
+  { rarities: ['Common', 'Banger'],              count: 3 },
+  { rarities: ['Premium'],                        count: 2 },
+  { rarities: ['Rare'],                           count: 2 },
+  { rarities: ['Exotic', 'Legendary', 'Mythic'],  count: 1 },
+]
 const CYCLE_MS    = UPKEEP_CYCLE_DAYS * 24 * 60 * 60 * 1000
 
 export async function GET(req: NextRequest) {
@@ -159,70 +168,80 @@ export async function GET(req: NextRequest) {
   }
   log.push(`liquidation: started ${liquidated} auction${liquidated !== 1 ? 's' : ''}`)
 
-  // 3. Ensure minimum live auctions — prefer cars, max 1 system business auction
-  const liveCount = await prisma.auction.count({ where: { status: 'active' } })
-  const needed    = Math.max(0, MIN_LIVE - liveCount)
+  // 3. Tier-balanced system auctions — 8 slots across Common/Premium/Rare/Exotic+
   const created: string[] = []
 
-  if (needed > 0) {
-    const auctionedItemIds = await prisma.itemEdition.findMany({
-      where: { isInAuction: true },
-      select: { itemId: true },
-    }).then(r => [...new Set(r.map(e => e.itemId))])
+  // Editions currently in any auction
+  const inAuctionIds = await prisma.itemEdition.findMany({
+    where: { isInAuction: true }, select: { id: true },
+  }).then(r => r.map(e => e.id))
 
-    const baseWhere = {
-      currentOwnerId: null as null,
-      isInAuction:    false,
-      isFrozen:       false,
-      itemId:         auctionedItemIds.length ? { notIn: auctionedItemIds } : undefined,
-    }
+  // Editions auctioned (settled) within the last 7 days — skip to rotate stock
+  const recentlySoldIds = await prisma.auction.findMany({
+    where: { status: 'settled', endsAt: { gte: new Date(Date.now() - ROTATION_WINDOW_MS) } },
+    select: { editionId: true },
+  }).then(r => r.map(a => a.editionId))
 
-    // Cars (non-business) first
-    const carCandidates = await prisma.itemEdition.findMany({
-      where: { ...baseWhere, item: { isApproved: true, isFrozen: false, businessRiskTier: null } },
-      include: { item: { select: { benchmarkPrice: true, rarityTier: true, name: true, businessRiskTier: true } } },
-      orderBy: { item: { benchmarkPrice: 'desc' } },
-      take: needed,
+  const excludeIds = [...new Set([...inAuctionIds, ...recentlySoldIds])]
+
+  // Count live system auctions already running per rarity group
+  const liveSystemAuctions = await prisma.auction.findMany({
+    where: { status: 'active', isSystemAuction: true },
+    select: { rarityTier: true },
+  })
+
+  for (const slot of SYSTEM_SLOTS) {
+    const liveInSlot = liveSystemAuctions.filter(a => slot.rarities.includes(a.rarityTier)).length
+    const needed     = Math.max(0, slot.count - liveInSlot)
+    if (needed === 0) continue
+
+    const candidates = await prisma.itemEdition.findMany({
+      where: {
+        currentOwnerId: null,
+        isFrozen:       false,
+        id:             excludeIds.length ? { notIn: excludeIds } : undefined,
+        item: {
+          isApproved:  true,
+          isFrozen:    false,
+          itemStatus:  'active',
+          rarityTier:  { in: slot.rarities },
+        },
+      },
+      include: { item: { select: { benchmarkPrice: true, rarityTier: true, name: true } } },
+      orderBy: { item: { benchmarkPrice: 'asc' } },  // cheapest first within each tier
+      take: needed * 3,  // over-fetch so we can vary selection
     })
 
-    let candidates: typeof carCandidates = carCandidates
+    // Shuffle candidates slightly by skipping a variable offset so the same item
+    // doesn't always win when supply is low
+    const shuffled = candidates.sort(() => Math.random() - 0.5).slice(0, needed)
 
-    // If short, optionally add 1 business (only if no system business auction is live)
-    if (carCandidates.length < needed) {
-      const liveSystemBiz = await prisma.auction.count({
-        where: { status: 'active', isSystemAuction: true, edition: { item: { businessRiskTier: { not: null } } } },
-      })
-      if (liveSystemBiz < 1) {
-        const bizCandidates = await prisma.itemEdition.findMany({
-          where: { ...baseWhere, item: { isApproved: true, isFrozen: false, businessRiskTier: { not: null } } },
-          include: { item: { select: { benchmarkPrice: true, rarityTier: true, name: true, businessRiskTier: true } } },
-          orderBy: { item: { benchmarkPrice: 'desc' } },
-          take: 1,
-        })
-        candidates = [...carCandidates, ...bizCandidates]
-      }
-    }
-
-    for (const edition of candidates.slice(0, needed)) {
+    for (const edition of shuffled) {
       const startingBid = Math.round(Number(edition.item.benchmarkPrice) * 0.10)
-      const endsAt      = new Date(Date.now() + DURATION_MS)
+      const endsAt      = new Date(Date.now() + SYSTEM_DURATION_MS)
       try {
         const auction = await prisma.$transaction(async (tx) => {
           const a = await tx.auction.create({
             data: {
-              editionId: edition.id, sellerId: null,
-              minimumBid: startingBid, benchmarkPrice: Number(edition.item.benchmarkPrice),
-              rarityTier: edition.item.rarityTier, status: 'active',
-              startsAt: new Date(), endsAt, isSystemAuction: true,
+              editionId:      edition.id,
+              sellerId:       null,
+              minimumBid:     startingBid,
+              benchmarkPrice: Number(edition.item.benchmarkPrice),
+              rarityTier:     edition.item.rarityTier,
+              status:         'active',
+              startsAt:       new Date(),
+              endsAt,
+              isSystemAuction: true,
             },
           })
           await tx.itemEdition.update({ where: { id: edition.id }, data: { isInAuction: true } })
           return a
         })
         created.push(auction.id)
-        log.push(`created system auction ${auction.id} for ${edition.item.name}`)
+        excludeIds.push(edition.id)  // prevent double-scheduling in same cron run
+        log.push(`system auction: ${edition.item.name} (${edition.item.rarityTier}) starting at $${startingBid.toLocaleString()}`)
       } catch (e) {
-        log.push(`create error: ${e}`)
+        log.push(`system auction error: ${e}`)
       }
     }
   }
