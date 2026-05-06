@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
+import { logAdminAction } from '@/lib/adminLog'
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -10,6 +11,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const { minimumBid, startsAt, endsAt } = await req.json()
 
   try {
+    const before = await prisma.auction.findUnique({
+      where: { id }, select: { minimumBid: true, startsAt: true, endsAt: true },
+    })
+
     await prisma.auction.update({
       where: { id },
       data: {
@@ -18,6 +23,16 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         endsAt:     endsAt     ? new Date(endsAt)   : undefined,
       },
     })
+
+    await logAdminAction({
+      adminUserId: session.user.id!,
+      action:      'admin_auction_edit',
+      targetType:  'auction',
+      targetId:    id,
+      before:      before ? { minimumBid: before.minimumBid.toString(), startsAt: before.startsAt?.toISOString(), endsAt: before.endsAt.toISOString() } : null,
+      after:       { minimumBid, startsAt, endsAt },
+    })
+
     return NextResponse.json({ ok: true })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
@@ -29,7 +44,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!session?.user?.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { id } = await params
-  const { action } = await req.json()
+  const { action, reason } = await req.json()
 
   if (action === 'activate') {
     const auction = await prisma.auction.findUnique({ where: { id } })
@@ -38,17 +53,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       where: { id },
       data: { status: 'active', startsAt: auction.startsAt ?? new Date() },
     })
+    await logAdminAction({ adminUserId: session.user.id!, action: 'admin_auction_activate', targetType: 'auction', targetId: id, before: { status: auction.status }, after: { status: 'active' } })
     return NextResponse.json({ ok: true })
   }
 
   if (action === 'cancel') {
+    if (!reason?.trim()) return NextResponse.json({ error: 'Reason required to cancel an auction' }, { status: 400 })
+
     const auction = await prisma.auction.findUnique({
       where:   { id },
       include: { bids: { where: { status: 'active' } }, edition: { include: { item: { select: { name: true } } } } },
     })
     if (!auction) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    // Release each active bid: decrement lock + create ledger record
     const releaseOps = auction.bids.flatMap(bid => [
       prisma.user.update({
         where: { id: bid.userId },
@@ -66,10 +83,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       prisma.itemEdition.update({ where: { id: auction.editionId }, data: { isInAuction: false } }),
       prisma.auction.update({ where: { id }, data: { status: 'cancelled' } }),
     ])
+
+    await logAdminAction({
+      adminUserId: session.user.id!,
+      action:      'admin_auction_cancel',
+      targetType:  'auction',
+      targetId:    id,
+      before:      { status: auction.status, bidCount: auction.bids.length },
+      after:       { status: 'cancelled' },
+      reason,
+    })
     return NextResponse.json({ ok: true })
   }
 
   if (action === 'reverse') {
+    if (!reason?.trim()) return NextResponse.json({ error: 'Reason required to reverse an auction' }, { status: 400 })
+
     const auction = await prisma.auction.findUnique({
       where:   { id },
       include: { bids: { where: { status: 'won' } }, edition: { include: { item: { select: { name: true } } } } },
@@ -90,7 +119,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       where: { id },
       data:  { status: 'reversed', winningBid: null, currentWinnerId: null },
     })
-    // Ownership: close current (winner's) ownership record, re-open seller's
     const ownershipCloseOp = prisma.ownership.updateMany({
       where: { editionId: auction.editionId, endedAt: null },
       data:  { endedAt: new Date() },
@@ -114,6 +142,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     ] : []
 
     await prisma.$transaction([editionOp, auctionOp, ownershipCloseOp, ...winnerRefundOps, ...sellerClawbackOps])
+
+    await logAdminAction({
+      adminUserId: session.user.id!,
+      action:      'admin_auction_reverse',
+      targetType:  'auction',
+      targetId:    id,
+      before:      { status: 'settled', winningBid: winAmount?.toString(), winnerId: winBid?.userId },
+      after:       { status: 'reversed' },
+      reason,
+    })
     return NextResponse.json({ ok: true })
   }
 

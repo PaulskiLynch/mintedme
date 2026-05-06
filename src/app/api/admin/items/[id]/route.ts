@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
+import { logAdminAction } from '@/lib/adminLog'
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -18,6 +19,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const minimumBid = Math.round(Number(benchmarkPrice) * 0.10)
 
   try {
+    const before = await prisma.item.findUnique({
+      where: { id },
+      select: { name: true, benchmarkPrice: true, rarityTier: true, itemStatus: true, isApproved: true, isFrozen: true },
+    })
+
     await prisma.item.update({
       where: { id },
       data: {
@@ -43,6 +49,16 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         itemStatus:       itemStatus       || 'active',
       },
     })
+
+    await logAdminAction({
+      adminUserId: session.user.id!,
+      action:      'admin_item_edit',
+      targetType:  'item',
+      targetId:    id,
+      before:      before ? { ...before, benchmarkPrice: before.benchmarkPrice.toString() } : null,
+      after:       { name, category, rarityTier, benchmarkPrice: Number(benchmarkPrice), itemStatus, isApproved: !!isApproved, isFrozen: !!isFrozen },
+    })
+
     return NextResponse.json({ ok: true })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
@@ -54,19 +70,42 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!session?.user?.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { id } = await params
-  const { action } = await req.json()
+  const body = await req.json()
+  const { action, reason } = body
+
+  if (action === 'freeze') {
+    if (!reason?.trim()) return NextResponse.json({ error: 'Reason required to freeze an item' }, { status: 400 })
+    try {
+      await prisma.item.update({ where: { id }, data: { isFrozen: true } })
+      await logAdminAction({ adminUserId: session.user.id!, action: 'admin_item_freeze', targetType: 'item', targetId: id, before: { isFrozen: false }, after: { isFrozen: true }, reason })
+      return NextResponse.json({ ok: true })
+    } catch { return NextResponse.json({ error: 'Failed' }, { status: 500 }) }
+  }
+
+  if (action === 'unfreeze') {
+    try {
+      await prisma.item.update({ where: { id }, data: { isFrozen: false } })
+      await logAdminAction({ adminUserId: session.user.id!, action: 'admin_item_unfreeze', targetType: 'item', targetId: id, before: { isFrozen: true }, after: { isFrozen: false } })
+      return NextResponse.json({ ok: true })
+    } catch { return NextResponse.json({ error: 'Failed' }, { status: 500 }) }
+  }
 
   const data =
-    action === 'approve'   ? { isApproved: true,  isFrozen: false } :
-    action === 'reject'    ? { isApproved: false } :
-    action === 'freeze'    ? { isFrozen: true  } :
-    action === 'unfreeze'  ? { isFrozen: false } :
+    action === 'approve'  ? { isApproved: true,  isFrozen: false } :
+    action === 'reject'   ? { isApproved: false } :
     null
 
   if (!data) return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 
   try {
     await prisma.item.update({ where: { id }, data })
+    await logAdminAction({
+      adminUserId: session.user.id!,
+      action:      action === 'approve' ? 'admin_item_approve' : 'admin_item_reject',
+      targetType:  'item',
+      targetId:    id,
+      after:       data,
+    })
     return NextResponse.json({ ok: true })
   } catch {
     return NextResponse.json({ error: 'Failed' }, { status: 500 })

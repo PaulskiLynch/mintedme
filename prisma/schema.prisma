@@ -55,6 +55,7 @@ model User {
   job                JobHolding?
   jobBids            JobBid[]
   wonJobAuctions     JobAuction[]       @relation("JobAuctionWinner")
+  adminLogs          AdminLog[]
 
   @@map("users")
 }
@@ -451,4 +452,24 @@ model ItemView {
   edition ItemEdition @relation(fields: [editionId], references: [id], onDelete: Cascade)
 
   @@map("item_views")
+}
+
+model AdminLog {
+  id          String   @id @default(uuid())
+  adminUserId String
+  action      String
+  targetType  String?  // user | item | auction | cron | suggestion
+  targetId    String?
+  beforeJson  Json?
+  afterJson   Json?
+  reason      String?
+  createdAt   DateTime @default(now())
+
+  admin User @relation(fields: [adminUserId], references: [id])
+
+  @@index([adminUserId])
+  @@index([action])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+  @@map("admin_logs")
 }

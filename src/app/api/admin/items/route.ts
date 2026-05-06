@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
+import { logAdminAction } from '@/lib/adminLog'
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -50,6 +51,14 @@ export async function POST(req: NextRequest) {
         data: { itemId: item.id, editionNumber: 1 },
       })
     }
+
+    await logAdminAction({
+      adminUserId: session.user.id!,
+      action:      'admin_item_create',
+      targetType:  'item',
+      targetId:    item.id,
+      after:       { name, category, rarityTier, benchmarkPrice: Number(benchmarkPrice), totalSupply: Number(totalSupply) },
+    })
 
     return NextResponse.json({ ok: true, id: item.id })
   } catch (e) {

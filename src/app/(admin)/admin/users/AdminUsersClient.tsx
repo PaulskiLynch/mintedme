@@ -31,7 +31,13 @@ export default function AdminUsersClient({ users: initial }: { users: User[] }) 
   // Balance modal
   const [balModal, setBalModal]   = useState<User | null>(null)
   const [balAmount, setBalAmount] = useState('')
+  const [balReason, setBalReason] = useState('')
   const [balError, setBalError]   = useState('')
+
+  // Freeze modal
+  const [freezeModal, setFreezeModal] = useState<User | null>(null)
+  const [freezeReason, setFreezeReason] = useState('')
+  const [freezeError, setFreezeError]   = useState('')
 
   // Edit modal
   const [editModal, setEditModal] = useState<User | null>(null)
@@ -77,15 +83,32 @@ export default function AdminUsersClient({ users: initial }: { users: User[] }) 
     if (!balModal) return
     const delta = Number(balAmount)
     if (isNaN(delta) || delta === 0) { setBalError('Enter a non-zero amount'); return }
+    if (!balReason.trim()) { setBalError('Reason is required'); return }
     setBusy('bal')
     const res = await fetch(`/api/admin/users/${balModal.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'adjust_balance', delta }),
+      body: JSON.stringify({ action: 'adjust_balance', delta, reason: balReason }),
     })
     const data = await res.json()
     if (!res.ok) { setBalError(data.error ?? 'Failed'); setBusy(null); return }
     setUsers(prev => prev.map(u => u.id === balModal.id ? { ...u, balance: data.balance } : u))
-    setBalModal(null); setBalAmount(''); setBusy(null)
+    setBalModal(null); setBalAmount(''); setBalReason(''); setBusy(null)
+    router.refresh()
+  }
+
+  async function freezeUser(e: React.FormEvent) {
+    e.preventDefault()
+    if (!freezeModal) return
+    if (!freezeReason.trim()) { setFreezeError('Reason is required'); return }
+    setBusy('freeze')
+    const res = await fetch(`/api/admin/users/${freezeModal.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'freeze', reason: freezeReason }),
+    })
+    const data = await res.json()
+    if (!res.ok) { setFreezeError(data.error ?? 'Failed'); setBusy(null); return }
+    setUsers(prev => prev.map(u => u.id === freezeModal.id ? { ...u, isFrozen: true } : u))
+    setFreezeModal(null); setFreezeReason(''); setBusy(null)
     router.refresh()
   }
 
@@ -154,13 +177,40 @@ export default function AdminUsersClient({ users: initial }: { users: User[] }) 
             <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 12, marginBottom: 0, lineHeight: 1.5 }}>
               Adds or subtracts cash from this user's balance and records an <em>admin_adjustment</em> transaction so it shows in their wallet history. Use positive numbers to give money, negative to take it.
             </p>
-            <form onSubmit={adjustBalance} style={{ marginTop: 16 }}>
-              <input className="form-input" type="number" placeholder="e.g. 50000 or -10000"
+            <form onSubmit={adjustBalance} style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <input style={inp} type="number" placeholder="e.g. 50000 or -10000"
                 value={balAmount} onChange={e => setBalAmount(e.target.value)} autoFocus required />
-              {balError && <div style={{ color: 'var(--red)', fontSize: 12, marginTop: 6 }}>{balError}</div>}
-              <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+              <input style={inp} placeholder="Reason (required for audit log)" value={balReason}
+                onChange={e => setBalReason(e.target.value)} required />
+              {balError && <div style={{ color: 'var(--red)', fontSize: 12 }}>{balError}</div>}
+              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                 <button type="submit" disabled={busy === 'bal'} className="btn btn-gold">{busy === 'bal' ? '…' : 'Apply'}</button>
                 <button type="button" className="btn btn-ghost" onClick={() => setBalModal(null)}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Freeze modal ── */}
+      {freezeModal && (
+        <div className="overlay" onClick={e => { if (e.target === e.currentTarget) setFreezeModal(null) }}>
+          <div className="modal" style={{ maxWidth: 380 }}>
+            <div className="modal-title" style={{ color: 'var(--red)' }}>Freeze User</div>
+            <div className="modal-sub">@{freezeModal.username}</div>
+            <p style={{ fontSize: 12, color: 'var(--muted)', margin: '12px 0' }}>
+              Frozen users cannot bid, buy, list, or accept offers. This action is logged.
+            </p>
+            <form onSubmit={freezeUser} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <input style={inp} placeholder="Reason (required)" value={freezeReason}
+                onChange={e => setFreezeReason(e.target.value)} autoFocus required />
+              {freezeError && <div style={{ color: 'var(--red)', fontSize: 12 }}>{freezeError}</div>}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="submit" disabled={busy === 'freeze'}
+                  style={{ padding: '9px 20px', background: 'var(--red)', color: '#fff', fontWeight: 900, fontSize: 13, borderRadius: 6, border: 'none', cursor: 'pointer' }}>
+                  {busy === 'freeze' ? '…' : 'Freeze account'}
+                </button>
+                <button type="button" className="btn btn-ghost" onClick={() => setFreezeModal(null)}>Cancel</button>
               </div>
             </form>
           </div>
@@ -309,7 +359,7 @@ export default function AdminUsersClient({ users: initial }: { users: User[] }) 
                     </Link>
                     {u.isFrozen
                       ? btn('Unfreeze', () => action(u.id, 'unfreeze'), 'var(--white)', !!busy)
-                      : btn('Freeze',   () => action(u.id, 'freeze'),   'var(--red)',   !!busy)
+                      : btn('Freeze',   () => { setFreezeModal(u); setFreezeReason(''); setFreezeError('') }, 'var(--red)', !!busy)
                     }
                     {!u.isEstablished && btn('+ Est.', () => action(u.id, 'mark_established'), 'var(--green)', !!busy)}
                     {!u.isAdmin && btn('+ Admin', () => action(u.id, 'make_admin'), 'var(--muted)', !!busy)}

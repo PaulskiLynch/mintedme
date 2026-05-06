@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
+import { logAdminAction } from '@/lib/adminLog'
 
 export async function POST() {
   const session = await auth()
@@ -12,5 +13,13 @@ export async function POST() {
     headers: secret ? { authorization: `Bearer ${secret}` } : {},
   })
   const data = await res.json()
+
+  await logAdminAction({
+    adminUserId: session.user.id!,
+    action:      'admin_cron_run',
+    targetType:  'cron',
+    after:       { ok: res.ok, log: data.log?.slice(0, 10) },
+  })
+
   return NextResponse.json(data)
 }

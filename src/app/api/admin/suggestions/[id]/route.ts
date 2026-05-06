@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
+import { logAdminAction } from '@/lib/adminLog'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -26,6 +27,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         message: `Your suggestion "${sub.itemName}" wasn't selected this time.${body.adminNotes ? ' Note: ' + body.adminNotes : ''}`,
         actionUrl: '/suggestions',
       },
+    })
+    await logAdminAction({
+      adminUserId: session.user.id!,
+      action:      'suggestion_reject',
+      targetType:  'suggestion',
+      targetId:    id,
+      after:       { itemName: sub.itemName, adminNotes: body.adminNotes || null },
     })
     return NextResponse.json({ ok: true })
   }
@@ -61,12 +69,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
         await tx.creatorSubmission.update({
           where: { id },
-          data:  {
-            status:      'approved',
-            linkedItemId: newItem.id,
-            reviewedBy:  session.user.id,
-            reviewedAt:  new Date(),
-          },
+          data:  { status: 'approved', linkedItemId: newItem.id, reviewedBy: session.user.id, reviewedAt: new Date() },
         })
 
         const discountPrice = Math.round(Number(benchmarkPrice) * 0.5)
@@ -81,6 +84,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
         return newItem
       })
+
+      await logAdminAction({
+        adminUserId: session.user.id!,
+        action:      'suggestion_approve',
+        targetType:  'suggestion',
+        targetId:    id,
+        after:       { itemId: item.id, itemName: sub.itemName, rarityTier, benchmarkPrice: Number(benchmarkPrice) },
+      })
+
       return NextResponse.json({ ok: true, itemId: item.id })
     } catch (e) {
       return NextResponse.json({ error: String(e) }, { status: 500 })
