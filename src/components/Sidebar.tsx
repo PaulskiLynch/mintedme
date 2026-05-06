@@ -36,9 +36,9 @@ export default function Sidebar({ username, balance, isAdmin = false, unreadCoun
     <>
       {/* Desktop sidebar */}
       <aside className="sidebar">
-        <div className="sidebar-logo">
+        <Link href="/feed" className="sidebar-logo" style={{ display: 'block' }}>
           <img src="/logo.png" alt="MilliBux" style={{ width: 120, height: 'auto', display: 'block' }} />
-        </div>
+        </Link>
 
         <div className="sidebar-user">
           <div className="sidebar-username">@{username}</div>
