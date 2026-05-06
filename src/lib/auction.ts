@@ -52,8 +52,33 @@ export async function settleAuction(auctionId: string) {
     })
     await tx.bid.updateMany({ where: { auctionId, userId: winnerId }, data: { status: 'won' } })
 
-    // Pay seller — user-owned auctions only; system auctions burn the funds
-    if (auction.sellerId && !auction.isSystemAuction) {
+    // Pay seller, clear liquidation debt, or burn (system auction)
+    if (auction.liquidationUserId) {
+      const debtor = await tx.user.findUnique({ where: { id: auction.liquidationUserId }, select: { debtAmount: true } })
+      const debt       = Number(debtor?.debtAmount ?? 0)
+      const debtCleared = Math.min(price, debt)
+      const remainder   = price - debtCleared
+      await tx.user.update({
+        where: { id: auction.liquidationUserId },
+        data: {
+          ...(debtCleared > 0 ? { debtAmount: { decrement: debtCleared } } : {}),
+          ...(remainder   > 0 ? { balance:    { increment: remainder   } } : {}),
+        },
+      })
+      if (remainder > 0) {
+        await tx.transaction.create({
+          data: { toUserId: auction.liquidationUserId, editionId: auction.editionId, amount: remainder, type: 'liquidation_credit', description: `Liquidation surplus: ${auction.edition.item.name}` },
+        })
+      }
+      await tx.notification.create({
+        data: {
+          userId:    auction.liquidationUserId,
+          type:      'liquidation_settled',
+          message:   `Your ${auction.edition.item.name} sold for $${price.toLocaleString()} — $${debtCleared.toLocaleString()} cleared your upkeep debt${remainder > 0 ? `, $${remainder.toLocaleString()} returned to your balance` : ''}.`,
+          actionUrl: '/wallet',
+        },
+      })
+    } else if (auction.sellerId && !auction.isSystemAuction) {
       await tx.user.update({ where: { id: auction.sellerId }, data: { balance: { increment: price } } })
     }
 

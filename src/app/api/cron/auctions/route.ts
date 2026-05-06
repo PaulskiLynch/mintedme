@@ -54,25 +54,106 @@ export async function GET(req: NextRequest) {
   })
 
   let upkeepCharged = 0
-  let upkeepSkipped = 0
+  let upkeepDebted  = 0
   for (const edition of dueEditions) {
     if (!edition.currentOwner) continue
     const cost = monthlyUpkeep(edition.item.rarityTier, Number(edition.item.benchmarkPrice))
-    if (Number(edition.currentOwner.balance) < cost) { upkeepSkipped++; continue }
+    const canPay = Number(edition.currentOwner.balance) >= cost
     try {
       await prisma.$transaction(async (tx) => {
-        await tx.user.update({ where: { id: edition.currentOwnerId! }, data: { balance: { decrement: cost } } })
         await tx.itemEdition.update({ where: { id: edition.id }, data: { lastUpkeepAt: new Date() } })
-        await tx.transaction.create({
-          data: { fromUserId: edition.currentOwnerId, amount: cost, type: 'upkeep', description: `Monthly upkeep: ${edition.item.name}` },
-        })
+        if (canPay) {
+          await tx.user.update({ where: { id: edition.currentOwnerId! }, data: { balance: { decrement: cost } } })
+          await tx.transaction.create({
+            data: { fromUserId: edition.currentOwnerId, amount: cost, type: 'upkeep', description: `Monthly upkeep: ${edition.item.name}` },
+          })
+        } else {
+          await tx.user.update({ where: { id: edition.currentOwnerId! }, data: { debtAmount: { increment: cost } } })
+          await tx.transaction.create({
+            data: { fromUserId: edition.currentOwnerId, amount: cost, type: 'upkeep_debt', description: `Upkeep debt: ${edition.item.name}` },
+          })
+          await tx.notification.create({
+            data: {
+              userId:    edition.currentOwnerId!,
+              type:      'upkeep_missed',
+              message:   `Couldn't charge $${cost.toLocaleString()} upkeep for ${edition.item.name} — your items may be liquidated to cover the debt.`,
+              actionUrl: '/wallet',
+            },
+          })
+        }
       })
-      upkeepCharged++
+      if (canPay) upkeepCharged++; else upkeepDebted++
     } catch (e) {
       log.push(`upkeep error ${edition.id}: ${e}`)
     }
   }
-  log.push(`upkeep: charged ${upkeepCharged}, skipped ${upkeepSkipped}`)
+  log.push(`upkeep: charged ${upkeepCharged}, debted ${upkeepDebted}`)
+
+  // 2b. Liquidate items for users with outstanding upkeep debt
+  const debtUsers = await prisma.user.findMany({
+    where: { debtAmount: { gt: 0 }, isFrozen: false },
+    select: {
+      id:          true,
+      username:    true,
+      debtAmount:  true,
+      ownedEditions: {
+        where:   { isFrozen: false, isInAuction: false },
+        include: { item: { select: { name: true, benchmarkPrice: true, rarityTier: true } } },
+        orderBy: { item: { benchmarkPrice: 'asc' } },
+      },
+    },
+  })
+
+  let liquidated = 0
+  for (const user of debtUsers) {
+    const existingLiq = await prisma.auction.findMany({
+      where:  { liquidationUserId: user.id, status: 'active' },
+      select: { minimumBid: true },
+    })
+    const alreadyCovering = existingLiq.reduce((s, a) => s + Number(a.minimumBid), 0)
+    let stillNeeded = Number(user.debtAmount) - alreadyCovering
+    if (stillNeeded <= 0) continue
+
+    for (const edition of user.ownedEditions) {
+      if (stillNeeded <= 0) break
+      const startingBid = Math.round(Number(edition.item.benchmarkPrice) * 0.10)
+      const endsAt      = new Date(Date.now() + DURATION_MS)
+      try {
+        const auction = await prisma.$transaction(async (tx) => {
+          const a = await tx.auction.create({
+            data: {
+              editionId:         edition.id,
+              sellerId:          null,
+              minimumBid:        startingBid,
+              benchmarkPrice:    Number(edition.item.benchmarkPrice),
+              rarityTier:        edition.item.rarityTier,
+              status:            'active',
+              startsAt:          new Date(),
+              endsAt,
+              isSystemAuction:   false,
+              liquidationUserId: user.id,
+            },
+          })
+          await tx.itemEdition.update({ where: { id: edition.id }, data: { isInAuction: true } })
+          await tx.notification.create({
+            data: {
+              userId:    user.id,
+              type:      'liquidation_started',
+              message:   `Your ${edition.item.name} has been placed in auction to recover $${Number(user.debtAmount).toLocaleString()} in unpaid upkeep.`,
+              actionUrl: `/auction/${a.id}`,
+            },
+          })
+          return a
+        })
+        log.push(`liquidation: ${edition.item.name} → auction ${auction.id} (user ${user.username})`)
+        stillNeeded -= startingBid
+        liquidated++
+      } catch (e) {
+        log.push(`liquidation error ${edition.id}: ${e}`)
+      }
+    }
+  }
+  log.push(`liquidation: started ${liquidated} auction${liquidated !== 1 ? 's' : ''}`)
 
   // 3. Ensure minimum live auctions — prefer cars, max 1 system business auction
   const liveCount = await prisma.auction.count({ where: { status: 'active' } })
@@ -264,5 +345,5 @@ export async function GET(req: NextRequest) {
   }
   log.push(`business income: paid ${incomesPaid}`)
 
-  return NextResponse.json({ ok: true, log, created: created.length, upkeepCharged, salaryPaid, incomesPaid, auctionIds: created })
+  return NextResponse.json({ ok: true, log, created: created.length, upkeepCharged, upkeepDebted, liquidated, salaryPaid, incomesPaid, auctionIds: created })
 }

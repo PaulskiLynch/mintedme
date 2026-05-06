@@ -22,6 +22,7 @@ model User {
   isEstablished Boolean  @default(false)
   isAdmin       Boolean  @default(false)
   isFrozen      Boolean  @default(false)
+  debtAmount    Decimal  @default(0)          @db.Decimal(12, 2)
   previousRank  Int?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -237,6 +238,7 @@ model Auction {
   endsAt             DateTime
   extensionCount     Int      @default(0)           // anti-snipe extensions applied
   isSystemAuction    Boolean  @default(false)       // true = MilliBux-owned, funds burned on win
+  liquidationUserId  String?                        // set on forced-sale auctions; proceeds clear their debt
   createdAt          DateTime @default(now())
 
   edition       ItemEdition      @relation(fields: [editionId],       references: [id])
