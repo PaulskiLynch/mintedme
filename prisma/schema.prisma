@@ -51,8 +51,39 @@ model User {
   feedComments       FeedComment[]
   reports            Report[]
   job                JobHolding?
+  jobBids            JobBid[]
+  wonJobAuctions     JobAuction[]       @relation("JobAuctionWinner")
 
   @@map("users")
+}
+
+model JobAuction {
+  id           String    @id @default(uuid())
+  jobCode      String
+  status       String    @default("active")  // active | settled
+  endsAt       DateTime
+  winnerId     String?
+  winnerSalary Int?
+  createdAt    DateTime  @default(now())
+
+  bids   JobBid[]
+  winner User?    @relation("JobAuctionWinner", fields: [winnerId], references: [id])
+
+  @@map("job_auctions")
+}
+
+model JobBid {
+  id           String   @id @default(uuid())
+  jobAuctionId String
+  userId       String
+  salaryBid    Int
+  createdAt    DateTime @default(now())
+
+  jobAuction JobAuction @relation(fields: [jobAuctionId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id])
+
+  @@unique([jobAuctionId, userId])
+  @@map("job_bids")
 }
 
 model JobHolding {

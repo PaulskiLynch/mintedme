@@ -5,25 +5,52 @@ import { JOB_CATALOGUE, slotsForJob } from '@/lib/jobs'
 
 export async function GET() {
   const session = await auth()
+  const userId  = session?.user?.id ?? null
 
-  const [activeUsers, holdings] = await Promise.all([
+  const [activeUsers, holdings, auctions, myJob, myActiveBid] = await Promise.all([
     prisma.user.count(),
     prisma.jobHolding.groupBy({ by: ['jobCode'], _count: { jobCode: true } }),
+    prisma.jobAuction.findMany({
+      where:   { status: 'active' },
+      include: {
+        bids:   { orderBy: { salaryBid: 'asc' }, select: { userId: true, salaryBid: true } },
+        _count: { select: { bids: true } },
+      },
+    }),
+    userId ? prisma.jobHolding.findUnique({ where: { userId } }) : null,
+    userId
+      ? prisma.jobBid.findFirst({
+          where:   { userId, jobAuction: { status: 'active' } },
+          include: { jobAuction: { select: { id: true, jobCode: true, endsAt: true } } },
+        })
+      : null,
   ])
 
-  const holderMap = Object.fromEntries(holdings.map(h => [h.jobCode, h._count.jobCode]))
+  const holderMap  = Object.fromEntries(holdings.map(h => [h.jobCode, h._count.jobCode]))
+  const auctionMap = Object.fromEntries(auctions.map(a => [a.jobCode, a]))
 
-  const myJob = session?.user?.id
-    ? await prisma.jobHolding.findUnique({ where: { userId: session.user.id } })
-    : null
+  const jobs = JOB_CATALOGUE.map(j => {
+    const auction = auctionMap[j.code]
+    const myBidHere = myActiveBid?.jobAuction.jobCode === j.code ? myActiveBid.salaryBid : null
+    return {
+      code:        j.code,
+      title:       j.title,
+      category:    j.category,
+      minSalary:   j.minSalary,
+      maxSalary:   j.maxSalary,
+      totalSlots:  slotsForJob(j.baseSlotsPerThousand, activeUsers),
+      heldSlots:   holderMap[j.code] ?? 0,
+      activeAuction: auction ? {
+        id:        auction.id,
+        endsAt:    auction.endsAt.toISOString(),
+        lowestBid: auction.bids[0]?.salaryBid ?? null,
+        bidCount:  auction._count.bids,
+        myBid:     myBidHere,
+      } : null,
+    }
+  })
 
-  const jobs = JOB_CATALOGUE.map(j => ({
-    ...j,
-    totalSlots:  slotsForJob(j.baseSlotsPerThousand, activeUsers),
-    heldSlots:   holderMap[j.code] ?? 0,
-  }))
-
-  return NextResponse.json({ jobs, myJob })
+  return NextResponse.json({ jobs, myJob, myActiveBid })
 }
 
 export async function DELETE() {

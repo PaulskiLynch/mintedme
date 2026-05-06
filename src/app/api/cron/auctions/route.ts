@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { settleAuction } from '@/lib/auction'
 import { monthlyUpkeep, UPKEEP_CYCLE_DAYS } from '@/lib/upkeep'
-import { JOB_BY_CODE } from '@/lib/jobs'
+import { JOB_BY_CODE, slotsForJob } from '@/lib/jobs'
 import { businessNetIncome } from '@/lib/business'
 
 const MIN_LIVE    = 2
@@ -142,7 +142,63 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // 4. Pay monthly salaries
+  // 4. Settle expired job auctions — award jobs to lowest bidders
+  const expiredJobAuctions = await prisma.jobAuction.findMany({
+    where:   { status: 'active', endsAt: { lt: new Date() } },
+    include: { bids: { orderBy: { salaryBid: 'asc' } } },
+  })
+
+  let jobsAwarded = 0
+  for (const ja of expiredJobAuctions) {
+    const jobDef = JOB_BY_CODE[ja.jobCode]
+    if (!jobDef || ja.bids.length === 0) {
+      await prisma.jobAuction.update({ where: { id: ja.id }, data: { status: 'settled' } })
+      continue
+    }
+
+    const [activeUsers, heldCount] = await Promise.all([
+      prisma.user.count(),
+      prisma.jobHolding.count({ where: { jobCode: ja.jobCode } }),
+    ])
+
+    let awarded = false
+    for (const bid of ja.bids) {
+      if (heldCount >= slotsForJob(jobDef.baseSlotsPerThousand, activeUsers)) break
+      const [user, existingJob] = await Promise.all([
+        prisma.user.findUnique({ where: { id: bid.userId }, select: { isFrozen: true } }),
+        prisma.jobHolding.findUnique({ where: { userId: bid.userId } }),
+      ])
+      if (user?.isFrozen || existingJob) continue
+      try {
+        await prisma.$transaction(async (tx) => {
+          await tx.jobHolding.create({
+            data: { userId: bid.userId, jobCode: ja.jobCode, monthlySalary: bid.salaryBid },
+          })
+          await tx.jobAuction.update({
+            where: { id: ja.id },
+            data:  { status: 'settled', winnerId: bid.userId, winnerSalary: bid.salaryBid },
+          })
+          await tx.notification.create({
+            data: {
+              userId:    bid.userId,
+              type:      'job_won',
+              message:   `You got the job — ${jobDef.title} at $${bid.salaryBid.toLocaleString()}/mo`,
+              actionUrl: '/jobs',
+            },
+          })
+        })
+        awarded = true
+        jobsAwarded++
+      } catch (e) { log.push(`job award error ${ja.id}: ${e}`) }
+      break
+    }
+    if (!awarded) {
+      await prisma.jobAuction.update({ where: { id: ja.id }, data: { status: 'settled' } })
+    }
+  }
+  log.push(`job auctions: awarded ${jobsAwarded}`)
+
+  // 5. Pay monthly job salaries
   const dueJobs = await prisma.jobHolding.findMany({
     where: { OR: [{ lastPaidAt: null }, { lastPaidAt: { lte: cutoff } }] },
     include: { user: { select: { id: true, isFrozen: true } } },
