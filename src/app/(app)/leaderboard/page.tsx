@@ -25,6 +25,7 @@ export default async function LeaderboardPage() {
       avatarUrl:     true,
       balance:       true,
       isEstablished: true,
+      previousRank:  true,
       _count: { select: { ownedEditions: { where: { isFrozen: false } } } },
       ownedEditions: {
         where:  { isFrozen: false },
@@ -44,6 +45,12 @@ export default async function LeaderboardPage() {
       return { ...u, mintValue, netWorth, balance: Number(u.balance) }
     })
     .sort((a, b) => b.netWorth - a.netWorth)
+    .map((u, i) => {
+      const currentRank  = i + 1
+      const prev         = u.previousRank
+      const rankDelta    = prev ? prev - currentRank : null  // positive = moved up
+      return { ...u, currentRank, rankDelta }
+    })
 
   const myRow = ranked.findIndex(u => u.id === session.user.id)
 
@@ -61,6 +68,11 @@ export default async function LeaderboardPage() {
             <span style={{ color: 'var(--muted)' }}>Your rank </span>
             <span style={{ fontWeight: 900, color: 'var(--gold)', fontSize: 18 }}>#{myRow + 1}</span>
             <span style={{ color: 'var(--muted)' }}> of {ranked.length}</span>
+            {ranked[myRow].rankDelta !== null && ranked[myRow].rankDelta !== 0 && (
+              <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 800, color: (ranked[myRow].rankDelta ?? 0) > 0 ? 'var(--green)' : 'var(--red)' }}>
+                {(ranked[myRow].rankDelta ?? 0) > 0 ? `↑ ${ranked[myRow].rankDelta} since last move` : `↓ ${Math.abs(ranked[myRow].rankDelta ?? 0)} since last move`}
+              </span>
+            )}
           </div>
           <div style={{ fontSize: 13, color: 'var(--muted)' }}>
             Net worth <span style={{ color: 'var(--white)', fontWeight: 700 }}>{fmt(ranked[myRow].netWorth)}</span>
@@ -70,8 +82,18 @@ export default async function LeaderboardPage() {
 
       {/* Leaderboard list */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {ranked.map((u, i) => {
+        {ranked.map((u) => {
           const isMe = u.id === session.user.id
+          const i    = u.currentRank - 1
+          const delta = u.rankDelta
+          const moveColour = delta === null ? 'transparent'
+                           : delta > 0     ? 'var(--green)'
+                           : delta < 0     ? 'var(--red)'
+                           : 'var(--muted)'
+          const moveLabel = delta === null ? ''
+                          : delta > 0     ? `↑${delta}`
+                          : delta < 0     ? `↓${Math.abs(delta)}`
+                          : '→'
           return (
             <Link
               key={u.id}
@@ -88,12 +110,15 @@ export default async function LeaderboardPage() {
                 transition: 'border-color 0.15s',
               }}
             >
-              {/* Rank */}
-              <div style={{ width: 36, textAlign: 'center', flexShrink: 0 }}>
+              {/* Rank + movement */}
+              <div style={{ width: 44, textAlign: 'center', flexShrink: 0 }}>
                 {i < 3 ? (
                   <span style={{ fontSize: 22 }}>{MEDALS[i]}</span>
                 ) : (
                   <span style={{ fontSize: 16, fontWeight: 900, color: 'var(--muted)' }}>#{i + 1}</span>
+                )}
+                {moveLabel && (
+                  <div style={{ fontSize: 10, fontWeight: 800, color: moveColour, marginTop: 2 }}>{moveLabel}</div>
                 )}
               </div>
 

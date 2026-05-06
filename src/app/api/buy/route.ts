@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
 import { maxEditions } from '@/lib/supply'
+import { snapshotRanks } from '@/lib/ranks'
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -69,6 +70,9 @@ export async function POST(req: NextRequest) {
       const creatorPct = creatorId && (isPrimarySale || creatorId !== sellerId) ? (isPrimarySale ? 0.8 : 0.2) : 0
       const creatorCut = Math.floor(price * creatorPct)
       const sellerGets = sellerId ? price - creatorCut : 0
+
+      // Snapshot current ranks for buyer (and seller if any) before net worth changes
+      await snapshotRanks(tx as typeof prisma, [buyerId, ...(sellerId ? [sellerId] : [])])
 
       await tx.user.update({ where: { id: buyerId }, data: { balance: { decrement: price } } })
       if (sellerId) await tx.user.update({ where: { id: sellerId }, data: { balance: { increment: sellerGets } } })
