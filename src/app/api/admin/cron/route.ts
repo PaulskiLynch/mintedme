@@ -7,7 +7,11 @@ export async function POST() {
   if (!session?.user?.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const secret  = process.env.CRON_SECRET ?? ''
-  const baseUrl = process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  // VERCEL_URL is injected automatically by Vercel for every deployment.
+  // NEXTAUTH_URL is typically set to http://localhost:3000 and must not be used server-side on Vercel.
+  const baseUrl = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : (process.env.NEXTAUTH_URL ?? 'http://localhost:3000')
 
   const res  = await fetch(`${baseUrl}/api/cron/auctions`, {
     headers: secret ? { authorization: `Bearer ${secret}` } : {},
