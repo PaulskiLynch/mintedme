@@ -34,7 +34,6 @@ interface Props {
   userId: string; userProfile: UserProfile
   initialEvents: FeedEvent[]; initialWatching: WatchItem[]; initialBids: ActiveBid[]
   initialAuctions: LiveAuction[]; initialFriends: Friend[]; initialInterests: string[]
-  reactionsByEventId: Record<string, string>
   myRank: number; totalPlayers: number
   classStats: ClassStats
   challenges: ClientChallenge[]
@@ -240,13 +239,6 @@ function metaLine(e: FeedEvent): string {
 
   return parts.join(' · ')
 }
-
-const REACTIONS = [
-  { type: 'smart', emoji: '📈', label: 'Smart' },
-  { type: 'bold',  emoji: '🔥', label: 'Bold'  },
-  { type: 'risky', emoji: '😬', label: 'Risky' },
-  { type: 'steal', emoji: '💰', label: 'Steal' },
-]
 
 function verdictLine(e: FeedEvent): { text: string; colour: string } | null {
   if (!e.amount || !e.edition?.item.benchmarkPrice) return null
@@ -475,11 +467,9 @@ function MarketCard({ event }: { event: FeedEvent }) {
 
 // ─── Feed post ────────────────────────────────────────────────────────────────
 
-function FeedPost({ event, myReaction: initReaction, likeCount: initLikes, commentCount: initCommCount, userId }: {
-  event: FeedEvent; myReaction: string | null; likeCount: number; commentCount: number; userId: string
+function FeedPost({ event, commentCount: initCommCount, userId }: {
+  event: FeedEvent; commentCount: number; userId: string
 }) {
-  const [myReaction,   setMyReaction]  = useState(initReaction)
-  const [likes,        setLikes]       = useState(initLikes)
   const [comments,     setComments]    = useState<Comment[]>([])
   const [commCount,    setCommCount]   = useState(initCommCount)
   const [expanded,     setExpanded]    = useState(false)
@@ -491,19 +481,9 @@ function FeedPost({ event, myReaction: initReaction, likeCount: initLikes, comme
   const [offerBusy,    setOfferBusy]   = useState(false)
   const [offerDone,    setOfferDone]   = useState(false)
 
-  const bench     = Number(event.edition?.item.benchmarkPrice ?? 0)
-  const offerNum  = Number(offerRaw || 0)
-  const offerPct  = bench && offerNum ? ((offerNum - bench) / bench * 100) : null
-
-  async function toggleReaction(type: string) {
-    const next = myReaction === type ? null : type
-    setMyReaction(next)
-    setLikes(l => next ? (myReaction ? l : l + 1) : l - 1)
-    await fetch(`/api/feed/${event.id}/like`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type }),
-    })
-  }
+  const bench    = Number(event.edition?.item.benchmarkPrice ?? 0)
+  const offerNum = Number(offerRaw || 0)
+  const offerPct = bench && offerNum ? ((offerNum - bench) / bench * 100) : null
 
   async function loadAndToggleComments() {
     if (!expanded) {
@@ -543,12 +523,12 @@ function FeedPost({ event, myReaction: initReaction, likeCount: initLikes, comme
   const item     = event.edition?.item
   const meta     = metaLine(event)
   const verdict  = verdictLine(event)
-  const impact   = impactLine(event)
-  const isOwner  = event.targetUser && (event.eventType === 'sell' || event.eventType === 'accept')
+  const canOffer = !!event.edition && !!userId && !offerDone &&
+                   !(event.targetUser && (event.eventType === 'sell' || event.eventType === 'accept'))
 
   return (
     <div className="feed-post">
-      {/* Header */}
+      {/* Header: avatar · event text · type pill */}
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: item?.imageUrl ? 12 : 0 }}>
         {event.user && (
           <Link href={`/mint/${event.user.username}`} style={{ flexShrink: 0 }}>
@@ -562,29 +542,31 @@ function FeedPost({ event, myReaction: initReaction, likeCount: initLikes, comme
             )}
             <span style={{ color: 'var(--muted)' }}>{eventText(event)}</span>
           </div>
-          {meta && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>{meta}</div>}
+          {/* Meta + verdict on the same line */}
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>
+            {meta}
+            {verdict && (
+              <span style={{ color: verdict.colour, fontWeight: 700, marginLeft: meta ? ' · '.length > 0 ? 6 : 0 : 0 }}>
+                {meta ? ' · ' : ''}{verdict.text}
+              </span>
+            )}
+          </div>
         </div>
         <span className={`feed-type-pill ${typeInfo.css}`} style={{ flexShrink: 0, marginTop: 2 }}>{typeInfo.label}</span>
       </div>
 
-      {/* Full-width image */}
+      {/* Image — clicking navigates to item */}
       {item?.imageUrl && event.edition && (
         <Link href={`/item/${event.edition.id}`} style={{ display: 'block', marginBottom: 10 }}>
           <img src={item.imageUrl} alt={item.name ?? ''} className="feed-post-image" />
         </Link>
       )}
 
-      {/* Asset name */}
+      {/* Asset name — also navigates to item */}
       {item?.name && event.edition && (
-        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6, color: 'var(--white)' }}>{item.name}</div>
-      )}
-
-      {/* Verdict + impact */}
-      {verdict && (
-        <div style={{ fontSize: 12, color: verdict.colour, fontWeight: 700, marginBottom: impact ? 2 : 8 }}>{verdict.text}</div>
-      )}
-      {impact && (
-        <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>{impact}</div>
+        <Link href={`/item/${event.edition.id}`} style={{ fontSize: 13, fontWeight: 700, display: 'block', marginBottom: 10, color: 'var(--white)', textDecoration: 'none' }}>
+          {item.name}
+        </Link>
       )}
 
       {/* Inline offer form */}
@@ -615,51 +597,28 @@ function FeedPost({ event, myReaction: initReaction, likeCount: initLikes, comme
                 style={{ paddingLeft: 22, fontSize: 13 }} autoFocus required
               />
             </div>
-            <button className="btn btn-gold btn-sm" type="submit" disabled={offerBusy || !offerRaw}>{offerBusy ? '...' : 'Send'}</button>
+            <button className="btn btn-gold btn-sm" type="submit" disabled={offerBusy || !offerRaw}>{offerBusy ? '…' : 'Send'}</button>
             <button className="btn btn-ghost btn-sm" type="button" onClick={() => setShowOffer(false)}>✕</button>
           </div>
         </form>
       )}
-      {offerDone && <div style={{ marginBottom: 8, fontSize: 12, color: 'var(--green)', fontWeight: 700 }}>Offer sent!</div>}
 
-      {/* Reactions row */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-        {REACTIONS.map(r => (
-          <button
-            key={r.type}
-            onClick={() => toggleReaction(r.type)}
-            style={{
-              fontSize: 11, fontWeight: 700,
-              background: myReaction === r.type ? 'var(--bg3)' : 'transparent',
-              border: `1px solid ${myReaction === r.type ? 'var(--gold)' : 'var(--border)'}`,
-              color:  myReaction === r.type ? 'var(--gold)' : 'var(--muted)',
-              borderRadius: 6, padding: '4px 8px', cursor: 'pointer',
-            }}
-          >
-            {r.emoji} {r.label}
+      {/* Action bar: comment count + offer */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+        <button className={`feed-action-btn${expanded ? ' liked' : ''}`} onClick={loadAndToggleComments} style={{ fontSize: 11 }}>
+          💬 {commCount > 0 ? commCount : 'Comment'}
+        </button>
+        {offerDone && <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 700 }}>Offer sent ✓</span>}
+        {canOffer && (
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowOffer(p => !p)} style={{ fontSize: 11, marginLeft: 'auto' }}>
+            {showOffer ? 'Cancel' : 'Make Offer'}
           </button>
-        ))}
-        {likes > 0 && <span style={{ fontSize: 11, color: 'var(--muted)', alignSelf: 'center', marginLeft: 2 }}>{likes} reaction{likes !== 1 ? 's' : ''}</span>}
-
-        {/* CTAs pushed right */}
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-          <button className={`feed-action-btn${expanded ? ' liked' : ''}`} onClick={loadAndToggleComments} style={{ fontSize: 11 }}>
-            💬 {commCount > 0 ? commCount : ''}
-          </button>
-          {event.edition && userId && !offerDone && !isOwner && (
-            <button className="btn btn-ghost btn-sm" onClick={() => setShowOffer(p => !p)} style={{ fontSize: 11 }}>
-              {showOffer ? 'Cancel' : 'Offer'}
-            </button>
-          )}
-          {event.edition && (
-            <Link href={`/item/${event.edition.id}`} className="btn btn-gold btn-sm" style={{ fontSize: 11 }}>View →</Link>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Comments */}
       {expanded && (
-        <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+        <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
           {comments.map(c => (
             <div key={c.id} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
               <Avatar avatarUrl={c.user.avatarUrl} username={c.user.username} size={24} />
@@ -772,7 +731,7 @@ function QuickSellModal({ onClose }: { onClose: () => void }) {
 export default function FeedClient({
   userId, userProfile, initialEvents, initialWatching, initialBids,
   initialAuctions, initialFriends, initialInterests,
-  reactionsByEventId, myRank, totalPlayers, classStats, challenges,
+  myRank, totalPlayers, classStats, challenges,
 }: Props) {
   const [events,        setEvents]        = useState(initialEvents)
   const [auctions,      setAuctions]      = useState(initialAuctions)
@@ -866,8 +825,7 @@ export default function FeedClient({
           return (
             <FeedPost
               key={e.id} event={e} userId={userId}
-              myReaction={reactionsByEventId[e.id] ?? null}
-              likeCount={e.likeCount} commentCount={e.commentCount}
+              commentCount={e.commentCount}
             />
           )
         })}

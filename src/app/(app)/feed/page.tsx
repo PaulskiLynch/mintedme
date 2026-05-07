@@ -20,7 +20,7 @@ export default async function FeedPage() {
 
   const [
     events, userFull, watchedItems, activeBidAuctions, liveAuctions,
-    followingUsers, myReactions, allUsers, onlineCount,
+    followingUsers, allUsers, onlineCount,
     recentEventCategories, ownedEditions, auctionWinCount,
     completedChallenges, endedOwnerships,
   ] = await Promise.all([
@@ -69,10 +69,6 @@ export default async function FeedPage() {
     prisma.follow.findMany({
       where: { followerId: session.user.id },
       include: { following: { select: { id: true, username: true, avatarUrl: true, lastSeenAt: true } } },
-    }),
-    prisma.feedLike.findMany({
-      where: { userId: session.user.id },
-      select: { feedEventId: true, type: true },
     }),
     prisma.user.findMany({
       select: { id: true, balance: true },
@@ -259,9 +255,6 @@ export default async function FeedPage() {
     status:    onlineStatus(f.following.lastSeenAt),
   }))
 
-  const reactionsByEventId: Record<string, string> = {}
-  for (const r of myReactions) reactionsByEventId[r.feedEventId] = r.type
-
   // Pass challenges with completion state to client
   const challengesForClient = CHALLENGES.map(ch => ({
     code:     ch.code,
@@ -291,7 +284,6 @@ export default async function FeedPage() {
       initialAuctions={auctions}
       initialFriends={friends}
       initialInterests={(userFull.interests as string[] | null) ?? []}
-      reactionsByEventId={reactionsByEventId}
       myRank={myRank}
       totalPlayers={totalPlayers}
       classStats={{ onlineCount, topPlayerUsername: topPlayer?.username ?? null, hotCategory }}
