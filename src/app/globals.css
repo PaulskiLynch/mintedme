@@ -393,9 +393,71 @@ textarea.form-input { resize: vertical; min-height: 80px; }
 }
 .auth-title { font-size: 24px; font-weight: 900; margin-bottom: 6px; }
 .auth-sub   { font-size: 14px; color: var(--muted); margin-bottom: 28px; }
-.auth-footer { margin-top: 20px; text-align: center; font-size: 13px; color: var(--muted); }
+.auth-footer { margin-top: 24px; text-align: center; font-size: 13px; color: var(--muted); }
 .auth-footer a { color: var(--gold); font-weight: 700; }
 .form-error { color: var(--red); font-size: 13px; font-weight: 600; margin-bottom: 14px; }
+
+/* ── Auth split layout ───────────────────────────── */
+.auth-split {
+  min-height: 100vh;
+  display: flex;
+}
+.auth-brand {
+  flex: 1;
+  background: linear-gradient(160deg, #0f0c00 0%, #0d0d0d 45%, #0d0a00 100%);
+  border-right: 1px solid var(--border);
+  padding: 60px 52px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+.auth-brand::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(200,169,110,0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(200,169,110,0.045) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+}
+.auth-brand::after {
+  content: '';
+  position: absolute;
+  width: 500px;
+  height: 500px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(200,169,110,0.07) 0%, transparent 70%);
+  top: 50%;
+  left: 40%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.auth-brand-content { position: relative; z-index: 1; }
+.auth-form-panel {
+  width: 480px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 44px;
+  background: var(--bg);
+}
+.auth-form-inner { width: 100%; max-width: 360px; }
+@media (max-width: 800px) {
+  .auth-split { flex-direction: column; }
+  .auth-brand {
+    flex: none;
+    padding: 28px 24px 22px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .auth-brand-features { display: none !important; }
+  .auth-brand-stat     { display: none !important; }
+  .auth-form-panel { width: 100%; padding: 32px 24px; }
+}
 
 /* ── Onboarding ─────────────────────────────────── */
 .onboard-wrap {

@@ -5,55 +5,219 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { formatDistanceToNow } from 'date-fns'
 
-interface OfferEdition {
-  id: string
-  lastSalePrice: string | null
-  listedPrice: string | null
-  highestOffer: string | null
-  item: { name: string; imageUrl: string | null }
+interface CounterOffer {
+  id:        string
+  amount:    string
+  message:   string | null
+  status:    string
+  expiresAt: string
+  createdAt: string
 }
 
-interface IncomingOffer {
-  id: string; amount: string; status: string; expiresAt: string
-  message: string | null
-  buyer: { username: string }
-  edition: OfferEdition
-}
-
-interface OutgoingOffer {
-  id: string; amount: string; status: string; expiresAt: string
-  edition: OfferEdition
+interface Thread {
+  id:           string
+  amount:       string
+  message:      string | null
+  status:       string
+  expiresAt:    string
+  createdAt:    string
+  edition: {
+    id:       string
+    itemName: string
+    imageUrl: string | null
+  }
+  counter:      CounterOffer | null
+  buyerUsername?: string
 }
 
 interface Props {
-  incoming: IncomingOffer[]
-  outgoing: OutgoingOffer[]
+  buyerThreads:  Thread[]
+  sellerThreads: Thread[]
 }
 
 const STATUS_COLOUR: Record<string, string> = {
-  pending:  'var(--gold)',
-  accepted: 'var(--green)',
-  declined: 'var(--red)',
-  expired:  'var(--muted)',
-  countered:'#7bb',
+  pending:   'var(--gold)',
+  countered: '#7bb',
+  accepted:  'var(--green)',
+  declined:  'var(--red)',
+  expired:   'var(--muted)',
 }
 
-export default function InboxClient({ incoming, outgoing }: Props) {
-  const router                        = useRouter()
-  const [tab, setTab]                 = useState<'in' | 'out'>('in')
-  const [busy, setBusy]               = useState('')
-  const [counter, setCounter]         = useState<{ id: string; amt: string } | null>(null)
+function amt(s: string) { return `$${Number(s).toLocaleString()}` }
 
-  async function act(offerId: string, action: string, counterAmount?: number) {
-    setBusy(offerId)
-    await fetch(`/api/offers/${offerId}`, {
+export default function InboxClient({ buyerThreads, sellerThreads }: Props) {
+  const router = useRouter()
+  const [tab, setTab]       = useState<'received' | 'sent'>('received')
+  const [busy, setBusy]     = useState('')
+  const [counter, setCounter] = useState<{ offerId: string; itemName: string; buyerOffer: string } | null>(null)
+  const [counterAmt, setCounterAmt] = useState('')
+  const [counterMsg, setCounterMsg] = useState('')
+
+  const pendingReceived = sellerThreads.filter(t =>
+    t.status === 'pending' && !t.counter
+  ).length
+
+  async function act(offerId: string, action: string, extra?: { counterAmount?: number; message?: string }) {
+    setBusy(offerId + action)
+    const res = await fetch(`/api/offers/${offerId}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, counterAmount }),
+      body: JSON.stringify({ action, ...extra }),
     })
-    setBusy(''); setCounter(null); router.refresh()
+    setBusy('')
+    setCounter(null)
+    if (!res.ok) {
+      const d = await res.json()
+      alert(d.error ?? 'Something went wrong')
+      return
+    }
+    router.refresh()
   }
 
-  const pendingCount = incoming.filter(o => o.status === 'pending').length
+  const tabStyle = (t: typeof tab): React.CSSProperties => ({
+    padding: '8px 18px', borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+    border: 'none', background: tab === t ? 'var(--gold)' : 'var(--bg3)',
+    color: tab === t ? '#000' : 'var(--muted)',
+  })
+
+  const btn = (bg: string, fg = '#fff'): React.CSSProperties => ({
+    padding: '7px 16px', fontSize: 12, fontWeight: 700, borderRadius: 6,
+    border: 'none', cursor: 'pointer', background: bg, color: fg,
+  })
+
+  function OfferRow({ label, amount, message, time, highlight }: { label: string; amount: string; message?: string | null; time: string; highlight?: boolean }) {
+    return (
+      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', paddingLeft: 8 }}>
+        <div style={{ width: 2, alignSelf: 'stretch', background: highlight ? 'var(--gold)' : 'var(--border)', borderRadius: 2, flexShrink: 0 }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <span style={{ fontSize: 12, color: 'var(--muted)' }}>{label}</span>
+            <span style={{ fontWeight: 900, fontSize: 15, color: highlight ? 'var(--gold)' : 'var(--white)' }}>{amt(amount)}</span>
+          </div>
+          {message && <div style={{ fontSize: 12, color: 'var(--muted)', fontStyle: 'italic', marginTop: 2 }}>&ldquo;{message}&rdquo;</div>}
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{formatDistanceToNow(new Date(time), { addSuffix: true })}</div>
+        </div>
+      </div>
+    )
+  }
+
+  function ThreadCard({ thread, myRole }: { thread: Thread; myRole: 'buyer' | 'seller' }) {
+    const { id, amount, message, status, expiresAt, createdAt, edition, counter, buyerUsername } = thread
+
+    // Determine the state of this thread
+    const counterPending = counter?.status === 'pending'
+    const isResolved     = ['accepted', 'declined', 'expired'].includes(counter?.status ?? status)
+    const finalStatus    = counter?.status ?? status
+
+    // Who needs to act?
+    const myTurn = myRole === 'seller'
+      ? status === 'pending' && !counter              // seller needs to respond to original
+      : counterPending                                 // buyer needs to respond to counter
+
+    const isBusy = busy.startsWith(counter?.id ?? id) || busy.startsWith(id)
+
+    return (
+      <div style={{
+        background: 'var(--bg2)', borderRadius: 10,
+        border: `1px solid ${myTurn ? 'var(--gold-dim, #6b4c0a)' : 'var(--border)'}`,
+        padding: 16, marginBottom: 12,
+      }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          {edition.imageUrl && (
+            <img src={edition.imageUrl} alt="" style={{ width: 52, height: 52, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+          )}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+              <div>
+                <Link href={`/item/${edition.id}`} style={{ fontWeight: 800, fontSize: 15, color: 'var(--white)', textDecoration: 'none' }}>
+                  {edition.itemName}
+                </Link>
+                {myRole === 'seller' && buyerUsername && (
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 1 }}>from @{buyerUsername}</div>
+                )}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                {myTurn && (
+                  <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--gold)', background: 'rgba(212,160,23,0.15)', padding: '2px 7px', borderRadius: 10, letterSpacing: '0.05em' }}>
+                    YOUR MOVE
+                  </span>
+                )}
+                {isResolved && (
+                  <span style={{ fontSize: 11, fontWeight: 700, color: STATUS_COLOUR[finalStatus] ?? 'var(--muted)' }}>
+                    {finalStatus.toUpperCase()}
+                  </span>
+                )}
+                {!myTurn && !isResolved && (
+                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>waiting…</span>
+                )}
+              </div>
+            </div>
+
+            {/* Offer thread timeline */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: myTurn ? 14 : 0 }}>
+              <OfferRow
+                label={myRole === 'buyer' ? 'Your offer' : `@${buyerUsername ?? 'buyer'} offered`}
+                amount={amount}
+                message={message}
+                time={createdAt}
+                highlight={myRole === 'seller' && status === 'pending' && !counter}
+              />
+              {counter && (
+                <OfferRow
+                  label={myRole === 'seller' ? 'Your counter' : 'Counter offer'}
+                  amount={counter.amount}
+                  message={counter.message}
+                  time={counter.createdAt}
+                  highlight={myRole === 'buyer' && counterPending}
+                />
+              )}
+            </div>
+
+            {/* Action buttons */}
+            {myRole === 'seller' && status === 'pending' && !counter && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button style={btn('var(--gold)', '#000')} disabled={isBusy}
+                  onClick={() => act(id, 'accept')}>
+                  {busy === id + 'accept' ? '…' : `Accept ${amt(amount)}`}
+                </button>
+                <button style={btn('var(--bg3)', 'var(--white)')} disabled={isBusy}
+                  onClick={() => { setCounter({ offerId: id, itemName: edition.itemName, buyerOffer: amount }); setCounterAmt(''); setCounterMsg('') }}>
+                  Counter
+                </button>
+                <button style={btn('rgba(239,68,68,0.15)', 'var(--red)')} disabled={isBusy}
+                  onClick={() => act(id, 'decline')}>
+                  {busy === id + 'decline' ? '…' : 'Decline'}
+                </button>
+              </div>
+            )}
+
+            {myRole === 'buyer' && counterPending && counter && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button style={btn('var(--gold)', '#000')} disabled={isBusy}
+                  onClick={() => act(counter.id, 'accept')}>
+                  {busy === counter.id + 'accept' ? '…' : `Accept ${amt(counter.amount)}`}
+                </button>
+                <button style={btn('rgba(239,68,68,0.15)', 'var(--red)')} disabled={isBusy}
+                  onClick={() => act(counter.id, 'decline')}>
+                  {busy === counter.id + 'decline' ? '…' : 'Decline'}
+                </button>
+              </div>
+            )}
+
+            {/* Expiry hint */}
+            {myTurn && (
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
+                Expires {formatDistanceToNow(new Date(counter?.expiresAt ?? expiresAt), { addSuffix: true })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const received = sellerThreads
+  const sent     = buyerThreads
 
   return (
     <div>
@@ -62,84 +226,56 @@ export default function InboxClient({ incoming, outgoing }: Props) {
           <div className="page-title">Inbox</div>
           <div className="page-sub">Your offers</div>
         </div>
-        {pendingCount > 0 && (
+        {pendingReceived > 0 && (
           <span style={{ background: 'var(--gold)', color: '#000', fontWeight: 800, fontSize: 12, padding: '3px 10px', borderRadius: 20 }}>
-            {pendingCount} pending
+            {pendingReceived} pending
           </span>
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        <button className={`pill${tab === 'in' ? ' active' : ''}`} onClick={() => setTab('in')}>
-          Received{pendingCount > 0 ? ` (${pendingCount})` : ''}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+        <button style={tabStyle('received')} onClick={() => setTab('received')}>
+          Received{pendingReceived > 0 ? ` (${pendingReceived})` : ` (${received.length})`}
         </button>
-        <button className={`pill${tab === 'out' ? ' active' : ''}`} onClick={() => setTab('out')}>Sent</button>
+        <button style={tabStyle('sent')} onClick={() => setTab('sent')}>
+          Sent ({sent.length})
+        </button>
       </div>
 
-      {tab === 'in' && (
-        incoming.length === 0
+      {tab === 'received' && (
+        received.length === 0
           ? <div style={{ color: 'var(--muted)', padding: '40px 0', textAlign: 'center', fontWeight: 700 }}>No offers received yet.</div>
-          : incoming.map(o => (
-            <div key={o.id} className="card" style={{ marginBottom: 12, padding: 16, display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-              {o.edition.item.imageUrl && <img src={o.edition.item.imageUrl} alt="" style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />}
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 15 }}>
-                  <span style={{ color: 'var(--gold)' }}>${Number(o.amount).toLocaleString()}</span>
-                  {' '}from{' '}
-                  <Link href={`/mint/${o.buyer.username}`} style={{ fontWeight: 700 }}>@{o.buyer.username}</Link>
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>
-                  for {o.edition.item.name} · expires {formatDistanceToNow(new Date(o.expiresAt), { addSuffix: true })}
-                </div>
-                {o.message && <div style={{ fontSize: 13, fontStyle: 'italic', color: 'var(--muted)', marginBottom: 8 }}>&ldquo;{o.message}&rdquo;</div>}
-                {o.status === 'pending' ? (
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <button className="btn btn-gold btn-sm" onClick={() => act(o.id, 'accept')} disabled={busy === o.id}>Accept</button>
-                    <button className="btn btn-outline btn-sm" onClick={() => setCounter({ id: o.id, amt: o.amount })} disabled={busy === o.id}>Counter</button>
-                    <button className="btn btn-danger btn-sm" onClick={() => act(o.id, 'decline')} disabled={busy === o.id}>Decline</button>
-                  </div>
-                ) : (
-                  <span style={{ fontSize: 12, fontWeight: 700, color: STATUS_COLOUR[o.status] ?? 'var(--muted)' }}>
-                    {o.status.toUpperCase()}
-                  </span>
-                )}
-              </div>
-            </div>
-          ))
+          : received.map(t => <ThreadCard key={t.id} thread={t} myRole="seller" />)
       )}
 
-      {tab === 'out' && (
-        outgoing.length === 0
+      {tab === 'sent' && (
+        sent.length === 0
           ? <div style={{ color: 'var(--muted)', padding: '40px 0', textAlign: 'center', fontWeight: 700 }}>No offers sent yet.</div>
-          : outgoing.map(o => (
-            <div key={o.id} className="card" style={{ marginBottom: 10, padding: 14, display: 'flex', gap: 12, alignItems: 'center' }}>
-              {o.edition.item.imageUrl && <img src={o.edition.item.imageUrl} alt="" style={{ width: 44, height: 44, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} />}
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>{o.edition.item.name}</div>
-                <div style={{ fontSize: 13, color: 'var(--muted)' }}>
-                  Your offer: <span style={{ color: 'var(--gold)' }}>${Number(o.amount).toLocaleString()}</span>
-                </div>
-              </div>
-              <span style={{ fontSize: 12, fontWeight: 700, color: STATUS_COLOUR[o.status] ?? 'var(--muted)', flexShrink: 0 }}>
-                {o.status.toUpperCase()}
-              </span>
-            </div>
-          ))
+          : sent.map(t => <ThreadCard key={t.id} thread={t} myRole="buyer" />)
       )}
 
       {/* Counter modal */}
       {counter && (
         <div className="overlay" onClick={e => { if (e.target === e.currentTarget) setCounter(null) }}>
           <div className="modal">
-            <div className="modal-title">Counter offer</div>
-            <div className="modal-sub">Enter your counter amount</div>
+            <div className="modal-title">Send counter offer</div>
+            <div className="modal-sub">{counter.itemName} · buyer offered {amt(counter.buyerOffer)}</div>
             <div className="form-group">
-              <label className="form-label">Counter amount (USD)</label>
-              <input className="form-input" type="number" min="1" value={counter.amt}
-                onChange={e => setCounter(c => c ? { ...c, amt: e.target.value } : null)} autoFocus />
+              <label className="form-label">Your counter amount</label>
+              <input className="form-input" type="number" min="1"
+                value={counterAmt} onChange={e => setCounterAmt(e.target.value)} autoFocus />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Message (optional)</label>
+              <input className="form-input" type="text" maxLength={200}
+                value={counterMsg} onChange={e => setCounterMsg(e.target.value)}
+                placeholder="e.g. Best I can do at this price" />
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn btn-gold" onClick={() => act(counter.id, 'counter', Number(counter.amt))} disabled={!!busy}>Send counter</button>
+              <button className="btn btn-gold" disabled={!!busy || !counterAmt}
+                onClick={() => act(counter.offerId, 'counter', { counterAmount: Number(counterAmt), message: counterMsg || undefined })}>
+                {busy ? 'Sending…' : 'Send counter'}
+              </button>
               <button className="btn btn-ghost" onClick={() => setCounter(null)}>Cancel</button>
             </div>
           </div>

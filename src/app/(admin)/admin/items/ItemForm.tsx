@@ -81,7 +81,9 @@ const inp: React.CSSProperties = {
 const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.06em', marginBottom: 4, display: 'block' }
 const grp: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4 }
 
-export default function ItemForm({ initial, isEdit }: { initial?: Partial<ItemData>; isEdit?: boolean }) {
+interface EditionStats { total: number; owned: number; unowned: number }
+
+export default function ItemForm({ initial, isEdit, editionStats }: { initial?: Partial<ItemData>; isEdit?: boolean; editionStats?: EditionStats }) {
   const router   = useRouter()
   const fileRef  = useRef<HTMLInputElement>(null)
   const [form, setForm]         = useState<ItemData>({ ...DEFAULTS, ...initial })
@@ -196,8 +198,15 @@ export default function ItemForm({ initial, isEdit }: { initial?: Partial<ItemDa
           </select>
         </div>
         <div style={grp}>
-          <label style={lbl}>TOTAL SUPPLY *</label>
+          <label style={lbl}>TOTAL SUPPLY (CAP) *</label>
           <input style={inp} type="number" min={1} value={form.totalSupply} onChange={e => set('totalSupply', Number(e.target.value))} required />
+          {editionStats && (
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+              {editionStats.total} / {form.totalSupply} minted
+              {' · '}<span style={{ color: editionStats.owned > 0 ? 'var(--green)' : 'var(--muted)' }}>{editionStats.owned} owned</span>
+              {' · '}<span style={{ color: editionStats.unowned > 0 ? 'var(--gold)' : 'var(--muted)' }}>{editionStats.unowned} unowned</span>
+            </div>
+          )}
         </div>
       </div>
 

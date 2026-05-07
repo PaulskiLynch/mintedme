@@ -73,6 +73,42 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body = await req.json()
   const { action, reason } = body
 
+  if (action === 'mint') {
+    const { count } = body
+    if (!count || count < 1) return NextResponse.json({ error: 'count must be ≥ 1' }, { status: 400 })
+
+    try {
+      const item = await prisma.item.findUnique({ where: { id }, select: { totalSupply: true, name: true } })
+      if (!item) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+      const existing = await prisma.itemEdition.count({ where: { itemId: id } })
+      const remaining = item.totalSupply - existing
+      if (remaining <= 0) return NextResponse.json({ error: 'Supply cap already reached' }, { status: 400 })
+
+      const toCreate = Math.min(count, remaining)
+      const maxEdition = await prisma.itemEdition.findFirst({
+        where: { itemId: id }, orderBy: { editionNumber: 'desc' }, select: { editionNumber: true },
+      })
+      const startFrom = (maxEdition?.editionNumber ?? 0) + 1
+
+      await prisma.itemEdition.createMany({
+        data: Array.from({ length: toCreate }, (_, i) => ({ itemId: id, editionNumber: startFrom + i })),
+      })
+
+      await logAdminAction({
+        adminUserId: session.user.id!,
+        action:      'admin_item_mint',
+        targetType:  'item',
+        targetId:    id,
+        after:       { minted: toCreate, editions: `#${startFrom}–#${startFrom + toCreate - 1}`, item: item.name },
+      })
+
+      return NextResponse.json({ ok: true, created: toCreate, startFrom, endAt: startFrom + toCreate - 1 })
+    } catch (e) {
+      return NextResponse.json({ error: String(e) }, { status: 500 })
+    }
+  }
+
   if (action === 'freeze') {
     if (!reason?.trim()) return NextResponse.json({ error: 'Reason required to freeze an item' }, { status: 400 })
     try {

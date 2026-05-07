@@ -454,6 +454,15 @@ model ItemView {
   @@map("item_views")
 }
 
+model BlockedEmail {
+  id        String   @id @default(uuid())
+  value     String   @unique // full email OR @domain.com
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@map("blocked_emails")
+}
+
 model AdminLog {
   id          String   @id @default(uuid())
   adminUserId String

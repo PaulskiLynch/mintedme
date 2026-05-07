@@ -732,9 +732,6 @@ export default function FeedClient({
           </div>
         </div>
 
-        {/* Challenge cards */}
-        <ChallengeCards challenges={challenges} />
-
         {/* Category filter */}
         <div className="interest-chips" style={{ marginBottom: 20 }}>
           <button className={`chip${!filter ? ' active' : ''}`} onClick={() => setFilter(null)}>All</button>
@@ -792,6 +789,61 @@ export default function FeedClient({
             <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={() => { setShowQuickSell(true); setRightOpen(false) }}>Quick Sell</button>
           </div>
         </Module>
+
+        {/* Challenges */}
+        {(() => {
+          const pending = challenges.filter(c => !c.claimed)
+          const total   = challenges.length
+          const done    = total - pending.length
+          return (
+            <Module
+              title={pending.length > 0 ? `Challenges · ${pending.length} remaining` : 'Challenges · All done!'}
+              collapsed={!!collapsed['challenges']}
+              onToggle={() => toggleSection('challenges')}
+            >
+              {pending.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '6px 0 2px' }}>
+                  <div style={{ fontSize: 22, marginBottom: 4 }}>🏆</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--green)' }}>All {total} challenges complete!</div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {pending.map(c => (
+                    <div key={c.code} style={{
+                      borderRadius: 8, padding: '10px 12px',
+                      background: c.done ? '#1a2400' : 'var(--bg3)',
+                      border: `1px solid ${c.done ? '#5a8a00' : 'var(--border)'}`,
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                        <span style={{ fontSize: 18, lineHeight: 1 }}>{c.icon}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--white)', lineHeight: 1.3 }}>{c.label}</div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.3, marginTop: 1 }}>{c.desc}</div>
+                          {c.progress && (
+                            <div style={{ marginTop: 5 }}>
+                              <div style={{ background: 'var(--bg)', borderRadius: 4, height: 3, overflow: 'hidden' }}>
+                                <div style={{
+                                  height: '100%', borderRadius: 4, background: 'var(--gold)',
+                                  width: (() => {
+                                    const [cur, max] = c.progress.split('/').map(Number)
+                                    return `${Math.min(100, Math.round((cur / max) * 100))}%`
+                                  })(),
+                                }} />
+                              </div>
+                              <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{c.progress}</div>
+                            </div>
+                          )}
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--gold)', flexShrink: 0, marginTop: 1 }}>+${c.reward.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                  <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', paddingTop: 2 }}>{done}/{total} complete</div>
+                </div>
+              )}
+            </Module>
+          )
+        })()}
 
         {/* Class / Leaderboard */}
         <Module title="Class" collapsed={!!collapsed['class']} onToggle={() => toggleSection('class')}>

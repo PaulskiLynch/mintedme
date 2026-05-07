@@ -78,6 +78,7 @@ export default function ItemActions({
   const [offerDisplay, setOfferDisplay] = useState('')
   const [offerNote, setOfferNote]     = useState('')
   const [showNote, setShowNote]       = useState(false)
+  const [offerSent, setOfferSent]     = useState(false)
 
   // Owner action state
   const [showList, setShowList]           = useState(false)
@@ -129,8 +130,14 @@ export default function ItemActions({
       body: JSON.stringify({ editionId, amount: Number(offerRaw), message: offerNote || undefined }),
     })
     const json = await res.json()
-    if (res.ok) { setOfferRaw(''); setOfferDisplay(''); setOfferNote(''); router.refresh() }
-    else { setError(json.error || 'Offer failed') }
+    if (res.ok) {
+      setOfferRaw(''); setOfferDisplay(''); setOfferNote(''); setShowNote(false)
+      setOfferSent(true)
+      setTimeout(() => setOfferSent(false), 4000)
+      router.refresh()
+    } else {
+      setError(json.error || 'Offer failed')
+    }
     setBusy(false)
   }
 
@@ -208,7 +215,7 @@ export default function ItemActions({
           return (
             <div style={{ marginTop: 16, padding: '12px 14px', borderRadius: 8, background: overdue ? '#2a1010' : 'var(--bg3)', border: `1px solid ${overdue ? 'var(--red)44' : 'transparent'}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.06em' }}>MONTHLY UPKEEP</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--red)', letterSpacing: '0.06em' }}>COST OF OWNERSHIP</span>
                 <span style={{ fontSize: 15, fontWeight: 900, color: overdue ? 'var(--red)' : 'var(--gold)' }}>
                   ${monthlyUpkeep.toLocaleString()}
                 </span>
@@ -362,8 +369,21 @@ export default function ItemActions({
       {claimedLine && <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>{claimedLine}</div>}
       {!claimedLine && <div style={{ marginBottom: 12 }} />}
 
+      {/* Offer sent confirmation */}
+      {offerSent && (
+        <div style={{ marginBottom: 16, padding: '12px 16px', background: '#0d2010', border: '1px solid #1a4020', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 16 }}>✓</span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--green)' }}>Offer sent!</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 1 }}>
+              The owner will be notified. Check your <a href="/inbox" style={{ color: 'var(--green)' }}>inbox</a> for their response.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Offer form */}
-      {!isInAuction && (
+      {!isInAuction && !offerSent && (
         <form onSubmit={handleOffer} style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--muted)', letterSpacing: '0.08em', marginBottom: 8 }}>MAKE OFFER</div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
@@ -434,8 +454,8 @@ export default function ItemActions({
       ) : monthlyUpkeep > 0 && (
         <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-            <span style={{ color: 'var(--muted)' }}>Monthly upkeep</span>
-            <span style={{ fontWeight: 700, color: '#e0a030' }}>${monthlyUpkeep.toLocaleString()}</span>
+            <span style={{ fontWeight: 700, color: 'var(--red)' }}>Cost of Ownership</span>
+            <span style={{ fontWeight: 700, color: 'var(--red)' }}>−${monthlyUpkeep.toLocaleString()}</span>
           </div>
         </div>
       )}
@@ -570,7 +590,7 @@ function PropertyPanel({ def, upkeep, appreciation, net }: {
           <span style={{ fontWeight: 700, color: 'var(--green)' }}>+${appreciation.toLocaleString()}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-          <span style={{ color: 'var(--muted)' }}>Monthly upkeep</span>
+          <span style={{ fontWeight: 700, color: 'var(--red)' }}>Cost of Ownership</span>
           <span style={{ fontWeight: 700, color: 'var(--red)' }}>−${upkeep.toLocaleString()}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, borderTop: '1px solid var(--border)', paddingTop: 6, marginTop: 2 }}>

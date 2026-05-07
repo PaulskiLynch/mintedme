@@ -2,12 +2,24 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { prisma } from '@/lib/db'
 import ItemForm from '../../ItemForm'
+import MintEditionsPanel from './MintEditionsPanel'
 
 export const dynamic = 'force-dynamic'
 
 export default async function EditItemPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const item = await prisma.item.findUnique({ where: { id } })
+  const [item, editionStats] = await Promise.all([
+    prisma.item.findUnique({ where: { id } }),
+    prisma.itemEdition.groupBy({
+      by: ['currentOwnerId'],
+      where: { itemId: id },
+      _count: { id: true },
+    }).then(rows => {
+      const total    = rows.reduce((s, r) => s + r._count.id, 0)
+      const owned    = rows.filter(r => r.currentOwnerId !== null).reduce((s, r) => s + r._count.id, 0)
+      return { total, owned, unowned: total - owned }
+    }),
+  ])
   if (!item) notFound()
 
   return (
@@ -19,6 +31,7 @@ export default async function EditItemPage({ params }: { params: Promise<{ id: s
       <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 28 }}>{item.name}</div>
       <ItemForm
         isEdit
+        editionStats={editionStats}
         initial={{
           id:              item.id,
           name:            item.name,
@@ -41,6 +54,13 @@ export default async function EditItemPage({ params }: { params: Promise<{ id: s
           isApproved:      item.isApproved,
           isFrozen:        item.isFrozen,
         }}
+      />
+      <MintEditionsPanel
+        itemId={item.id}
+        totalSupply={item.totalSupply}
+        minted={editionStats.total}
+        owned={editionStats.owned}
+        unowned={editionStats.unowned}
       />
     </div>
   )

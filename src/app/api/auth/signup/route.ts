@@ -4,9 +4,26 @@ import { prisma } from '@/lib/db'
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, username, password } = await req.json()
+    const { email, username, password, inviteCode } = await req.json()
     if (!email || !username || !password) {
       return NextResponse.json({ error: 'All fields required.' }, { status: 400 })
+    }
+
+    // Email blacklist — check full address and @domain
+    const emailLower  = email.trim().toLowerCase()
+    const emailDomain = '@' + (emailLower.split('@')[1] ?? '')
+    const blocked = await prisma.blockedEmail.findFirst({
+      where: { value: { in: [emailLower, emailDomain] } },
+    })
+    if (blocked) {
+      return NextResponse.json({ error: 'This email address is not permitted.' }, { status: 403 })
+    }
+
+    const requiredCode = process.env.INVITE_CODE
+    if (requiredCode) {
+      if (!inviteCode || inviteCode.trim().toUpperCase() !== requiredCode.trim().toUpperCase()) {
+        return NextResponse.json({ error: 'Invalid invite code.' }, { status: 403 })
+      }
     }
     if (password.length < 8) {
       return NextResponse.json({ error: 'Password must be at least 8 characters.' }, { status: 400 })

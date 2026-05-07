@@ -8,6 +8,7 @@ import { monthlyAircraftUpkeep } from '@/lib/aircraft'
 import { monthlyUpkeep } from '@/lib/upkeep'
 import { JOB_BY_CODE } from '@/lib/jobs'
 import FollowButton from './FollowButton'
+import AdminMintPanel from './AdminMintPanel'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,6 +34,7 @@ export default async function MintProfilePage({ params }: { params: Promise<{ us
   if (!user) notFound()
 
   const isOwn    = session?.user?.id === user.id
+  const isAdmin  = session?.user?.isAdmin ?? false
   const viewerId = session?.user?.id ?? null
 
   const [followerCount, followingCount, followRecord] = await Promise.all([
@@ -152,6 +154,24 @@ export default async function MintProfilePage({ params }: { params: Promise<{ us
             <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--gold)' }}>${user.job.monthlySalary.toLocaleString()}</div>
           </div>
         </div>
+      )}
+
+      {/* Admin mint editor */}
+      {isAdmin && (
+        <AdminMintPanel
+          profileUserId={user.id}
+          editions={user.ownedEditions.map(e => ({
+            id:            e.id,
+            editionNumber: e.editionNumber,
+            item: {
+              id:        e.item.id,
+              name:      e.item.name,
+              imageUrl:  e.item.imageUrl,
+              category:  e.item.category,
+              rarityTier: e.item.rarityTier,
+            },
+          }))}
+        />
       )}
 
       {/* Items by category */}

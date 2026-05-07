@@ -136,3 +136,71 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 }
+
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth()
+  if (!session?.user?.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const { id } = await params
+
+  // Prevent self-delete
+  if (id === session.user.id) {
+    return NextResponse.json({ error: 'Cannot delete your own account.' }, { status: 400 })
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        username: true,
+        email: true,
+        _count: {
+          select: {
+            ownedEditions: true,
+            bids:          true,
+            offersAsBuyer: true,
+            ownerships:    true,
+          },
+        },
+      },
+    })
+    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+    const hasActivity = user._count.ownedEditions > 0
+      || user._count.bids > 0
+      || user._count.offersAsBuyer > 0
+      || user._count.ownerships > 0
+
+    if (hasActivity) {
+      return NextResponse.json({
+        error: `Cannot delete @${user.username} — they have active editions, bids, or trade history. Freeze the account instead.`,
+      }, { status: 409 })
+    }
+
+    // Safe to delete: clean up related records first, then the user
+    await prisma.$transaction([
+      prisma.notification.deleteMany({ where: { userId: id } }),
+      prisma.watchedItem.deleteMany({ where: { userId: id } }),
+      prisma.wishlist.deleteMany({ where: { userId: id } }),
+      prisma.feedEvent.deleteMany({ where: { userId: id } }),
+      prisma.feedLike.deleteMany({ where: { userId: id } }),
+      prisma.feedComment.deleteMany({ where: { userId: id } }),
+      prisma.transaction.deleteMany({ where: { OR: [{ toUserId: id }, { fromUserId: id }] } }),
+      prisma.user.delete({ where: { id } }),
+    ])
+
+    await logAdminAction({
+      adminUserId: session.user.id!,
+      action:      'admin_user_delete',
+      targetType:  'user',
+      targetId:    id,
+      after:       { username: user.username, email: user.email },
+      reason:      'Admin hard delete',
+    })
+
+    return NextResponse.json({ ok: true })
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
+}

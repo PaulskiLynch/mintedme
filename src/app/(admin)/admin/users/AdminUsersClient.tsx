@@ -44,6 +44,11 @@ export default function AdminUsersClient({ users: initial }: { users: User[] }) 
   const [editForm, setEditForm]   = useState({ username: '', email: '', tagline: '', avatarUrl: '', password: '', isAdmin: false, isFrozen: false, isEstablished: false })
   const [editError, setEditError] = useState('')
 
+  // Delete confirm
+  const [deleteTarget, setDeleteTarget] = useState<User | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [deleteError, setDeleteError]   = useState('')
+
   // Add user modal
   const [addOpen, setAddOpen]   = useState(false)
   const [addForm, setAddForm]   = useState({ username: '', email: '', password: '', tagline: '', balance: '1000000' })

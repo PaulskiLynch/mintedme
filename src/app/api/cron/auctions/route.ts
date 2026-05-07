@@ -14,10 +14,10 @@ const ROTATION_WINDOW_MS = 7  * 24 * 60 * 60 * 1000   // skip items auctioned wi
 
 // Target concurrent system auctions per rarity group
 const SYSTEM_SLOTS: Array<{ rarities: string[]; count: number }> = [
-  { rarities: ['Common', 'Banger'],              count: 3 },
-  { rarities: ['Premium'],                        count: 2 },
-  { rarities: ['Rare'],                           count: 2 },
-  { rarities: ['Exotic', 'Legendary', 'Mythic'],  count: 1 },
+  { rarities: ['Common', 'Banger', 'Custom'],     count: 3 },
+  { rarities: ['Premium'],                         count: 2 },
+  { rarities: ['Rare'],                            count: 2 },
+  { rarities: ['Exotic', 'Legendary', 'Mythic'],   count: 1 },
 ]
 const CYCLE_MS    = UPKEEP_CYCLE_DAYS * 24 * 60 * 60 * 1000
 
@@ -185,6 +185,12 @@ export async function GET(req: NextRequest) {
 
   const excludeIds = [...new Set([...inAuctionIds, ...recentlySoldIds])]
 
+  // Diagnostic: total unowned editions available
+  const totalUnowned = await prisma.itemEdition.count({
+    where: { currentOwnerId: null, isFrozen: false, item: { isApproved: true, isFrozen: false, itemStatus: 'active' } },
+  })
+  log.push(`system auctions: ${totalUnowned} eligible unowned editions total, ${inAuctionIds.length} already in auction, ${recentlySoldIds.length} recently sold (excluded)`)
+
   // Count live system auctions already running per rarity group
   const liveSystemAuctions = await prisma.auction.findMany({
     where: { status: 'active', isSystemAuction: true },
@@ -194,7 +200,10 @@ export async function GET(req: NextRequest) {
   for (const slot of SYSTEM_SLOTS) {
     const liveInSlot = liveSystemAuctions.filter(a => slot.rarities.includes(a.rarityTier)).length
     const needed     = Math.max(0, slot.count - liveInSlot)
-    if (needed === 0) continue
+    if (needed === 0) {
+      log.push(`slot [${slot.rarities.join('/')}]: full (${liveInSlot}/${slot.count})`)
+      continue
+    }
 
     const candidates = await prisma.itemEdition.findMany({
       where: {
@@ -212,6 +221,8 @@ export async function GET(req: NextRequest) {
       orderBy: { item: { benchmarkPrice: 'asc' } },  // cheapest first within each tier
       take: needed * 3,  // over-fetch so we can vary selection
     })
+
+    log.push(`slot [${slot.rarities.join('/')}]: need ${needed}, found ${candidates.length} candidates`)
 
     // Shuffle candidates slightly by skipping a variable offset so the same item
     // doesn't always win when supply is low
