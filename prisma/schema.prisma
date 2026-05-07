@@ -56,8 +56,11 @@ model User {
   jobBids            JobBid[]
   wonJobAuctions     JobAuction[]       @relation("JobAuctionWinner")
   adminLogs          AdminLog[]
-  groupMemberships   GroupMember[]
-  createdGroups      Group[]            @relation("GroupCreator")
+  groupMemberships        GroupMember[]
+  createdGroups           Group[]                @relation("GroupCreator")
+  groupMessages           GroupMessage[]
+  groupChallengesCreated  GroupChallenge[]       @relation("ChallengeCreator")
+  challengeRankings       GroupChallengeRanking[]
 
   @@map("users")
 }
@@ -490,14 +493,19 @@ model Group {
   name        String
   slug        String   @unique
   description String?
+  avatarUrl   String?
+  coverUrl    String?
   createdById String
   joinType    String   @default("open") // open | invite_only
   inviteCode  String?  @unique
   maxMembers  Int?
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
 
-  createdBy User          @relation("GroupCreator", fields: [createdById], references: [id])
-  members   GroupMember[]
+  createdBy  User             @relation("GroupCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  members    GroupMember[]
+  messages   GroupMessage[]
+  challenges GroupChallenge[]
 
   @@index([createdById])
   @@map("groups")
@@ -506,7 +514,7 @@ model Group {
 model GroupMember {
   groupId  String
   userId   String
-  role     String   @default("member") // owner | admin | member
+  role     String   @default("member") // owner | member
   joinedAt DateTime @default(now())
 
   group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
@@ -514,4 +522,63 @@ model GroupMember {
 
   @@id([groupId, userId])
   @@map("group_members")
+}
+
+model GroupMessage {
+  id        String    @id @default(uuid())
+  content   String    @db.Text
+  groupId   String
+  userId    String
+  deletedAt DateTime?
+  deletedBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([groupId, createdAt(sort: Desc)])
+  @@map("group_messages")
+}
+
+model GroupChallenge {
+  id          String   @id @default(uuid())
+  groupId     String
+  title       String
+  description String?
+  type        String   // most_profit | most_trades | highest_roi | auction_winner
+  metric      String   // profit_abs | profit_pct | trade_count | roi
+  timeframe   String   // daily | weekly | monthly | custom
+  startAt     DateTime
+  endAt       DateTime
+  prizePool   Int?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  createdById String
+
+  group    Group                  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy User                 @relation("ChallengeCreator", fields: [createdById], references: [id])
+  rankings GroupChallengeRanking[]
+
+  @@index([groupId, isActive])
+  @@map("group_challenges")
+}
+
+model GroupChallengeRanking {
+  id            String  @id @default(uuid())
+  challengeId   String
+  userId        String
+  rank          Int
+  score         Float
+  prizeAwarded  Boolean @default(false)
+
+  updatedAt DateTime @updatedAt
+
+  challenge GroupChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id])
+
+  @@unique([challengeId, userId])
+  @@index([challengeId, rank])
+  @@map("group_challenge_rankings")
 }

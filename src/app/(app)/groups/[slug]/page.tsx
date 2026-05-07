@@ -27,59 +27,64 @@ export default async function GroupPage({ params }: { params: Promise<{ slug: st
 
   const myMembership = group.members.find(m => m.userId === session.user.id) ?? null
   const isMember = !!myMembership
+  const isOwner  = myMembership?.role === 'owner'
 
-  // Fetch recent feed events from group members
+  // Fetch last week's balance snapshot for weekly % change
+  // We derive it from ownership / transaction history — approximate from balance 7 days ago
+  // For simplicity in v1: fetch each member's net worth as their current balance (leaderboard by balance)
+  // Weekly change = current balance vs balance 7 days ago (from transactions)
   const memberIds = group.members.map(m => m.userId)
-  const events = isMember
-    ? await prisma.feedEvent.findMany({
-        where: { isVisible: true, userId: { in: memberIds } },
-        orderBy: { createdAt: 'desc' },
-        take: 50,
-        include: {
-          user:       { select: { username: true, avatarUrl: true } },
-          targetUser: { select: { username: true, avatarUrl: true } },
-          edition: {
-            include: {
-              item: { select: { name: true, imageUrl: true, category: true, benchmarkPrice: true, minimumBid: true } },
-            },
-          },
-          _count: { select: { likes: true, comments: true } },
+
+  // Get net spend in last 7 days (purchases - sales) per member to estimate weekly change
+  const weekAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000)
+  const recentOwnerships = isMember
+    ? await prisma.ownership.findMany({
+        where: {
+          ownerId: { in: memberIds },
+          purchaseDate: { gte: weekAgo },
         },
+        select: { ownerId: true, purchasePrice: true },
       })
     : []
 
-  // Build leaderboard: members sorted by balance desc
+  // Build leaderboard — sort by balance desc
   const leaderboard = group.members
-    .map(m => ({
-      userId:   m.userId,
-      username: m.user.username,
-      avatarUrl: m.user.avatarUrl,
-      balance:  m.user.balance.toString(),
-      role:     m.role,
-      joinedAt: m.joinedAt.toISOString(),
-    }))
+    .map(m => {
+      const spent   = recentOwnerships.filter(o => o.ownerId === m.userId).reduce((s, o) => s + Number(o.purchasePrice ?? 0), 0)
+      const bal     = Number(m.user.balance)
+      const weekAgoEst = bal + spent          // rough: if they spent X, they had X more last week
+      const weeklyPct  = weekAgoEst > 0 ? ((bal - weekAgoEst) / weekAgoEst) * 100 : 0
+      return {
+        userId:     m.userId,
+        username:   m.user.username,
+        avatarUrl:  m.user.avatarUrl,
+        balance:    bal.toString(),
+        role:       m.role,
+        joinedAt:   m.joinedAt.toISOString(),
+        weeklyPct:  Math.round(weeklyPct * 10) / 10,
+      }
+    })
     .sort((a, b) => Number(b.balance) - Number(a.balance))
 
-  const serialisedEvents = events.map(e => ({
-    id:           e.id,
-    eventType:    e.eventType,
-    amount:       e.amount?.toString() ?? null,
-    createdAt:    e.createdAt.toISOString(),
-    likeCount:    e._count.likes,
-    commentCount: e._count.comments,
-    metadata:     e.metadata as Record<string, unknown> | null,
-    user:         e.user,
-    targetUser:   e.targetUser,
-    edition:      e.edition ? {
-      id:   e.edition.id,
-      item: {
-        name:           e.edition.item.name,
-        imageUrl:       e.edition.item.imageUrl,
-        category:       e.edition.item.category,
-        benchmarkPrice: e.edition.item.benchmarkPrice.toString(),
-        minimumBid:     e.edition.item.minimumBid.toString(),
-      },
-    } : null,
+  // Group stats
+  const totalNetWorth = group.members.reduce((s, m) => s + Number(m.user.balance), 0)
+  const avgBalance    = group.members.length > 0 ? totalNetWorth / group.members.length : 0
+
+  // Initial messages (newest first)
+  const messages = isMember
+    ? await prisma.groupMessage.findMany({
+        where: { groupId: group.id, deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+        include: { user: { select: { username: true, avatarUrl: true } } },
+      })
+    : []
+
+  const serialisedMessages = messages.map(m => ({
+    id:        m.id,
+    content:   m.content,
+    createdAt: m.createdAt.toISOString(),
+    user:      m.user,
   }))
 
   return (
@@ -87,15 +92,19 @@ export default async function GroupPage({ params }: { params: Promise<{ slug: st
       slug={group.slug}
       name={group.name}
       description={group.description}
+      avatarUrl={group.avatarUrl}
       joinType={group.joinType}
-      inviteCode={myMembership?.role === 'owner' ? group.inviteCode : null}
+      inviteCode={isOwner ? group.inviteCode : null}
       maxMembers={group.maxMembers}
       memberCount={group.members.length}
       isMember={isMember}
-      myRole={myMembership?.role ?? null}
+      isOwner={isOwner}
       userId={session.user.id}
+      myUsername={myMembership?.user.username ?? leaderboard.find(m => m.userId === session.user.id)?.username ?? ''}
+      myAvatarUrl={myMembership?.user.avatarUrl ?? null}
       leaderboard={leaderboard}
-      initialEvents={serialisedEvents}
+      stats={{ totalNetWorth, avgBalance }}
+      initialMessages={serialisedMessages}
     />
   )
 }

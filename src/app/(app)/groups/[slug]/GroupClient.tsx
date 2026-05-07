@@ -1,173 +1,230 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-interface FeedEvent {
-  id: string; eventType: string; amount: string | null; createdAt: string
-  likeCount: number; commentCount: number
-  metadata?: Record<string, unknown> | null
-  user: { username: string; avatarUrl: string | null } | null
-  targetUser: { username: string; avatarUrl: string | null } | null
-  edition: {
-    id: string
-    item: { name: string; imageUrl: string | null; category: string; benchmarkPrice: string; minimumBid: string }
-  } | null
-}
-
 interface Member {
   userId: string; username: string; avatarUrl: string | null
-  balance: string; role: string; joinedAt: string
+  balance: string; role: string; joinedAt: string; weeklyPct: number
+}
+
+interface ChatMessage {
+  id: string; content: string; createdAt: string
+  user: { username: string; avatarUrl: string | null }
 }
 
 interface Props {
-  slug: string; name: string; description: string | null
+  slug: string; name: string; description: string | null; avatarUrl: string | null
   joinType: string; inviteCode: string | null
   maxMembers: number | null; memberCount: number
-  isMember: boolean; myRole: string | null
-  userId: string
+  isMember: boolean; isOwner: boolean
+  userId: string; myUsername: string; myAvatarUrl: string | null
   leaderboard: Member[]
-  initialEvents: FeedEvent[]
+  stats: { totalNetWorth: number; avgBalance: number }
+  initialMessages: ChatMessage[]
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const TYPE_INFO: Record<string, { label: string; css: string }> = {
-  buy:           { label: 'PURCHASE',    css: 'purchase'    },
-  sell:          { label: 'SALE',        css: 'sale'        },
-  accept:        { label: 'SALE',        css: 'sale'        },
-  offer:         { label: 'OFFER',       css: 'offer'       },
-  auction_start: { label: 'AUCTION',     css: 'auction'     },
-  auction_end:   { label: 'AUCTION WIN', css: 'auction'     },
-  create_item:   { label: 'NEW ITEM',    css: 'new-item'    },
-  post:          { label: 'POST',        css: 'post'        },
-  achievement:   { label: 'ACHIEVEMENT', css: 'achievement' },
-}
-
-function fmt(n: string | number | null | undefined) {
-  if (!n) return null
+function fmt(n: number | string) {
   const v = Number(n)
-  if (isNaN(v) || v === 0) return null
+  if (isNaN(v)) return '$0'
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`
   if (v >= 1_000)     return `$${(v / 1_000).toFixed(0)}k`
   return `$${v.toLocaleString()}`
 }
 
-function cap(s: string | undefined | null) {
-  if (!s) return ''
-  return s[0].toUpperCase() + s.slice(1)
-}
+// ─── Invite panel ─────────────────────────────────────────────────────────────
 
-function eventText(e: FeedEvent): string {
-  const item = e.edition?.item.name ?? 'an item'
-  const amt  = e.amount ? fmt(e.amount) ?? '' : ''
-  switch (e.eventType) {
-    case 'buy':           return `bought ${item}${amt ? ' for ' + amt : ''}`
-    case 'sell':          return `sold ${item}${amt ? ' for ' + amt : ''}`
-    case 'offer':         return `offered ${amt} on ${item}`
-    case 'accept':        return `accepted ${amt} for ${item}`
-    case 'auction_start': return `started an auction on ${item}`
-    case 'auction_end':   return `won ${item}${amt ? ' for ' + amt : ''} at auction`
-    case 'create_item':   return `crafted a new item: ${item}`
-    case 'post':          return String(e.metadata?.text ?? '')
-    default:              return e.eventType.replace(/_/g, ' ')
+function InvitePanel({ slug }: { slug: string }) {
+  const [query, setQuery]   = useState('')
+  const [results, setResults] = useState<{ id: string; username: string; avatarUrl: string | null }[]>([])
+  const [loading, setLoading] = useState(false)
+  const [status, setStatus]  = useState<Record<string, 'inviting' | 'done' | 'error'>>({})
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (query.length < 2) { setResults([]); return }
+    clearTimeout(timerRef.current!)
+    timerRef.current = setTimeout(async () => {
+      setLoading(true)
+      const res = await fetch(`/api/groups/${slug}/invite?q=${encodeURIComponent(query)}`)
+      const data = await res.json()
+      setResults(Array.isArray(data) ? data : [])
+      setLoading(false)
+    }, 300)
+  }, [query, slug])
+
+  async function invite(userId: string, username: string) {
+    setStatus(s => ({ ...s, [userId]: 'inviting' }))
+    const res = await fetch(`/api/groups/${slug}/invite`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username }),
+    })
+    setStatus(s => ({ ...s, [userId]: res.ok ? 'done' : 'error' }))
+    if (res.ok) setResults(r => r.filter(u => u.id !== userId))
   }
-}
-
-// ─── Feed post ────────────────────────────────────────────────────────────────
-
-function FeedPost({ e }: { e: FeedEvent }) {
-  const info = TYPE_INFO[e.eventType] ?? { label: e.eventType.toUpperCase(), css: 'post' }
-  const editionHref = e.edition ? `/item/${e.edition.id}` : null
 
   return (
-    <div className="feed-post">
-      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-        {/* Avatar */}
-        <Link href={`/mint/${e.user?.username ?? ''}`} style={{ flexShrink: 0 }}>
-          <div style={{
-            width: 34, height: 34, borderRadius: '50%',
-            background: 'var(--bg3)', border: '1px solid var(--border)',
-            overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            {e.user?.avatarUrl
-              ? <img src={e.user.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              : <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 800 }}>
-                  {e.user?.username?.[0]?.toUpperCase() ?? '?'}
-                </span>
+    <div style={{ marginTop: 12 }}>
+      <input
+        className="form-input"
+        placeholder="Search username..."
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+        style={{ maxWidth: '100%', marginBottom: 8 }}
+      />
+      {loading && <div style={{ fontSize: 12, color: 'var(--muted)' }}>Searching...</div>}
+      {results.map(u => (
+        <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+            {u.avatarUrl
+              ? <img src={u.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--muted)' }}>{u.username[0]?.toUpperCase()}</span>
             }
           </div>
-        </Link>
-
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Row 1: username + type pill + text */}
-          <div style={{ fontSize: 13, lineHeight: 1.45, marginBottom: 4 }}>
-            <Link href={`/mint/${e.user?.username ?? ''}`} style={{ fontWeight: 800, color: 'var(--white)', marginRight: 4 }}>
-              @{e.user?.username ?? 'unknown'}
-            </Link>
-            <span className={`type-pill type-pill--${info.css}`} style={{ marginRight: 6 }}>{info.label}</span>
-            <span style={{ color: 'var(--muted)' }}>
-              {e.edition
-                ? <>
-                    {eventText(e).split(e.edition.item.name)[0]}
-                    {editionHref
-                      ? <Link href={editionHref} style={{ color: 'var(--white)', fontWeight: 700 }}>{e.edition.item.name}</Link>
-                      : <span style={{ fontWeight: 700, color: 'var(--white)' }}>{e.edition.item.name}</span>
-                    }
-                    {eventText(e).split(e.edition.item.name)[1]}
-                  </>
-                : eventText(e)
-              }
-            </span>
-          </div>
-
-          {/* Meta line */}
-          <div style={{ fontSize: 11, color: 'var(--muted)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {e.edition?.item.category && <span>{cap(e.edition.item.category)}</span>}
-            <span>{formatDistanceToNow(new Date(e.createdAt), { addSuffix: true })}</span>
-            {e.targetUser && <span>with @{e.targetUser.username}</span>}
-          </div>
+          <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--white)' }}>@{u.username}</span>
+          <button
+            onClick={() => invite(u.id, u.username)}
+            disabled={!!status[u.id]}
+            style={{
+              background: status[u.id] === 'done' ? 'var(--bg3)' : 'var(--gold)',
+              color: status[u.id] === 'done' ? 'var(--muted)' : '#0d0d0d',
+              border: 'none', borderRadius: 6, padding: '4px 12px',
+              fontSize: 12, fontWeight: 800, cursor: status[u.id] ? 'default' : 'pointer',
+            }}
+          >
+            {status[u.id] === 'inviting' ? '...' : status[u.id] === 'done' ? 'Added ✓' : status[u.id] === 'error' ? 'Failed' : 'Invite'}
+          </button>
         </div>
-
-        {/* Thumbnail */}
-        {e.edition?.item.imageUrl && (
-          <div style={{ width: 44, height: 44, borderRadius: 6, overflow: 'hidden', flexShrink: 0, border: '1px solid var(--border)' }}>
-            <img src={e.edition.item.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          </div>
-        )}
-      </div>
+      ))}
+      {query.length >= 2 && !loading && results.length === 0 && (
+        <div style={{ fontSize: 12, color: 'var(--muted)' }}>No users found.</div>
+      )}
     </div>
   )
 }
 
-// ─── Join form (for invite_only) ──────────────────────────────────────────────
+// ─── Chat panel ───────────────────────────────────────────────────────────────
+
+function ChatPanel({ slug, myUsername, myAvatarUrl, initialMessages }: {
+  slug: string; myUsername: string; myAvatarUrl: string | null
+  initialMessages: ChatMessage[]
+}) {
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
+  const [draft, setDraft]       = useState('')
+  const [sending, setSending]   = useState(false)
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  // Poll for new messages every 10s
+  useEffect(() => {
+    const id = setInterval(async () => {
+      const res  = await fetch(`/api/groups/${slug}/messages`)
+      const data = await res.json()
+      if (Array.isArray(data)) setMessages(data)
+    }, 10_000)
+    return () => clearInterval(id)
+  }, [slug])
+
+  async function send(e: React.FormEvent) {
+    e.preventDefault()
+    if (!draft.trim() || sending) return
+    setSending(true)
+    const optimistic: ChatMessage = {
+      id: Date.now().toString(),
+      content: draft.trim(),
+      createdAt: new Date().toISOString(),
+      user: { username: myUsername, avatarUrl: myAvatarUrl },
+    }
+    setMessages(m => [optimistic, ...m])
+    setDraft('')
+    const res  = await fetch(`/api/groups/${slug}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: optimistic.content }),
+    })
+    if (res.ok) {
+      const saved = await res.json()
+      setMessages(m => m.map(msg => msg.id === optimistic.id ? saved : msg))
+    }
+    setSending(false)
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Message list — newest first */}
+      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {messages.length === 0 && (
+          <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+            No messages yet. Say something!
+          </div>
+        )}
+        {messages.map(m => (
+          <div key={m.id} style={{ display: 'flex', gap: 8, padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+            <Link href={`/mint/${m.user.username}`} style={{ flexShrink: 0 }}>
+              <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--bg3)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {m.user.avatarUrl
+                  ? <img src={m.user.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--muted)' }}>{m.user.username[0]?.toUpperCase()}</span>
+                }
+              </div>
+            </Link>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', marginBottom: 2 }}>
+                <Link href={`/mint/${m.user.username}`} style={{ fontSize: 12, fontWeight: 800, color: m.user.username === myUsername ? 'var(--gold)' : 'var(--white)' }}>
+                  @{m.user.username}
+                </Link>
+                <span style={{ fontSize: 10, color: 'var(--muted)' }}>
+                  {formatDistanceToNow(new Date(m.createdAt), { addSuffix: true })}
+                </span>
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--white)', lineHeight: 1.5, wordBreak: 'break-word' }}>{m.content}</div>
+            </div>
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input */}
+      <form onSubmit={send} style={{ display: 'flex', gap: 8, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+        <input
+          className="form-input"
+          placeholder="Message..."
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          maxLength={1000}
+          style={{ flex: 1 }}
+        />
+        <button type="submit" className="btn btn-primary" disabled={sending || !draft.trim()} style={{ flexShrink: 0 }}>
+          Send
+        </button>
+      </form>
+    </div>
+  )
+}
+
+// ─── Join form ────────────────────────────────────────────────────────────────
 
 function JoinForm({ slug, joinType, onJoined }: { slug: string; joinType: string; onJoined: () => void }) {
-  const [code, setCode] = useState('')
+  const [code, setCode]   = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   async function join() {
-    setError(null)
-    setLoading(true)
+    setError(null); setLoading(true)
     const body = joinType === 'invite_only' ? { inviteCode: code } : {}
-    try {
-      const res = await fetch(`/api/groups/${slug}/join`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      const data = await res.json()
-      if (!res.ok) { setError(data.error ?? 'Failed'); setLoading(false); return }
-      onJoined()
-    } catch {
-      setError('Something went wrong')
-      setLoading(false)
-    }
+    const res  = await fetch(`/api/groups/${slug}/join`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const data = await res.json()
+    if (!res.ok) { setError(data.error ?? 'Failed'); setLoading(false); return }
+    onJoined()
   }
 
   return (
@@ -190,64 +247,71 @@ function JoinForm({ slug, joinType, onJoined }: { slug: string; joinType: string
   )
 }
 
-// ─── Main component ────────────────────────────────────────────────────────────
+// ─── Main ──────────────────────────────────────────────────────────────────────
 
 export default function GroupClient({
-  slug, name, description, joinType, inviteCode,
-  maxMembers, memberCount, isMember, myRole, userId,
-  leaderboard, initialEvents,
+  slug, name, description, avatarUrl, joinType, inviteCode,
+  maxMembers, memberCount, isMember, isOwner,
+  userId, myUsername, myAvatarUrl,
+  leaderboard, stats, initialMessages,
 }: Props) {
   const router = useRouter()
   const [, startTransition] = useTransition()
+  const [joined, setJoined] = useState(isMember)
   const [leaving, setLeaving] = useState(false)
   const [leaveError, setLeaveError] = useState<string | null>(null)
-  const [joined, setJoined] = useState(isMember)
   const [copied, setCopied] = useState(false)
+  const [activeTab, setActiveTab] = useState<'leaderboard' | 'members' | 'chat'>('leaderboard')
+
+  const myRank = leaderboard.findIndex(m => m.userId === userId) + 1
 
   async function leave() {
-    setLeaving(true)
-    setLeaveError(null)
-    try {
-      const res = await fetch(`/api/groups/${slug}/leave`, { method: 'POST' })
-      const data = await res.json()
-      if (!res.ok) { setLeaveError(data.error ?? 'Failed'); setLeaving(false); return }
-      if (data.deleted) {
-        startTransition(() => router.push('/groups'))
-      } else {
-        startTransition(() => router.refresh())
-      }
-    } catch {
-      setLeaveError('Something went wrong')
-      setLeaving(false)
-    }
+    setLeaving(true); setLeaveError(null)
+    const res  = await fetch(`/api/groups/${slug}/leave`, { method: 'POST' })
+    const data = await res.json()
+    if (!res.ok) { setLeaveError(data.error ?? 'Failed'); setLeaving(false); return }
+    if (data.deleted) startTransition(() => router.push('/groups'))
+    else              startTransition(() => router.refresh())
   }
 
-  function copyInvite() {
+  function copyCode() {
     if (!inviteCode) return
     navigator.clipboard.writeText(inviteCode)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const myRank = leaderboard.findIndex(m => m.userId === userId) + 1
+  const tabStyle = (active: boolean): React.CSSProperties => ({
+    padding: '8px 16px', border: 'none', cursor: 'pointer', background: 'transparent',
+    borderBottom: `2px solid ${active ? 'var(--gold)' : 'transparent'}`,
+    color: active ? 'var(--gold)' : 'var(--muted)',
+    fontWeight: active ? 700 : 600, fontSize: 13,
+    transition: 'color 0.15s, border-color 0.15s',
+    marginBottom: -1,
+  })
 
   return (
     <div>
-      {/* Header */}
+      {/* ── Header ── */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: 'var(--white)' }}>{name}</h1>
-              {joinType === 'invite_only' && <span style={{ fontSize: 12, color: 'var(--muted)' }}>🔒</span>}
-            </div>
-            {description && <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--muted)', maxWidth: 500 }}>{description}</p>}
-            <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', gap: 12 }}>
-              <span><strong style={{ color: 'var(--white)' }}>{memberCount}</strong> member{memberCount !== 1 ? 's' : ''}</span>
-              {maxMembers && <span>· max {maxMembers}</span>}
-              {joined && myRank > 0 && (
-                <span>· You&apos;re <strong style={{ color: 'var(--gold)' }}>#{myRank}</strong> in this group</span>
-              )}
+          <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+            {avatarUrl && (
+              <div style={{ width: 52, height: 52, borderRadius: 10, overflow: 'hidden', flexShrink: 0, border: '1px solid var(--border)' }}>
+                <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              </div>
+            )}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: 'var(--white)' }}>{name}</h1>
+                {joinType === 'invite_only' && <span style={{ fontSize: 13, color: 'var(--muted)' }}>🔒</span>}
+              </div>
+              {description && <p style={{ margin: '0 0 6px', fontSize: 13, color: 'var(--muted)' }}>{description}</p>}
+              <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', gap: 12 }}>
+                <span><strong style={{ color: 'var(--white)' }}>{memberCount}</strong> member{memberCount !== 1 ? 's' : ''}</span>
+                {maxMembers && <span>· max {maxMembers}</span>}
+                {joined && myRank > 0 && <span>· You&apos;re <strong style={{ color: 'var(--gold)' }}>#{myRank}</strong></span>}
+              </div>
             </div>
           </div>
 
@@ -256,60 +320,58 @@ export default function GroupClient({
             {joined ? (
               <>
                 {inviteCode && (
-                  <button
-                    onClick={copyInvite}
-                    className="btn btn-outline"
-                    style={{ fontSize: 12 }}
-                  >
+                  <button onClick={copyCode} className="btn btn-outline" style={{ fontSize: 12 }}>
                     {copied ? '✓ Copied!' : '🔗 Copy Invite Code'}
                   </button>
                 )}
                 <button
-                  onClick={leave}
-                  disabled={leaving}
-                  style={{
-                    background: 'none', border: 'none', color: 'var(--muted)',
-                    fontSize: 12, cursor: 'pointer', fontWeight: 600, padding: '4px 0',
-                  }}
+                  onClick={leave} disabled={leaving}
+                  style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 12, cursor: 'pointer', fontWeight: 600, padding: '4px 0' }}
                 >
-                  {leaving ? 'Leaving...' : myRole === 'owner' ? 'Leave / Dissolve' : 'Leave group'}
+                  {leaving ? 'Leaving...' : isOwner ? 'Leave / Dissolve' : 'Leave group'}
                 </button>
                 {leaveError && <div style={{ fontSize: 12, color: 'var(--red)' }}>{leaveError}</div>}
               </>
             ) : (
-              <JoinForm
-                slug={slug}
-                joinType={joinType}
-                onJoined={() => { setJoined(true); startTransition(() => router.refresh()) }}
-              />
+              <JoinForm slug={slug} joinType={joinType} onJoined={() => { setJoined(true); startTransition(() => router.refresh()) }} />
             )}
           </div>
         </div>
       </div>
 
-      {/* Two-column layout: feed + leaderboard */}
-      <div className="feed-layout">
-        {/* Feed */}
-        <div className="feed-main">
-          {!joined ? (
-            <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--muted)', fontWeight: 700 }}>
-              Join this group to see member activity.
-            </div>
-          ) : initialEvents.length === 0 ? (
-            <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--muted)', fontWeight: 700 }}>
-              No activity yet — be the first to make a move.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {initialEvents.map(e => <FeedPost key={e.id} e={e} />)}
-            </div>
-          )}
+      {/* ── Stats panel ── */}
+      {joined && (
+        <div className="stats-row" style={{ marginBottom: 28 }}>
+          <div className="stat-box">
+            <div className="stat-label">Group Net Worth</div>
+            <div className="stat-value">{fmt(stats.totalNetWorth)}</div>
+          </div>
+          <div className="stat-box">
+            <div className="stat-label">Avg Balance</div>
+            <div className="stat-value">{fmt(stats.avgBalance)}</div>
+          </div>
+          <div className="stat-box">
+            <div className="stat-label">Members</div>
+            <div className="stat-value">{memberCount}{maxMembers ? ` / ${maxMembers}` : ''}</div>
+          </div>
+          <div className="stat-box">
+            <div className="stat-label">Your Rank</div>
+            <div className="stat-value" style={{ color: 'var(--gold)' }}>#{myRank > 0 ? myRank : '—'}</div>
+          </div>
         </div>
+      )}
 
-        {/* Leaderboard sidebar */}
-        <aside className="feed-right">
-          <div className="panel">
-            <div className="panel-title">Group Leaderboard</div>
+      {/* ── Tabs ── */}
+      {joined ? (
+        <>
+          <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
+            <button style={tabStyle(activeTab === 'leaderboard')} onClick={() => setActiveTab('leaderboard')}>Leaderboard</button>
+            <button style={tabStyle(activeTab === 'members')}     onClick={() => setActiveTab('members')}>Members</button>
+            <button style={tabStyle(activeTab === 'chat')}        onClick={() => setActiveTab('chat')}>Chat</button>
+          </div>
+
+          {/* Leaderboard tab */}
+          {activeTab === 'leaderboard' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {leaderboard.map((m, i) => (
                 <Link
@@ -317,50 +379,110 @@ export default function GroupClient({
                   href={`/mint/${m.username}`}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '8px 0', textDecoration: 'none', color: 'inherit',
-                    borderBottom: i < leaderboard.length - 1 ? '1px solid var(--border)' : 'none',
+                    padding: '12px 14px', background: 'var(--bg2)',
+                    border: `1px solid ${m.userId === userId ? 'rgba(200,169,110,0.4)' : 'var(--border)'}`,
+                    borderRadius: 8, textDecoration: 'none', color: 'inherit', marginBottom: 4,
                   }}
                 >
                   <span style={{
-                    width: 22, textAlign: 'center', fontSize: 12, fontWeight: 900,
+                    width: 24, textAlign: 'center', fontSize: 13, fontWeight: 900, flexShrink: 0,
                     color: i === 0 ? 'var(--gold)' : i === 1 ? '#b0b8c8' : i === 2 ? '#c8935a' : 'var(--muted)',
-                    flexShrink: 0,
                   }}>
                     {i + 1}
                   </span>
 
-                  <div style={{
-                    width: 28, height: 28, borderRadius: '50%',
-                    background: 'var(--bg3)', border: '1px solid var(--border)',
-                    overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    flexShrink: 0,
-                  }}>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--bg3)', border: '1px solid var(--border)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     {m.avatarUrl
                       ? <img src={m.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      : <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 800 }}>{m.username[0]?.toUpperCase()}</span>
+                      : <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--muted)' }}>{m.username[0]?.toUpperCase()}</span>
                     }
                   </div>
 
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
-                      fontSize: 13, fontWeight: m.userId === userId ? 800 : 600,
+                      fontSize: 14, fontWeight: 700,
                       color: m.userId === userId ? 'var(--gold)' : 'var(--white)',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
                       @{m.username}
-                      {m.role === 'owner' && <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 4 }}>owner</span>}
+                      {m.role === 'owner' && <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 6 }}>owner</span>}
                     </div>
                   </div>
 
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--white)', flexShrink: 0 }}>
-                    {fmt(m.balance) ?? '$0'}
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--white)' }}>{fmt(m.balance)}</div>
+                    {m.weeklyPct !== 0 && (
+                      <div style={{ fontSize: 11, fontWeight: 700, color: m.weeklyPct > 0 ? 'var(--green)' : 'var(--red)' }}>
+                        {m.weeklyPct > 0 ? '+' : ''}{m.weeklyPct}% this week
+                      </div>
+                    )}
                   </div>
                 </Link>
               ))}
             </div>
-          </div>
-        </aside>
-      </div>
+          )}
+
+          {/* Members tab */}
+          {activeTab === 'members' && (
+            <div>
+              {isOwner && (
+                <div className="panel" style={{ marginBottom: 20 }}>
+                  <div className="panel-title">Invite Member</div>
+                  <InvitePanel slug={slug} />
+                  {inviteCode && (
+                    <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--muted)', letterSpacing: '0.08em', marginBottom: 6 }}>INVITE CODE</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <code style={{ fontSize: 16, fontWeight: 900, letterSpacing: '0.15em', color: 'var(--gold)' }}>{inviteCode}</code>
+                        <button onClick={copyCode} className="btn btn-outline" style={{ fontSize: 11, padding: '3px 10px' }}>
+                          {copied ? 'Copied!' : 'Copy'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {leaderboard.map(m => (
+                  <div key={m.userId} style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '10px 14px', background: 'var(--bg2)',
+                    border: '1px solid var(--border)', borderRadius: 8,
+                  }}>
+                    <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--bg3)', border: '1px solid var(--border)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {m.avatarUrl
+                        ? <img src={m.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--muted)' }}>{m.username[0]?.toUpperCase()}</span>
+                      }
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <Link href={`/mint/${m.username}`} style={{ fontSize: 14, fontWeight: 700, color: 'var(--white)', textDecoration: 'none' }}>
+                        @{m.username}
+                      </Link>
+                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                        {m.role === 'owner' ? 'Owner' : 'Member'} · joined {formatDistanceToNow(new Date(m.joinedAt), { addSuffix: true })}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--white)', flexShrink: 0 }}>{fmt(m.balance)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Chat tab */}
+          {activeTab === 'chat' && (
+            <div style={{ maxWidth: 640 }}>
+              <ChatPanel slug={slug} myUsername={myUsername} myAvatarUrl={myAvatarUrl} initialMessages={initialMessages} />
+            </div>
+          )}
+        </>
+      ) : (
+        /* Not a member — preview only */
+        <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--muted)', fontWeight: 700 }}>
+          Join this group to see the leaderboard and chat.
+        </div>
+      )}
     </div>
   )
 }
