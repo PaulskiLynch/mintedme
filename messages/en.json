@@ -71,5 +71,157 @@
     "settings":      "Settings",
     "more":          "More",
     "signOut":       "out ↩"
+  },
+  "marketplace": {
+    "title":          "Marketplace",
+    "subtitle":       "Cars, businesses, and property — buy, sell, auction.",
+    "searchPlaceholder": "Search assets...",
+    "searchButton":   "Search",
+    "sortLabel":      "Sort:",
+    "sortNewest":     "Newest",
+    "sortPriceAsc":   "Price ↑",
+    "sortPriceDesc":  "Price ↓",
+    "empty":          "No assets found.",
+    "card": {
+      "trueValue":     "TRUE VALUE",
+      "buyNow":        "BUY NOW",
+      "buyNowArrow":   "Buy Now →",
+      "viewAsset":     "View Asset →",
+      "liveAuction":   "Live auction",
+      "uniqueEdition": "1 of 1 · Unique edition",
+      "available":     "1 available · Get it first",
+      "soldOut":       "SOLD OUT · {n} more members needed",
+      "secondaryOnly": "Secondary market only",
+      "allClaimed":    "All claimed",
+      "onlyOneLeft":   "Only 1 left",
+      "soldToday":     "{n} sold today",
+      "lastSold":      "Last sold {price}",
+      "watching":      "{n} watching",
+      "freeToOwn":     "Free to own · No upkeep",
+      "netPositive":   "+{n}/mo net",
+      "netNegative":   "−{n}/mo net",
+      "trendAbove":    "↑ +{pct}% above value",
+      "trendBelow":    "↓ {pct}% below value"
+    }
+  },
+  "feed": {
+    "title":       "Feed",
+    "subtitle":    "What's happening in the economy",
+    "emptyFilter": "No {filter} activity yet.",
+    "emptyAll":    "No activity yet. Buy something!",
+    "all":         "All",
+    "more":        "More ▾",
+    "biggestMove": "🔥 BIGGEST MOVE TODAY",
+    "viewAsset":   "View Asset →",
+    "event": {
+      "bought":         "bought {item} for {amt}",
+      "boughtNoAmt":    "bought {item}",
+      "sold":           "sold {item} for {amt}",
+      "soldNoAmt":      "sold {item}",
+      "offered":        "offered {amt} on {item}",
+      "accepted":       "accepted {amt} for {item}",
+      "auctionStart":   "started an auction on {item}",
+      "auctionEnd":     "won {item} for {amt} at auction",
+      "auctionEndNoAmt":"won {item} at auction",
+      "crafted":        "crafted a new item: {item}"
+    },
+    "type": {
+      "purchase":   "PURCHASE",
+      "sale":       "SALE",
+      "offer":      "OFFER",
+      "auction":    "AUCTION",
+      "auctionWin": "AUCTION WIN",
+      "newItem":    "NEW ITEM",
+      "post":       "POST",
+      "achievement":"ACHIEVEMENT",
+      "income":     "INCOME",
+      "market":     "MARKET"
+    },
+    "meta": {
+      "paid":     "Paid {amt}",
+      "received": "Received {amt}",
+      "wonFor":   "Won for {amt}",
+      "owner":    "Owner @{username}",
+      "buyer":    "Buyer @{username}"
+    },
+    "verdict": {
+      "smartBuy":    "📉 {pct}% below market · Smart buy",
+      "overpaid":    "📈 {pct}% above market · Overpaid",
+      "fairPrice":   "Fair market price",
+      "lowball":     "😬 Lowball — {pct}% below market",
+      "belowAsk":    "{pct}% below ask",
+      "strongOffer": "📈 Above market · Strong offer",
+      "greatFlip":   "💰 {pct}% above market · Great flip",
+      "underSold":   "{pct}% below market · Under-sold",
+      "fairSale":    "Fair sale",
+      "bargain":     "💰 Won {pct}% below market · Bargain",
+      "paidUp":      "{pct}% above market · Paid up"
+    },
+    "comment": {
+      "prompt0":     "Good buy?",
+      "prompt1":     "Overpaid?",
+      "prompt2":     "Future classic?",
+      "prompt3":     "Flip it!",
+      "prompt4":     "Hold it!",
+      "placeholder": "Add a comment…",
+      "post":        "Post",
+      "count":       "Comment",
+      "offerSent":   "Offer sent ✓",
+      "makeOffer":   "Make Offer",
+      "cancel":      "Cancel"
+    },
+    "offer": {
+      "marketValue": "Market value:",
+      "vsMarket":    "% vs market",
+      "send":        "Send"
+    },
+    "quickSell": {
+      "title":       "Quick Sell",
+      "subtitle":    "List an item from your Mint",
+      "success":     "Listed successfully!",
+      "loading":     "Loading your items…",
+      "empty":       "No items available to list.",
+      "selectLabel": "Select item",
+      "selectPlaceholder": "Choose…",
+      "listed":      "(listed)",
+      "lastSale":    "Last sale:",
+      "priceLabel":  "Listing price (USD)",
+      "submitting":  "Listing…",
+      "submit":      "List for sale",
+      "cancel":      "Cancel",
+      "close":       "Close"
+    },
+    "profile": {
+      "title":          "Profile",
+      "rank":           "Rank #{rank} of {total}",
+      "myMint":         "My Mint",
+      "quickSell":      "Quick Sell",
+      "playersOnline":  "Players online",
+      "topPlayer":      "#1 player",
+      "hotToday":       "Hot today"
+    },
+    "challenges": {
+      "titleRemaining": "Challenges · {n} remaining",
+      "titleDone":      "Challenges · All done!",
+      "allComplete":    "All {total} challenges complete!",
+      "progress":       "{done}/{total} complete",
+      "claimed":        "CLAIMED ✓"
+    },
+    "auctions": {
+      "title":    "Live Auctions",
+      "empty":    "No active auctions right now.",
+      "minBid":   "Min {price} · ends {time}",
+      "placeBid": "Place Bid →",
+      "seeAll":   "See all auctions →"
+    },
+    "achievement": {
+      "pill":        "ACHIEVEMENT",
+      "viewProfile": "View Profile →"
+    },
+    "market": {
+      "pill":           "MARKET",
+      "browseCategory": "Browse {category} →",
+      "browseAll":      "Browse Market →"
+    }
   }
 }

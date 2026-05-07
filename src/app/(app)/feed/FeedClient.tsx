@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
+import { useTranslations } from 'next-intl'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,20 +40,32 @@ interface Props {
   challenges: ClientChallenge[]
 }
 
-const COMMENT_PROMPTS = ['Good buy?', 'Overpaid?', 'Future classic?', 'Flip it!', 'Hold it!']
+const TYPE_CSS: Record<string, string> = {
+  buy:           'purchase',
+  sell:          'sale',
+  accept:        'sale',
+  offer:         'offer',
+  auction_start: 'auction',
+  auction_end:   'auction',
+  create_item:   'new-item',
+  post:          'post',
+  achievement:   'achievement',
+  income:        'achievement',
+  market_event:  'market',
+}
 
-const TYPE_INFO: Record<string, { label: string; css: string }> = {
-  buy:           { label: 'PURCHASE',    css: 'purchase'    },
-  sell:          { label: 'SALE',        css: 'sale'        },
-  accept:        { label: 'SALE',        css: 'sale'        },
-  offer:         { label: 'OFFER',       css: 'offer'       },
-  auction_start: { label: 'AUCTION',     css: 'auction'     },
-  auction_end:   { label: 'AUCTION WIN', css: 'auction'     },
-  create_item:   { label: 'NEW ITEM',    css: 'new-item'    },
-  post:          { label: 'POST',        css: 'post'        },
-  achievement:   { label: 'ACHIEVEMENT', css: 'achievement' },
-  income:        { label: 'INCOME',      css: 'achievement' },
-  market_event:  { label: 'MARKET',      css: 'market'      },
+const TYPE_LABEL_KEY: Record<string, string> = {
+  buy:           'purchase',
+  sell:          'sale',
+  accept:        'sale',
+  offer:         'offer',
+  auction_start: 'auction',
+  auction_end:   'auctionWin',
+  create_item:   'newItem',
+  post:          'post',
+  achievement:   'achievement',
+  income:        'income',
+  market_event:  'market',
 }
 
 function fmt(n: string | number | null | undefined) {
@@ -86,6 +99,7 @@ function CategoryFilter({ events, filter, onFilter }: {
   filter: string | null
   onFilter: (cat: string | null) => void
 }) {
+  const t = useTranslations('feed')
   const [moreOpen, setMoreOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -143,7 +157,7 @@ function CategoryFilter({ events, filter, onFilter }: {
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)', marginBottom: 24, overflowX: 'auto', scrollbarWidth: 'none' }}>
-      <button style={tabStyle(!filter)} onClick={() => onFilter(null)}>All</button>
+      <button style={tabStyle(!filter)} onClick={() => onFilter(null)}>{t('all')}</button>
 
       {visible.map(([cat, count]) => (
         <button
@@ -162,7 +176,7 @@ function CategoryFilter({ events, filter, onFilter }: {
             style={{ ...tabStyle(overflowHasActive), paddingRight: 10 }}
             onClick={() => setMoreOpen(p => !p)}
           >
-            {overflowHasActive ? `${cap(filter!)} ▾` : `More ▾`}
+            {overflowHasActive ? `${cap(filter!)} ▾` : t('more')}
           </button>
           {moreOpen && (
             <div style={{
@@ -197,23 +211,23 @@ function CategoryFilter({ events, filter, onFilter }: {
   )
 }
 
-function eventText(e: FeedEvent): string {
+function eventText(e: FeedEvent, t: ReturnType<typeof useTranslations>): string {
   const item = e.edition?.item.name ?? 'an item'
   const amt  = e.amount ? fmt(e.amount) ?? '' : ''
   switch (e.eventType) {
-    case 'buy':           return `bought ${item}${amt ? ' for ' + amt : ''}`
-    case 'sell':          return `sold ${item}${amt ? ' for ' + amt : ''}`
-    case 'offer':         return `offered ${amt} on ${item}`
-    case 'accept':        return `accepted ${amt} for ${item}`
-    case 'auction_start': return `started an auction on ${item}`
-    case 'auction_end':   return `won ${item}${amt ? ' for ' + amt : ''} at auction`
-    case 'create_item':   return `crafted a new item: ${item}`
+    case 'buy':           return amt ? t('event.bought', { item, amt }) : t('event.boughtNoAmt', { item })
+    case 'sell':          return amt ? t('event.sold', { item, amt }) : t('event.soldNoAmt', { item })
+    case 'offer':         return t('event.offered', { item, amt })
+    case 'accept':        return t('event.accepted', { item, amt })
+    case 'auction_start': return t('event.auctionStart', { item })
+    case 'auction_end':   return amt ? t('event.auctionEnd', { item, amt }) : t('event.auctionEndNoAmt', { item })
+    case 'create_item':   return t('event.crafted', { item })
     case 'post':          return String(e.metadata?.text ?? '')
     default:              return e.eventType.replace(/_/g, ' ')
   }
 }
 
-function metaLine(e: FeedEvent): string {
+function metaLine(e: FeedEvent, t: ReturnType<typeof useTranslations>): string {
   const parts: string[] = []
   const cat = e.edition?.item.category
   if (cat) parts.push(cap(cat))
@@ -222,25 +236,29 @@ function metaLine(e: FeedEvent): string {
   const amt = e.amount ? fmt(e.amount) : null
   switch (e.eventType) {
     case 'buy':
-      if (amt) parts.push(`Paid ${amt}`)
+      if (amt) parts.push(t('meta.paid', { amt }))
       break
     case 'sell': case 'accept':
-      if (amt) parts.push(`Received ${amt}`)
+      if (amt) parts.push(t('meta.received', { amt }))
       break
     case 'auction_end':
-      if (amt) parts.push(`Won for ${amt}`)
+      if (amt) parts.push(t('meta.wonFor', { amt }))
       break
   }
 
   if (e.targetUser) {
-    const label = (e.eventType === 'buy' || e.eventType === 'offer') ? 'Owner' : 'Buyer'
-    parts.push(`${label} @${e.targetUser.username}`)
+    const username = e.targetUser.username
+    parts.push(
+      (e.eventType === 'buy' || e.eventType === 'offer')
+        ? t('meta.owner', { username })
+        : t('meta.buyer', { username })
+    )
   }
 
   return parts.join(' · ')
 }
 
-function verdictLine(e: FeedEvent): { text: string; colour: string } | null {
+function verdictLine(e: FeedEvent, t: ReturnType<typeof useTranslations>): { text: string; colour: string } | null {
   if (!e.amount || !e.edition?.item.benchmarkPrice) return null
   const amount = Number(e.amount)
   const bench  = Number(e.edition.item.benchmarkPrice)
@@ -249,21 +267,21 @@ function verdictLine(e: FeedEvent): { text: string; colour: string } | null {
 
   switch (e.eventType) {
     case 'buy':
-      if (pct < -25) return { text: `📉 ${Math.abs(pct).toFixed(0)}% below market · Smart buy`, colour: 'var(--green)' }
-      if (pct >  25) return { text: `📈 ${pct.toFixed(0)}% above market · Overpaid`,             colour: 'var(--red)'   }
-      return { text: 'Fair market price', colour: 'var(--muted)' }
+      if (pct < -25) return { text: t('verdict.smartBuy', { pct: Math.abs(pct).toFixed(0) }), colour: 'var(--green)' }
+      if (pct >  25) return { text: t('verdict.overpaid',  { pct: pct.toFixed(0) }),           colour: 'var(--red)'   }
+      return { text: t('verdict.fairPrice'), colour: 'var(--muted)' }
     case 'offer':
-      if (pct < -60) return { text: `😬 Lowball — ${Math.abs(pct).toFixed(0)}% below market`,   colour: 'var(--red)'   }
-      if (pct < -25) return { text: `${Math.abs(pct).toFixed(0)}% below ask`,                    colour: 'var(--muted)' }
-      if (pct >   0) return { text: `📈 Above market · Strong offer`,                            colour: 'var(--green)' }
+      if (pct < -60) return { text: t('verdict.lowball',     { pct: Math.abs(pct).toFixed(0) }), colour: 'var(--red)'   }
+      if (pct < -25) return { text: t('verdict.belowAsk',    { pct: Math.abs(pct).toFixed(0) }), colour: 'var(--muted)' }
+      if (pct >   0) return { text: t('verdict.strongOffer'),                                     colour: 'var(--green)' }
       return null
     case 'sell': case 'accept':
-      if (pct >  25) return { text: `💰 ${pct.toFixed(0)}% above market · Great flip`,           colour: 'var(--green)' }
-      if (pct < -25) return { text: `${Math.abs(pct).toFixed(0)}% below market · Under-sold`,    colour: 'var(--red)'   }
-      return { text: 'Fair sale', colour: 'var(--muted)' }
+      if (pct >  25) return { text: t('verdict.greatFlip', { pct: pct.toFixed(0) }),            colour: 'var(--green)' }
+      if (pct < -25) return { text: t('verdict.underSold', { pct: Math.abs(pct).toFixed(0) }), colour: 'var(--red)'   }
+      return { text: t('verdict.fairSale'), colour: 'var(--muted)' }
     case 'auction_end':
-      if (pct < -20) return { text: `💰 Won ${Math.abs(pct).toFixed(0)}% below market · Bargain`, colour: 'var(--green)' }
-      if (pct >  20) return { text: `${pct.toFixed(0)}% above market · Paid up`,                  colour: 'var(--muted)' }
+      if (pct < -20) return { text: t('verdict.bargain', { pct: Math.abs(pct).toFixed(0) }), colour: 'var(--green)' }
+      if (pct >  20) return { text: t('verdict.paidUp',  { pct: pct.toFixed(0) }),            colour: 'var(--muted)' }
       return null
   }
   return null
@@ -313,6 +331,7 @@ function isVisible(e: FeedEvent): boolean {
 // ─── Biggest Move Today ───────────────────────────────────────────────────────
 
 function BiggestMoveToday({ events }: { events: FeedEvent[] }) {
+  const t = useTranslations('feed')
   const DAY = 86400000
   const candidates = events.filter(e =>
     Date.now() - new Date(e.createdAt).getTime() < DAY &&
@@ -321,19 +340,19 @@ function BiggestMoveToday({ events }: { events: FeedEvent[] }) {
   )
   if (!candidates.length) return null
   const top = candidates.sort((a, b) => Number(b.amount) - Number(a.amount))[0]
-  const verdict = verdictLine(top)
+  const verdict = verdictLine(top, t)
 
   return (
     <div style={{ background: 'linear-gradient(135deg, #1a1400, #2a2000)', border: '1px solid var(--gold)', borderRadius: 12, padding: '14px 16px' }}>
-      <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--gold)', letterSpacing: '0.1em', marginBottom: 8 }}>🔥 BIGGEST MOVE TODAY</div>
+      <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--gold)', letterSpacing: '0.1em', marginBottom: 8 }}>{t('biggestMove')}</div>
       <div style={{ fontSize: 14, lineHeight: 1.5 }}>
         <Link href={`/mint/${top.user!.username}`} style={{ fontWeight: 700 }}>@{top.user!.username}</Link>
-        {' '}<span style={{ color: 'var(--muted)' }}>{eventText(top)}</span>
+        {' '}<span style={{ color: 'var(--muted)' }}>{eventText(top, t)}</span>
       </div>
       {verdict && <div style={{ fontSize: 12, color: verdict.colour, marginTop: 4, fontWeight: 700 }}>{verdict.text}</div>}
       {top.edition && (
         <div style={{ marginTop: 10 }}>
-          <Link href={`/item/${top.edition.id}`} className="btn btn-gold btn-sm">View Asset →</Link>
+          <Link href={`/item/${top.edition.id}`} className="btn btn-gold btn-sm">{t('viewAsset')}</Link>
         </div>
       )}
     </div>
@@ -411,6 +430,7 @@ function ChallengeCards({ challenges }: { challenges: ClientChallenge[] }) {
 // ─── Achievement card ─────────────────────────────────────────────────────────
 
 function AchievementCard({ event }: { event: FeedEvent }) {
+  const t = useTranslations('feed')
   const icon        = String(event.metadata?.icon  ?? '🏆')
   const title       = String(event.metadata?.title ?? '')
   const desc        = String(event.metadata?.description ?? '')
@@ -420,7 +440,7 @@ function AchievementCard({ event }: { event: FeedEvent }) {
 
   return (
     <div className="feed-post">
-      <span className="feed-type-pill achievement">ACHIEVEMENT</span>
+      <span className="feed-type-pill achievement">{t('achievement.pill')}</span>
       <div style={{ fontWeight: 800, fontSize: 15, lineHeight: 1.4 }}>{icon} {title}</div>
       {desc && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>{desc}</div>}
       {rankBefore !== undefined && rankAfter !== undefined && (
@@ -430,7 +450,7 @@ function AchievementCard({ event }: { event: FeedEvent }) {
       )}
       {username && (
         <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
-          <Link href={`/mint/${username}`} className="btn btn-ghost btn-sm">View Profile →</Link>
+          <Link href={`/mint/${username}`} className="btn btn-ghost btn-sm">{t('achievement.viewProfile')}</Link>
         </div>
       )}
     </div>
@@ -440,6 +460,7 @@ function AchievementCard({ event }: { event: FeedEvent }) {
 // ─── Market event card ────────────────────────────────────────────────────────
 
 function MarketCard({ event }: { event: FeedEvent }) {
+  const t = useTranslations('feed')
   const icon     = String(event.metadata?.icon  ?? '📊')
   const title    = String(event.metadata?.title ?? '')
   const desc     = String(event.metadata?.description ?? '')
@@ -450,7 +471,7 @@ function MarketCard({ event }: { event: FeedEvent }) {
 
   return (
     <div className="feed-post">
-      <span className="feed-type-pill market">MARKET</span>
+      <span className="feed-type-pill market">{t('market.pill')}</span>
       <div style={{ fontWeight: 800, fontSize: 15, lineHeight: 1.4 }}>{icon} {cleanTitle || title}</div>
       {desc && <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 6, lineHeight: 1.5 }}>{desc}</div>}
       <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
@@ -458,7 +479,7 @@ function MarketCard({ event }: { event: FeedEvent }) {
           href={category ? `/marketplace?category=${category}` : '/marketplace'}
           className="btn btn-gold btn-sm"
         >
-          {category ? `Browse ${cap(category)} →` : 'Browse Market →'}
+          {category ? t('market.browseCategory', { category: cap(category) }) : t('market.browseAll')}
         </Link>
       </div>
     </div>
@@ -470,6 +491,8 @@ function MarketCard({ event }: { event: FeedEvent }) {
 function FeedPost({ event, commentCount: initCommCount, userId }: {
   event: FeedEvent; commentCount: number; userId: string
 }) {
+  const t = useTranslations('feed')
+  const COMMENT_PROMPTS = [t('comment.prompt0'), t('comment.prompt1'), t('comment.prompt2'), t('comment.prompt3'), t('comment.prompt4')]
   const [comments,     setComments]    = useState<Comment[]>([])
   const [commCount,    setCommCount]   = useState(initCommCount)
   const [expanded,     setExpanded]    = useState(false)
@@ -519,10 +542,11 @@ function FeedPost({ event, commentCount: initCommCount, userId }: {
     setOfferBusy(false)
   }
 
-  const typeInfo = TYPE_INFO[event.eventType] ?? { label: event.eventType.toUpperCase(), css: 'post' }
+  const typeCss   = TYPE_CSS[event.eventType] ?? 'post'
+  const typeLabel = TYPE_LABEL_KEY[event.eventType] ? t(`type.${TYPE_LABEL_KEY[event.eventType]}` as any) : event.eventType.toUpperCase()
   const item     = event.edition?.item
-  const meta     = metaLine(event)
-  const verdict  = verdictLine(event)
+  const meta     = metaLine(event, t)
+  const verdict  = verdictLine(event, t)
   const canOffer = !!event.edition && !!userId && !offerDone &&
                    !(event.targetUser && (event.eventType === 'sell' || event.eventType === 'accept'))
 
@@ -540,7 +564,7 @@ function FeedPost({ event, commentCount: initCommCount, userId }: {
             {event.user && (
               <Link href={`/mint/${event.user.username}`} style={{ fontWeight: 700 }}>@{event.user.username} </Link>
             )}
-            <span style={{ color: 'var(--muted)' }}>{eventText(event)}</span>
+            <span style={{ color: 'var(--muted)' }}>{eventText(event, t)}</span>
           </div>
           {/* Meta + verdict on the same line */}
           <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>
@@ -552,7 +576,7 @@ function FeedPost({ event, commentCount: initCommCount, userId }: {
             )}
           </div>
         </div>
-        <span className={`feed-type-pill ${typeInfo.css}`} style={{ flexShrink: 0, marginTop: 2 }}>{typeInfo.label}</span>
+        <span className={`feed-type-pill ${typeCss}`} style={{ flexShrink: 0, marginTop: 2 }}>{typeLabel}</span>
       </div>
 
       {/* Image — clicking navigates to item */}
@@ -574,10 +598,10 @@ function FeedPost({ event, commentCount: initCommCount, userId }: {
         <form onSubmit={submitOffer} style={{ marginBottom: 10, padding: '12px', background: 'var(--bg3)', borderRadius: 8 }}>
           {bench > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
-              <span>Market value: <strong style={{ color: 'var(--white)' }}>{fmt(bench)}</strong></span>
+              <span>{t('offer.marketValue')} <strong style={{ color: 'var(--white)' }}>{fmt(bench)}</strong></span>
               {offerPct !== null && (
                 <span style={{ color: offerPct < -30 ? 'var(--red)' : offerPct > 0 ? 'var(--green)' : 'var(--muted)', fontWeight: 700 }}>
-                  {offerPct > 0 ? '+' : ''}{offerPct.toFixed(0)}% vs market
+                  {offerPct > 0 ? '+' : ''}{offerPct.toFixed(0)}{t('offer.vsMarket')}
                 </span>
               )}
             </div>
@@ -597,7 +621,7 @@ function FeedPost({ event, commentCount: initCommCount, userId }: {
                 style={{ paddingLeft: 22, fontSize: 13 }} autoFocus required
               />
             </div>
-            <button className="btn btn-gold btn-sm" type="submit" disabled={offerBusy || !offerRaw}>{offerBusy ? '…' : 'Send'}</button>
+            <button className="btn btn-gold btn-sm" type="submit" disabled={offerBusy || !offerRaw}>{offerBusy ? '…' : t('offer.send')}</button>
             <button className="btn btn-ghost btn-sm" type="button" onClick={() => setShowOffer(false)}>✕</button>
           </div>
         </form>
@@ -606,12 +630,12 @@ function FeedPost({ event, commentCount: initCommCount, userId }: {
       {/* Action bar: comment count + offer */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
         <button className={`feed-action-btn${expanded ? ' liked' : ''}`} onClick={loadAndToggleComments} style={{ fontSize: 11 }}>
-          💬 {commCount > 0 ? commCount : 'Comment'}
+          💬 {commCount > 0 ? commCount : t('comment.count')}
         </button>
-        {offerDone && <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 700 }}>Offer sent ✓</span>}
+        {offerDone && <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 700 }}>{t('comment.offerSent')}</span>}
         {canOffer && (
           <button className="btn btn-ghost btn-sm" onClick={() => setShowOffer(p => !p)} style={{ fontSize: 11, marginLeft: 'auto' }}>
-            {showOffer ? 'Cancel' : 'Make Offer'}
+            {showOffer ? t('comment.cancel') : t('comment.makeOffer')}
           </button>
         )}
       </div>
@@ -636,8 +660,8 @@ function FeedPost({ event, commentCount: initCommCount, userId }: {
                 ))}
               </div>
               <form onSubmit={postComment} style={{ display: 'flex', gap: 8 }}>
-                <input className="form-input" value={commentInput} onChange={e => setCommentInput(e.target.value)} placeholder="Add a comment…" maxLength={500} style={{ flex: 1, fontSize: 13 }} />
-                <button className="btn btn-gold btn-sm" type="submit" disabled={posting || !commentInput.trim()}>Post</button>
+                <input className="form-input" value={commentInput} onChange={e => setCommentInput(e.target.value)} placeholder={t('comment.placeholder')} maxLength={500} style={{ flex: 1, fontSize: 13 }} />
+                <button className="btn btn-gold btn-sm" type="submit" disabled={posting || !commentInput.trim()}>{t('comment.post')}</button>
               </form>
             </div>
           )}
@@ -650,6 +674,7 @@ function FeedPost({ event, commentCount: initCommCount, userId }: {
 // ─── Quick Sell modal ─────────────────────────────────────────────────────────
 
 function QuickSellModal({ onClose }: { onClose: () => void }) {
+  const t = useTranslations('feed')
   const [items,    setItems]    = useState<InventoryItem[]>([])
   const [selected, setSelected] = useState('')
   const [price,    setPrice]    = useState('')
@@ -678,28 +703,28 @@ function QuickSellModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="modal">
-        <div className="modal-title">Quick Sell</div>
-        <div className="modal-sub">List an item from your Mint</div>
+        <div className="modal-title">{t('quickSell.title')}</div>
+        <div className="modal-sub">{t('quickSell.subtitle')}</div>
         {done ? (
           <div style={{ paddingTop: 16 }}>
-            <div style={{ color: 'var(--green)', fontWeight: 700, marginBottom: 16 }}>Listed successfully!</div>
-            <button className="btn btn-ghost btn-full" onClick={onClose}>Close</button>
+            <div style={{ color: 'var(--green)', fontWeight: 700, marginBottom: 16 }}>{t('quickSell.success')}</div>
+            <button className="btn btn-ghost btn-full" onClick={onClose}>{t('quickSell.close')}</button>
           </div>
         ) : loading ? (
-          <div style={{ color: 'var(--muted)', fontSize: 13, paddingTop: 12 }}>Loading your items…</div>
+          <div style={{ color: 'var(--muted)', fontSize: 13, paddingTop: 12 }}>{t('quickSell.loading')}</div>
         ) : items.length === 0 ? (
-          <div style={{ color: 'var(--muted)', fontSize: 13, paddingTop: 12 }}>No items available to list.</div>
+          <div style={{ color: 'var(--muted)', fontSize: 13, paddingTop: 12 }}>{t('quickSell.empty')}</div>
         ) : (
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 16 }}>
             <div className="form-group">
-              <label className="form-label">Select item</label>
+              <label className="form-label">{t('quickSell.selectLabel')}</label>
               <select className="form-input" value={selected} onChange={e => {
                 setSelected(e.target.value)
                 const it = items.find(i => i.editionId === e.target.value)
                 setPrice(it?.listedPrice ?? it?.lastSalePrice ?? it?.minimumBid ?? '')
               }} required>
-                <option value="">Choose…</option>
-                {items.map(i => <option key={i.editionId} value={i.editionId}>{i.itemName}{i.isListed ? ' (listed)' : ''}</option>)}
+                <option value="">{t('quickSell.selectPlaceholder')}</option>
+                {items.map(i => <option key={i.editionId} value={i.editionId}>{i.itemName}{i.isListed ? ' ' + t('quickSell.listed') : ''}</option>)}
               </select>
             </div>
             {item && (
@@ -707,17 +732,17 @@ function QuickSellModal({ onClose }: { onClose: () => void }) {
                 {item.imageUrl && <img src={item.imageUrl} alt="" style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover' }} />}
                 <div>
                   <div style={{ fontWeight: 700 }}>{item.itemName}</div>
-                  {item.lastSalePrice && <div style={{ fontSize: 12, color: 'var(--muted)' }}>Last sale: {fmt(item.lastSalePrice)}</div>}
+                  {item.lastSalePrice && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{t('quickSell.lastSale')} {fmt(item.lastSalePrice)}</div>}
                 </div>
               </div>
             )}
             <div className="form-group">
-              <label className="form-label">Listing price (USD)</label>
+              <label className="form-label">{t('quickSell.priceLabel')}</label>
               <input className="form-input" type="number" min="1" value={price} onChange={e => setPrice(e.target.value)} required />
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn btn-gold" type="submit" disabled={busy || !selected || !price}>{busy ? 'Listing…' : 'List for sale'}</button>
-              <button className="btn btn-ghost" type="button" onClick={onClose}>Cancel</button>
+              <button className="btn btn-gold" type="submit" disabled={busy || !selected || !price}>{busy ? t('quickSell.submitting') : t('quickSell.submit')}</button>
+              <button className="btn btn-ghost" type="button" onClick={onClose}>{t('quickSell.cancel')}</button>
             </div>
           </form>
         )}
@@ -733,6 +758,7 @@ export default function FeedClient({
   initialAuctions, initialFriends, initialInterests,
   myRank, totalPlayers, classStats, challenges,
 }: Props) {
+  const t = useTranslations('feed')
   const [events,        setEvents]        = useState(initialEvents)
   const [auctions,      setAuctions]      = useState(initialAuctions)
   const [filter,        setFilter]        = useState<string | null>(null)
@@ -795,8 +821,8 @@ export default function FeedClient({
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div>
-            <div className="page-title" style={{ marginBottom: 2 }}>Feed</div>
-            <div style={{ fontSize: 13, color: 'var(--muted)' }}>What&apos;s happening in the economy</div>
+            <div className="page-title" style={{ marginBottom: 2 }}>{t('title')}</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)' }}>{t('subtitle')}</div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <Link href="/notifications" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 8, background: 'var(--bg3)', border: '1px solid var(--border)', fontSize: 16, textDecoration: 'none' }}>🔔</Link>
@@ -811,7 +837,7 @@ export default function FeedClient({
         {/* Feed */}
         {filteredEvents.length === 0 ? (
           <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--muted)', fontWeight: 700 }}>
-            {filter ? `No ${filter} activity yet.` : 'No activity yet. Buy something!'}
+            {filter ? t('emptyFilter', { filter }) : t('emptyAll')}
           </div>
         ) : filteredEvents.map(e => {
           if (e.eventType === 'achievement') return <AchievementCard key={e.id} event={e} />
@@ -839,22 +865,22 @@ export default function FeedClient({
         <BiggestMoveToday events={visibleEvents} />
 
         {/* Profile + Class stats merged */}
-        <Module title="Profile" collapsed={!!collapsed['profile']} onToggle={() => toggleSection('profile')}>
+        <Module title={t('profile.title')} collapsed={!!collapsed['profile']} onToggle={() => toggleSection('profile')}>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
             <Avatar avatarUrl={userProfile.avatarUrl} username={userProfile.username} size={44} />
             <div>
               <div style={{ fontWeight: 700 }}>@{userProfile.username}</div>
               {userProfile.tagline && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{userProfile.tagline}</div>}
-              {myRank > 0 && <div style={{ fontSize: 11, color: 'var(--gold)', marginTop: 3 }}>Rank #{myRank} of {totalPlayers}</div>}
+              {myRank > 0 && <div style={{ fontSize: 11, color: 'var(--gold)', marginTop: 3 }}>{t('profile.rank', { rank: myRank, total: totalPlayers })}</div>}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-            <Link href={`/mint/${userProfile.username}`} className="btn btn-ghost btn-sm" style={{ flex: 1, textAlign: 'center' }}>My Mint</Link>
-            <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={() => { setShowQuickSell(true); setRightOpen(false) }}>Quick Sell</button>
+            <Link href={`/mint/${userProfile.username}`} className="btn btn-ghost btn-sm" style={{ flex: 1, textAlign: 'center' }}>{t('profile.myMint')}</Link>
+            <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={() => { setShowQuickSell(true); setRightOpen(false) }}>{t('profile.quickSell')}</button>
           </div>
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-              <span style={{ color: 'var(--muted)' }}>Players online</span>
+              <span style={{ color: 'var(--muted)' }}>{t('profile.playersOnline')}</span>
               <span style={{ fontWeight: 700 }}>
                 <span className="status-dot online" style={{ marginRight: 4 }} />
                 {classStats.onlineCount} / {totalPlayers}
@@ -862,7 +888,7 @@ export default function FeedClient({
             </div>
             {classStats.topPlayerUsername && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                <span style={{ color: 'var(--muted)' }}>#1 player</span>
+                <span style={{ color: 'var(--muted)' }}>{t('profile.topPlayer')}</span>
                 <Link href={`/mint/${classStats.topPlayerUsername}`} style={{ fontWeight: 700, color: 'var(--gold)' }}>
                   @{classStats.topPlayerUsername}
                 </Link>
@@ -870,7 +896,7 @@ export default function FeedClient({
             )}
             {classStats.hotCategory && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                <span style={{ color: 'var(--muted)' }}>Hot today</span>
+                <span style={{ color: 'var(--muted)' }}>{t('profile.hotToday')}</span>
                 <span style={{ fontWeight: 700, textTransform: 'capitalize' }}>🔥 {classStats.hotCategory}</span>
               </div>
             )}
@@ -884,14 +910,14 @@ export default function FeedClient({
           const done    = total - pending.length
           return (
             <Module
-              title={pending.length > 0 ? `Challenges · ${pending.length} remaining` : 'Challenges · All done!'}
+              title={pending.length > 0 ? t('challenges.titleRemaining', { n: pending.length }) : t('challenges.titleDone')}
               collapsed={!!collapsed['challenges']}
               onToggle={() => toggleSection('challenges')}
             >
               {pending.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '6px 0 2px' }}>
                   <div style={{ fontSize: 22, marginBottom: 4 }}>🏆</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--green)' }}>All {total} challenges complete!</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--green)' }}>{t('challenges.allComplete', { total })}</div>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -925,7 +951,7 @@ export default function FeedClient({
                       </div>
                     </div>
                   ))}
-                  <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', paddingTop: 2 }}>{done}/{total} complete</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', paddingTop: 2 }}>{t('challenges.progress', { done, total })}</div>
                 </div>
               )}
             </Module>
@@ -933,9 +959,9 @@ export default function FeedClient({
         })()}
 
         {/* Live Auctions */}
-        <Module title="Live Auctions" collapsed={!!collapsed['auctions']} onToggle={() => toggleSection('auctions')}>
+        <Module title={t('auctions.title')} collapsed={!!collapsed['auctions']} onToggle={() => toggleSection('auctions')}>
           {auctions.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>No active auctions right now.</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>{t('auctions.empty')}</div>
           ) : auctions.map(a => (
             <div key={a.id} style={{ marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
@@ -947,13 +973,13 @@ export default function FeedClient({
                     <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--red)', display: 'inline-block', animation: 'pulse 1.5s infinite' }} />
                     <span style={{ fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.itemName}</span>
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>Min {fmt(a.minimumBid)} · ends {timeLeft(a.endsAt)}</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t('auctions.minBid', { price: fmt(a.minimumBid) ?? '', time: timeLeft(a.endsAt) })}</div>
                 </div>
               </div>
-              <Link href={`/auction/${a.id}`} className="btn btn-gold btn-full btn-sm" style={{ textAlign: 'center' }}>Place Bid →</Link>
+              <Link href={`/auction/${a.id}`} className="btn btn-gold btn-full btn-sm" style={{ textAlign: 'center' }}>{t('auctions.placeBid')}</Link>
             </div>
           ))}
-          <Link href="/auctions" style={{ fontSize: 12, color: 'var(--gold)' }}>See all auctions →</Link>
+          <Link href="/auctions" style={{ fontSize: 12, color: 'var(--gold)' }}>{t('auctions.seeAll')}</Link>
         </Module>
       </div>
 

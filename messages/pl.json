@@ -71,5 +71,157 @@
     "settings":      "Ustawienia",
     "more":          "Więcej",
     "signOut":       "wyloguj ↩"
+  },
+  "marketplace": {
+    "title":          "Rynek",
+    "subtitle":       "Auta, biznesy i nieruchomości — kup, sprzedaj, przelicytuj.",
+    "searchPlaceholder": "Szukaj zasobów...",
+    "searchButton":   "Szukaj",
+    "sortLabel":      "Sortuj:",
+    "sortNewest":     "Najnowsze",
+    "sortPriceAsc":   "Cena ↑",
+    "sortPriceDesc":  "Cena ↓",
+    "empty":          "Brak zasobów.",
+    "card": {
+      "trueValue":     "WARTOŚĆ",
+      "buyNow":        "KUP TERAZ",
+      "buyNowArrow":   "Kup teraz →",
+      "viewAsset":     "Zobacz →",
+      "liveAuction":   "Aukcja na żywo",
+      "uniqueEdition": "1 z 1 · Unikalna edycja",
+      "available":     "1 dostępny · Bądź pierwszy",
+      "soldOut":       "WYPRZEDANE · potrzeba {n} więcej graczy",
+      "secondaryOnly": "Tylko rynek wtórny",
+      "allClaimed":    "Wszystkie zajęte",
+      "onlyOneLeft":   "Ostatnia sztuka",
+      "soldToday":     "{n} sprzedane dziś",
+      "lastSold":      "Ostatnia sprzedaż {price}",
+      "watching":      "{n} obserwuje",
+      "freeToOwn":     "Bezpłatne · Brak utrzymania",
+      "netPositive":   "+{n}/mies. netto",
+      "netNegative":   "−{n}/mies. netto",
+      "trendAbove":    "↑ +{pct}% powyżej wartości",
+      "trendBelow":    "↓ {pct}% poniżej wartości"
+    }
+  },
+  "feed": {
+    "title":       "Aktualności",
+    "subtitle":    "Co się dzieje w gospodarce",
+    "emptyFilter": "Brak aktywności w kategorii {filter}.",
+    "emptyAll":    "Brak aktywności. Kup coś!",
+    "all":         "Wszystkie",
+    "more":        "Więcej ▾",
+    "biggestMove": "🔥 NAJWIĘKSZY RUCH DZIŚ",
+    "viewAsset":   "Zobacz →",
+    "event": {
+      "bought":         "kupił {item} za {amt}",
+      "boughtNoAmt":    "kupił {item}",
+      "sold":           "sprzedał {item} za {amt}",
+      "soldNoAmt":      "sprzedał {item}",
+      "offered":        "zaproponował {amt} za {item}",
+      "accepted":       "przyjął {amt} za {item}",
+      "auctionStart":   "rozpoczął aukcję na {item}",
+      "auctionEnd":     "wygrał {item} za {amt} na aukcji",
+      "auctionEndNoAmt":"wygrał {item} na aukcji",
+      "crafted":        "stworzył nowy przedmiot: {item}"
+    },
+    "type": {
+      "purchase":   "ZAKUP",
+      "sale":       "SPRZEDAŻ",
+      "offer":      "OFERTA",
+      "auction":    "AUKCJA",
+      "auctionWin": "WYGRANA",
+      "newItem":    "NOWY PRZEDMIOT",
+      "post":       "POST",
+      "achievement":"OSIĄGNIĘCIE",
+      "income":     "DOCHÓD",
+      "market":     "RYNEK"
+    },
+    "meta": {
+      "paid":     "Zapłacono {amt}",
+      "received": "Otrzymano {amt}",
+      "wonFor":   "Wygrano za {amt}",
+      "owner":    "Właściciel @{username}",
+      "buyer":    "Kupiec @{username}"
+    },
+    "verdict": {
+      "smartBuy":    "📉 {pct}% poniżej rynku · Dobry zakup",
+      "overpaid":    "📈 {pct}% powyżej rynku · Przepłacono",
+      "fairPrice":   "Cena rynkowa",
+      "lowball":     "😬 Za nisko — {pct}% poniżej rynku",
+      "belowAsk":    "{pct}% poniżej ceny",
+      "strongOffer": "📈 Powyżej rynku · Mocna oferta",
+      "greatFlip":   "💰 {pct}% powyżej rynku · Świetny flip",
+      "underSold":   "{pct}% poniżej rynku · Za tanio",
+      "fairSale":    "Uczciwa sprzedaż",
+      "bargain":     "💰 Wygrano {pct}% poniżej rynku · Okazja",
+      "paidUp":      "{pct}% powyżej rynku · Przepłacono"
+    },
+    "comment": {
+      "prompt0":     "Dobry zakup?",
+      "prompt1":     "Przepłacono?",
+      "prompt2":     "Przyszły klasyk?",
+      "prompt3":     "Sprzedaj z zyskiem!",
+      "prompt4":     "Trzymaj!",
+      "placeholder": "Dodaj komentarz…",
+      "post":        "Wyślij",
+      "count":       "Komentarz",
+      "offerSent":   "Oferta wysłana ✓",
+      "makeOffer":   "Złóż ofertę",
+      "cancel":      "Anuluj"
+    },
+    "offer": {
+      "marketValue": "Wartość rynkowa:",
+      "vsMarket":    "% vs rynek",
+      "send":        "Wyślij"
+    },
+    "quickSell": {
+      "title":       "Szybka sprzedaż",
+      "subtitle":    "Wystaw przedmiot z twojego Minta",
+      "success":     "Wystawiono pomyślnie!",
+      "loading":     "Ładowanie przedmiotów…",
+      "empty":       "Brak przedmiotów do wystawienia.",
+      "selectLabel": "Wybierz przedmiot",
+      "selectPlaceholder": "Wybierz…",
+      "listed":      "(wystawiony)",
+      "lastSale":    "Ostatnia sprzedaż:",
+      "priceLabel":  "Cena wywoławcza (USD)",
+      "submitting":  "Wystawianie…",
+      "submit":      "Wystaw na sprzedaż",
+      "cancel":      "Anuluj",
+      "close":       "Zamknij"
+    },
+    "profile": {
+      "title":         "Profil",
+      "rank":          "Miejsce #{rank} z {total}",
+      "myMint":        "Mój Mint",
+      "quickSell":     "Szybka sprzedaż",
+      "playersOnline": "Gracze online",
+      "topPlayer":     "Gracz #1",
+      "hotToday":      "Gorące dziś"
+    },
+    "challenges": {
+      "titleRemaining": "Wyzwania · {n} pozostało",
+      "titleDone":      "Wyzwania · Wszystko zrobione!",
+      "allComplete":    "Wszystkie {total} wyzwania ukończone!",
+      "progress":       "{done}/{total} ukończone",
+      "claimed":        "ODEBRANE ✓"
+    },
+    "auctions": {
+      "title":    "Aukcje na żywo",
+      "empty":    "Brak aktywnych aukcji.",
+      "minBid":   "Min {price} · kończy się {time}",
+      "placeBid": "Licytuj →",
+      "seeAll":   "Zobacz wszystkie aukcje →"
+    },
+    "achievement": {
+      "pill":        "OSIĄGNIĘCIE",
+      "viewProfile": "Zobacz profil →"
+    },
+    "market": {
+      "pill":           "RYNEK",
+      "browseCategory": "Przeglądaj {category} →",
+      "browseAll":      "Przeglądaj rynek →"
+    }
   }
 }

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { PROPERTY_TIER_DEFS, monthlyPropertyNet } from '@/lib/property'
 
 interface Edition {
@@ -68,31 +69,31 @@ function fmt(n: string | null) {
   return '$' + Number(n).toLocaleString()
 }
 
-function trendSignal(editions: Edition[], benchmarkPrice: string): { label: string; colour: string } | null {
+// Returns pct delta; caller formats the string with t()
+function trendSignal(editions: Edition[], benchmarkPrice: string): { pct: number } | null {
   const lastSale = editions.find(e => e.lastSalePrice)
   if (!lastSale?.lastSalePrice) return null
   const pct = ((Number(lastSale.lastSalePrice) - Number(benchmarkPrice)) / Number(benchmarkPrice)) * 100
   if (Math.abs(pct) < 2) return null
-  return pct > 0
-    ? { label: `↑ +${pct.toFixed(0)}% above value`, colour: 'var(--green)' }
-    : { label: `↓ ${pct.toFixed(0)}% below value`,  colour: 'var(--red)' }
+  return { pct }
 }
 
-function scarcityLine(editions: Edition[], totalSupply: number): { text: string; urgent: boolean } | null {
-  const available  = editions.filter(e => !e.currentOwnerId).length
-  const claimed    = editions.filter(e => e.currentOwnerId).length
+// Returns structured scarcity info; caller formats the string with t()
+function scarcityLine(editions: Edition[]): { type: 'soldToday' | 'onlyOne' | 'allClaimed'; n?: number; urgent: boolean } | null {
+  const available = editions.filter(e => !e.currentOwnerId).length
+  const claimed   = editions.filter(e => e.currentOwnerId).length
+  const DAY       = 86400000
+  const soldToday = editions.filter(e => e.lastSaleDate && Date.now() - new Date(e.lastSaleDate).getTime() < DAY).length
 
-  const DAY = 86400000
-  const soldToday  = editions.filter(e => e.lastSaleDate && Date.now() - new Date(e.lastSaleDate).getTime() < DAY).length
-
-  if (soldToday > 0) return { text: `${soldToday} sold today`, urgent: true }
-  if (available === 1 && claimed > 0) return { text: 'Only 1 left', urgent: true }
-  if (available === 0 && claimed > 0) return { text: 'All claimed', urgent: false }
+  if (soldToday > 0) return { type: 'soldToday', n: soldToday, urgent: true }
+  if (available === 1 && claimed > 0) return { type: 'onlyOne', urgent: true }
+  if (available === 0 && claimed > 0) return { type: 'allClaimed', urgent: false }
   return null
 }
 
 function MarketplaceCard({ item, userId, scarcityOn, membersNeeded }: { item: Item; userId: string | null; scarcityOn: boolean; membersNeeded: number }) {
   const router = useRouter()
+  const t = useTranslations('marketplace')
   const [hovered, setHovered] = useState(false)
 
   const listedEdition  = item.editions.find(e => e.isListed)
@@ -102,10 +103,17 @@ function MarketplaceCard({ item, userId, scarcityOn, membersNeeded }: { item: It
   const editionId      = listedEdition?.id ?? auctionEdition?.id ?? item.editions[0]?.id
   const lastSold       = listedEdition?.lastSalePrice ?? item.editions.find(e => e.lastSalePrice)?.lastSalePrice ?? null
   const trend          = trendSignal(item.editions, item.benchmarkPrice)
-  const scarcity       = scarcityLine(item.editions, item.totalSupply)
+  const scarcity       = scarcityLine(item.editions)
   const soldOut        = scarcityOn && availableCount === 0 && item.editions.some(e => e.currentOwnerId)
 
   const href = editionId ? `/item/${editionId}` : '#'
+
+  function scarcityText() {
+    if (!scarcity) return null
+    if (scarcity.type === 'soldToday') return t('card.soldToday', { n: scarcity.n ?? 0 })
+    if (scarcity.type === 'onlyOne')   return t('card.onlyOneLeft')
+    return t('card.allClaimed')
+  }
 
   return (
     <div
@@ -156,30 +164,38 @@ function MarketplaceCard({ item, userId, scarcityOn, membersNeeded }: { item: It
           <span style={{ fontSize: 10, fontWeight: 800, color: colour, flexShrink: 0, marginLeft: 6 }}>{item.rarityTier.toUpperCase()}</span>
         </div>
 
-        <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginBottom: 1 }}>TRUE VALUE</div>
+        <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginBottom: 1 }}>{t('card.trueValue')}</div>
         <div className="item-card-price">{fmt(item.benchmarkPrice)}</div>
 
         {/* Trend line */}
         {trend && (
-          <div style={{ fontSize: 11, color: trend.colour, fontWeight: 700, marginBottom: 2 }}>{trend.label}</div>
+          <div style={{ fontSize: 11, color: trend.pct > 0 ? 'var(--green)' : 'var(--red)', fontWeight: 700, marginBottom: 2 }}>
+            {trend.pct > 0
+              ? t('card.trendAbove', { pct: trend.pct.toFixed(0) })
+              : t('card.trendBelow', { pct: Math.abs(trend.pct).toFixed(0) })
+            }
+          </div>
         )}
         {!trend && item.watcherCount > 0 && (
-          <div style={{ fontSize: 11, color: 'var(--gold)', fontWeight: 700, marginBottom: 2 }}>🔥 {item.watcherCount} watching</div>
+          <div style={{ fontSize: 11, color: 'var(--gold)', fontWeight: 700, marginBottom: 2 }}>🔥 {t('card.watching', { n: item.watcherCount })}</div>
         )}
 
         {lastSold && (
-          <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 2 }}>Last sold {fmt(lastSold)}</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 2 }}>{t('card.lastSold', { price: fmt(lastSold) ?? '' })}</div>
         )}
 
         {/* Property monthly net */}
         {item.propertyTier && (() => {
           const net = monthlyPropertyNet(item.propertyTier, Number(item.benchmarkPrice))
           if (item.propertyTier === 'rent_free') {
-            return <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>Free to own · No upkeep</div>
+            return <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>{t('card.freeToOwn')}</div>
           }
           return (
             <div style={{ fontSize: 11, color: net >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 700, marginBottom: 4 }}>
-              {net >= 0 ? '+' : '−'}${Math.abs(net).toLocaleString()}/mo net
+              {net >= 0
+                ? t('card.netPositive', { n: `$${Math.abs(net).toLocaleString()}` })
+                : t('card.netNegative', { n: `$${Math.abs(net).toLocaleString()}` })
+              }
             </div>
           )
         })()}
@@ -195,21 +211,21 @@ function MarketplaceCard({ item, userId, scarcityOn, membersNeeded }: { item: It
         {/* Availability / scarcity */}
         <div className="item-card-edition">
           {auctionEdition
-            ? <span style={{ color: colour, fontWeight: 700 }}>Live auction</span>
+            ? <span style={{ color: colour, fontWeight: 700 }}>{t('card.liveAuction')}</span>
             : (item.rarityTier === 'Custom' || item.rarityTier === 'Banger')
-            ? <span style={{ color: colour, fontWeight: 700 }}>1 of 1 · Unique edition</span>
+            ? <span style={{ color: colour, fontWeight: 700 }}>{t('card.uniqueEdition')}</span>
             : soldOut
-            ? <span style={{ color: 'var(--red)', fontWeight: 700 }}>SOLD OUT · {membersNeeded} more members needed</span>
+            ? <span style={{ color: 'var(--red)', fontWeight: 700 }}>{t('card.soldOut', { n: membersNeeded })}</span>
             : scarcity
-            ? <span style={{ color: scarcity.urgent ? 'var(--red)' : 'var(--muted)', fontWeight: scarcity.urgent ? 700 : 400 }}>{scarcity.text}</span>
+            ? <span style={{ color: scarcity.urgent ? 'var(--red)' : 'var(--muted)', fontWeight: scarcity.urgent ? 700 : 400 }}>{scarcityText()}</span>
             : availableCount > 0
-            ? <span style={{ color: 'var(--green)', fontWeight: 700 }}>1 available · Get it first</span>
-            : 'Secondary market only'}
+            ? <span style={{ color: 'var(--green)', fontWeight: 700 }}>{t('card.available')}</span>
+            : t('card.secondaryOnly')}
         </div>
 
         {listedEdition && (
           <div style={{ marginTop: 6 }}>
-            <span style={{ fontSize: 11, background: 'var(--gold)', color: '#0d0d0d', fontWeight: 900, padding: '2px 8px', borderRadius: 4 }}>BUY NOW</span>
+            <span style={{ fontSize: 11, background: 'var(--gold)', color: '#0d0d0d', fontWeight: 900, padding: '2px 8px', borderRadius: 4 }}>{t('card.buyNow')}</span>
           </div>
         )}
       </div>
@@ -231,7 +247,7 @@ function MarketplaceCard({ item, userId, scarcityOn, membersNeeded }: { item: It
           onClick={e => { e.stopPropagation(); router.push(href) }}
           style={{ flex: 1, textAlign: 'center', background: 'var(--gold)', color: '#0d0d0d', fontWeight: 900, fontSize: 12, borderRadius: 6, padding: '7px 0', cursor: 'pointer' }}
         >
-          {listedEdition ? 'Buy Now →' : 'View Asset →'}
+          {listedEdition ? t('card.buyNowArrow') : t('card.viewAsset')}
         </span>
         {!listedEdition && editionId && (
           <span
@@ -248,6 +264,7 @@ function MarketplaceCard({ item, userId, scarcityOn, membersNeeded }: { item: It
 
 export default function MarketplaceClient({ items, categories, currentCategory, currentSort, query, userId, scarcityOn, membersNeeded }: Props) {
   const router = useRouter()
+  const t = useTranslations('marketplace')
   const [q, setQ] = useState(query)
   const [, startTransition] = useTransition()
 
@@ -266,13 +283,13 @@ export default function MarketplaceClient({ items, categories, currentCategory, 
 
   return (
     <div>
-      <div className="page-title">Marketplace</div>
-      <div className="page-sub">Cars, businesses, and property — buy, sell, auction.</div>
+      <div className="page-title">{t('title')}</div>
+      <div className="page-sub">{t('subtitle')}</div>
 
       <form onSubmit={handleSearch} style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 8 }}>
-          <input className="form-input" style={{ maxWidth: 360 }} placeholder="Search assets..." value={q} onChange={e => setQ(e.target.value)} />
-          <button className="btn btn-outline" type="submit">Search</button>
+          <input className="form-input" style={{ maxWidth: 360 }} placeholder={t('searchPlaceholder')} value={q} onChange={e => setQ(e.target.value)} />
+          <button className="btn btn-outline" type="submit">{t('searchButton')}</button>
         </div>
       </form>
 
@@ -289,8 +306,8 @@ export default function MarketplaceClient({ items, categories, currentCategory, 
         </select>
 
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>Sort:</span>
-          {[['newest', 'Newest'], ['price_asc', 'Price ↑'], ['price_desc', 'Price ↓']].map(([v, l]) => (
+          <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>{t('sortLabel')}</span>
+          {([['newest', t('sortNewest')], ['price_asc', t('sortPriceAsc')], ['price_desc', t('sortPriceDesc')]] as [string, string][]).map(([v, l]) => (
             <button key={v} className={`pill btn-sm${currentSort === v ? ' active' : ''}`} onClick={() => nav({ category: currentCategory, sort: v, q })}>
               {l}
             </button>
@@ -300,7 +317,7 @@ export default function MarketplaceClient({ items, categories, currentCategory, 
 
 
       {items.length === 0 ? (
-        <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--muted)', fontWeight: 700 }}>No assets found.</div>
+        <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--muted)', fontWeight: 700 }}>{t('empty')}</div>
       ) : (
         <div className="items-grid">
           {items.map(item => (
