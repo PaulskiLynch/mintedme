@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -40,8 +40,6 @@ interface Props {
   challenges: ClientChallenge[]
 }
 
-const ALL_CATEGORIES = ['Cars', 'Yachts', 'Watches', 'Art', 'Fashion', 'Jets', 'Mansions', 'Collectibles', 'Businesses']
-
 const COMMENT_PROMPTS = ['Good buy?', 'Overpaid?', 'Future classic?', 'Flip it!', 'Hold it!']
 
 const TYPE_INFO: Record<string, { label: string; css: string }> = {
@@ -78,6 +76,126 @@ function timeLeft(iso: string) {
 function cap(s: string | undefined | null) {
   if (!s) return ''
   return s[0].toUpperCase() + s.slice(1)
+}
+
+// ─── Smart category filter ────────────────────────────────────────────────────
+
+const MAX_TABS = 5
+
+function CategoryFilter({ events, filter, onFilter }: {
+  events: FeedEvent[]
+  filter: string | null
+  onFilter: (cat: string | null) => void
+}) {
+  const [moreOpen, setMoreOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!moreOpen) return
+    function handleClick(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setMoreOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [moreOpen])
+
+  // Count events per category from the full (unfiltered) feed
+  const counts = new Map<string, number>()
+  for (const e of events) {
+    const cat = e.edition?.item.category?.toLowerCase()
+    if (cat) counts.set(cat, (counts.get(cat) ?? 0) + 1)
+  }
+
+  // Sort by count desc; if active filter has no events, still keep it
+  let sorted = [...counts.entries()].sort((a, b) => b[1] - a[1])
+  if (filter && !counts.has(filter)) sorted = [[filter, 0], ...sorted]
+
+  // Split into visible row and overflow
+  let visible = sorted.slice(0, MAX_TABS)
+  let overflow = sorted.slice(MAX_TABS)
+
+  // If the active filter landed in overflow, swap it with the last visible tab
+  if (filter && overflow.some(([c]) => c === filter)) {
+    const idx = overflow.findIndex(([c]) => c === filter)
+    const [active] = overflow.splice(idx, 1)
+    const displaced = visible.pop()!
+    overflow.unshift(displaced)
+    visible.push(active)
+  }
+
+  const overflowHasActive = overflow.some(([c]) => c === filter)
+
+  const tabStyle = (active: boolean): React.CSSProperties => ({
+    padding: '6px 14px',
+    border: 'none',
+    borderBottom: `2px solid ${active ? 'var(--gold)' : 'transparent'}`,
+    marginBottom: -1,
+    fontSize: 12,
+    fontWeight: active ? 700 : 600,
+    cursor: 'pointer',
+    background: 'transparent',
+    color: active ? 'var(--gold)' : 'var(--muted)',
+    whiteSpace: 'nowrap',
+    transition: 'color 0.15s, border-color 0.15s',
+  })
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)', marginBottom: 24, overflowX: 'auto', scrollbarWidth: 'none' }}>
+      <button style={tabStyle(!filter)} onClick={() => onFilter(null)}>All</button>
+
+      {visible.map(([cat, count]) => (
+        <button
+          key={cat}
+          style={tabStyle(filter === cat)}
+          onClick={() => onFilter(filter === cat ? null : cat)}
+        >
+          {cap(cat)}
+          {count > 0 && <span style={{ marginLeft: 4, fontSize: 10, opacity: 0.55 }}>{count}</span>}
+        </button>
+      ))}
+
+      {overflow.length > 0 && (
+        <div ref={dropdownRef} style={{ position: 'relative', flexShrink: 0 }}>
+          <button
+            style={{ ...tabStyle(overflowHasActive), paddingRight: 10 }}
+            onClick={() => setMoreOpen(p => !p)}
+          >
+            {overflowHasActive ? `${cap(filter!)} ▾` : `More ▾`}
+          </button>
+          {moreOpen && (
+            <div style={{
+              position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 50,
+              background: 'var(--bg2)', border: '1px solid var(--border)',
+              borderRadius: 8, padding: 4, minWidth: 150,
+              boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+            }}>
+              {overflow.map(([cat, count]) => (
+                <button
+                  key={cat}
+                  onClick={() => { onFilter(filter === cat ? null : cat); setMoreOpen(false) }}
+                  style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    width: '100%', padding: '8px 12px',
+                    background: filter === cat ? 'rgba(200,169,110,0.1)' : 'transparent',
+                    border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13,
+                    color: filter === cat ? 'var(--gold)' : 'var(--white)',
+                    fontWeight: filter === cat ? 700 : 400,
+                    textTransform: 'capitalize', textAlign: 'left',
+                  }}
+                >
+                  <span>{cat}</span>
+                  {count > 0 && <span style={{ fontSize: 11, color: 'var(--muted)', marginLeft: 12 }}>{count}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function eventText(e: FeedEvent): string {
@@ -733,16 +851,8 @@ export default function FeedClient({
           </div>
         </div>
 
-        {/* Category filter */}
-        <div className="interest-chips" style={{ marginBottom: 24 }}>
-          <button className={`chip${!filter ? ' active' : ''}`} onClick={() => setFilter(null)}>All</button>
-          {ALL_CATEGORIES.map(cat => (
-            <button key={cat} className={`chip${filter === cat.toLowerCase() ? ' active' : ''}`}
-              onClick={() => setFilter(filter === cat.toLowerCase() ? null : cat.toLowerCase())}>
-              {cat}
-            </button>
-          ))}
-        </div>
+        {/* Category filter — dynamic, shows only active categories */}
+        <CategoryFilter events={visibleEvents} filter={filter} onFilter={setFilter} />
 
         {/* Feed */}
         {filteredEvents.length === 0 ? (
