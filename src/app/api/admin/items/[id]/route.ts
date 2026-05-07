@@ -126,6 +126,70 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     } catch { return NextResponse.json({ error: 'Failed' }, { status: 500 }) }
   }
 
+  if (action === 'push_auction') {
+    const AUCTION_DURATION_MS = 24 * 60 * 60 * 1000
+    try {
+      const item = await prisma.item.findUnique({
+        where:  { id },
+        select: { name: true, benchmarkPrice: true, rarityTier: true, totalSupply: true, isApproved: true },
+      })
+      if (!item) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+      if (!item.isApproved) return NextResponse.json({ error: 'Approve the item before pushing to auction' }, { status: 400 })
+
+      // Find an unowned, available edition
+      let edition = await prisma.itemEdition.findFirst({
+        where: { itemId: id, currentOwnerId: null, isInAuction: false, isFrozen: false },
+      })
+
+      // If none exists, mint one if supply allows
+      if (!edition) {
+        const existingCount = await prisma.itemEdition.count({ where: { itemId: id } })
+        if (existingCount >= item.totalSupply) {
+          return NextResponse.json({ error: 'All editions owned — no supply available to auction' }, { status: 400 })
+        }
+        const maxEdition = await prisma.itemEdition.findFirst({
+          where: { itemId: id }, orderBy: { editionNumber: 'desc' }, select: { editionNumber: true },
+        })
+        edition = await prisma.itemEdition.create({
+          data: { itemId: id, editionNumber: (maxEdition?.editionNumber ?? 0) + 1 },
+        })
+      }
+
+      const startingBid = Math.round(Number(item.benchmarkPrice) * 0.10)
+      const endsAt      = new Date(Date.now() + AUCTION_DURATION_MS)
+
+      const auction = await prisma.$transaction(async (tx) => {
+        const a = await tx.auction.create({
+          data: {
+            editionId:       edition!.id,
+            sellerId:        null,
+            minimumBid:      startingBid,
+            benchmarkPrice:  Number(item.benchmarkPrice),
+            rarityTier:      item.rarityTier,
+            status:          'active',
+            startsAt:        new Date(),
+            endsAt,
+            isSystemAuction: true,
+          },
+        })
+        await tx.itemEdition.update({ where: { id: edition!.id }, data: { isInAuction: true } })
+        return a
+      })
+
+      await logAdminAction({
+        adminUserId: session.user.id!,
+        action:      'admin_item_push_auction',
+        targetType:  'item',
+        targetId:    id,
+        after:       { auctionId: auction.id, item: item.name, startingBid, endsAt: endsAt.toISOString() },
+      })
+
+      return NextResponse.json({ ok: true, auctionId: auction.id })
+    } catch (e) {
+      return NextResponse.json({ error: String(e) }, { status: 500 })
+    }
+  }
+
   const data =
     action === 'approve'  ? { isApproved: true,  isFrozen: false } :
     action === 'reject'   ? { isApproved: false } :

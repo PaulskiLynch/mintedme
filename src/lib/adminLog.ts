@@ -15,6 +15,7 @@ export type AdminAction =
   | 'admin_item_reject'
   | 'admin_item_freeze'
   | 'admin_item_unfreeze'
+  | 'admin_item_push_auction'
   | 'admin_auction_activate'
   | 'admin_auction_edit'
   | 'admin_auction_cancel'
