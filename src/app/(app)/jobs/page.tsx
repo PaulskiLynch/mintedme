@@ -1,13 +1,14 @@
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
+import { getTranslations } from 'next-intl/server'
 import { JOB_BY_CODE, dailyShuffledJobs, activeJobCount } from '@/lib/jobs'
 import JobsClient from './JobsClient'
 
 export const dynamic = 'force-dynamic'
 
 export default async function JobsPage() {
-  const session = await auth()
-  const userId  = session?.user?.id ?? null
+  const [session, t] = await Promise.all([auth(), getTranslations('jobs')])
+  const userId = session?.user?.id ?? null
 
   const [userCount, holdings, auctions, myJob, myActiveBid] = await Promise.all([
     prisma.user.count(),
@@ -57,7 +58,6 @@ export default async function JobsPage() {
 
   const myJobTitle = myJob ? (JOB_BY_CODE[myJob.jobCode]?.title ?? null) : null
 
-  // Next refresh: tomorrow midnight (when the daily shuffle resets)
   const now       = new Date()
   const tomorrow  = new Date(now)
   tomorrow.setDate(tomorrow.getDate() + 1)
@@ -67,28 +67,26 @@ export default async function JobsPage() {
   return (
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-        <h1 style={{ fontWeight: 900, fontSize: 22, margin: 0 }}>Jobs</h1>
+        <h1 style={{ fontWeight: 900, fontSize: 22, margin: 0 }}>{t('title')}</h1>
         <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'right' }}>
-          <div style={{ fontWeight: 700 }}>{activeCount} of {40} roles today</div>
-          <div>Rotates daily · 1 slot each</div>
+          <div style={{ fontWeight: 700 }}>{t('rolesCount', { n: activeCount })}</div>
+          <div>{t('rotatesNote')}</div>
         </div>
       </div>
-      <p style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 28 }}>
-        Bid via reverse auction — lowest salary bid wins. One job at a time, paid monthly.
-      </p>
+      <p style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 28 }}>{t('subtitle')}</p>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 28 }}>
         <div style={{ background: 'var(--bg2)', borderRadius: 10, padding: '14px 16px', textAlign: 'center' }}>
           <div style={{ fontSize: 22, fontWeight: 900 }}>{activeCount}</div>
-          <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginTop: 2 }}>TODAY&apos;S ROLES</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginTop: 2 }}>{t('todayRoles')}</div>
         </div>
         <div style={{ background: 'var(--bg2)', borderRadius: 10, padding: '14px 16px', textAlign: 'center' }}>
           <div style={{ fontSize: 22, fontWeight: 900 }}>{totalHeld}</div>
-          <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginTop: 2 }}>FILLED</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginTop: 2 }}>{t('filled')}</div>
         </div>
         <div style={{ background: 'var(--bg2)', borderRadius: 10, padding: '14px 16px', textAlign: 'center' }}>
           <div style={{ fontSize: 22, fontWeight: 900, color: openSlots > 0 ? 'var(--green)' : 'var(--red)' }}>{openSlots}</div>
-          <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginTop: 2 }}>OPEN</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginTop: 2 }}>{t('open')}</div>
         </div>
       </div>
 

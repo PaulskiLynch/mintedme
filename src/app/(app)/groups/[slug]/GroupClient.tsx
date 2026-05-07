@@ -4,6 +4,7 @@ import { useState, useTransition, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
+import { useTranslations } from 'next-intl'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -41,10 +42,11 @@ function fmt(n: number | string) {
 // ─── Invite panel ─────────────────────────────────────────────────────────────
 
 function InvitePanel({ slug }: { slug: string }) {
-  const [query, setQuery]   = useState('')
+  const t = useTranslations('groups')
+  const [query, setQuery]     = useState('')
   const [results, setResults] = useState<{ id: string; username: string; avatarUrl: string | null }[]>([])
   const [loading, setLoading] = useState(false)
-  const [status, setStatus]  = useState<Record<string, 'inviting' | 'done' | 'error'>>({})
+  const [status, setStatus]   = useState<Record<string, 'inviting' | 'done' | 'error'>>({})
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -79,7 +81,7 @@ function InvitePanel({ slug }: { slug: string }) {
         onChange={e => setQuery(e.target.value)}
         style={{ maxWidth: '100%', marginBottom: 8 }}
       />
-      {loading && <div style={{ fontSize: 12, color: 'var(--muted)' }}>Searching...</div>}
+      {loading && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{t('searching')}</div>}
       {results.map(u => (
         <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
           <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
@@ -99,12 +101,15 @@ function InvitePanel({ slug }: { slug: string }) {
               fontSize: 12, fontWeight: 800, cursor: status[u.id] ? 'default' : 'pointer',
             }}
           >
-            {status[u.id] === 'inviting' ? '...' : status[u.id] === 'done' ? 'Added ✓' : status[u.id] === 'error' ? 'Failed' : 'Invite'}
+            {status[u.id] === 'inviting' ? '...'
+              : status[u.id] === 'done'     ? t('added')
+              : status[u.id] === 'error'    ? t('failed')
+              : t('invite')}
           </button>
         </div>
       ))}
       {query.length >= 2 && !loading && results.length === 0 && (
-        <div style={{ fontSize: 12, color: 'var(--muted)' }}>No users found.</div>
+        <div style={{ fontSize: 12, color: 'var(--muted)' }}>{t('noUsersFound')}</div>
       )}
     </div>
   )
@@ -116,12 +121,12 @@ function ChatPanel({ slug, myUsername, myAvatarUrl, initialMessages }: {
   slug: string; myUsername: string; myAvatarUrl: string | null
   initialMessages: ChatMessage[]
 }) {
+  const t = useTranslations('groups')
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [draft, setDraft]       = useState('')
   const [sending, setSending]   = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // Poll for new messages every 10s
   useEffect(() => {
     const id = setInterval(async () => {
       const res  = await fetch(`/api/groups/${slug}/messages`)
@@ -157,11 +162,10 @@ function ChatPanel({ slug, myUsername, myAvatarUrl, initialMessages }: {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Message list — newest first */}
       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
         {messages.length === 0 && (
           <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-            No messages yet. Say something!
+            {t('noMessages')}
           </div>
         )}
         {messages.map(m => (
@@ -190,18 +194,17 @@ function ChatPanel({ slug, myUsername, myAvatarUrl, initialMessages }: {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
       <form onSubmit={send} style={{ display: 'flex', gap: 8, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
         <input
           className="form-input"
-          placeholder="Message..."
+          placeholder={t('messagePlaceholder')}
           value={draft}
           onChange={e => setDraft(e.target.value)}
           maxLength={1000}
           style={{ flex: 1 }}
         />
         <button type="submit" className="btn btn-primary" disabled={sending || !draft.trim()} style={{ flexShrink: 0 }}>
-          Send
+          {t('sendMessage')}
         </button>
       </form>
     </div>
@@ -211,6 +214,7 @@ function ChatPanel({ slug, myUsername, myAvatarUrl, initialMessages }: {
 // ─── Join form ────────────────────────────────────────────────────────────────
 
 function JoinForm({ slug, joinType, onJoined }: { slug: string; joinType: string; onJoined: () => void }) {
+  const t = useTranslations('groups')
   const [code, setCode]   = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -232,7 +236,7 @@ function JoinForm({ slug, joinType, onJoined }: { slug: string; joinType: string
       {joinType === 'invite_only' && (
         <input
           className="form-input"
-          placeholder="Invite code"
+          placeholder={t('inviteCode')}
           value={code}
           onChange={e => setCode(e.target.value.toUpperCase())}
           style={{ maxWidth: 180, letterSpacing: '0.1em', fontWeight: 700 }}
@@ -241,7 +245,7 @@ function JoinForm({ slug, joinType, onJoined }: { slug: string; joinType: string
       )}
       {error && <div style={{ fontSize: 12, color: 'var(--red)' }}>{error}</div>}
       <button className="btn btn-primary" onClick={join} disabled={loading || (joinType === 'invite_only' && !code)}>
-        {loading ? 'Joining...' : 'Join Group'}
+        {loading ? t('joining') : t('joinGroup')}
       </button>
     </div>
   )
@@ -255,12 +259,13 @@ export default function GroupClient({
   userId, myUsername, myAvatarUrl,
   leaderboard, stats, initialMessages,
 }: Props) {
+  const t = useTranslations('groups')
   const router = useRouter()
   const [, startTransition] = useTransition()
-  const [joined, setJoined] = useState(isMember)
-  const [leaving, setLeaving] = useState(false)
+  const [joined, setJoined]       = useState(isMember)
+  const [leaving, setLeaving]     = useState(false)
   const [leaveError, setLeaveError] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied]       = useState(false)
   const [activeTab, setActiveTab] = useState<'leaderboard' | 'members' | 'chat'>('leaderboard')
 
   const myRank = leaderboard.findIndex(m => m.userId === userId) + 1
@@ -308,9 +313,9 @@ export default function GroupClient({
               </div>
               {description && <p style={{ margin: '0 0 6px', fontSize: 13, color: 'var(--muted)' }}>{description}</p>}
               <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', gap: 12 }}>
-                <span><strong style={{ color: 'var(--white)' }}>{memberCount}</strong> member{memberCount !== 1 ? 's' : ''}</span>
-                {maxMembers && <span>· max {maxMembers}</span>}
-                {joined && myRank > 0 && <span>· You&apos;re <strong style={{ color: 'var(--gold)' }}>#{myRank}</strong></span>}
+                <span>{t('memberCount', { n: memberCount })}</span>
+                {maxMembers && <span>{t('maxMembers', { n: maxMembers })}</span>}
+                {joined && myRank > 0 && <span>{t('yourRankDisplay', { n: myRank })}</span>}
               </div>
             </div>
           </div>
@@ -321,14 +326,14 @@ export default function GroupClient({
               <>
                 {inviteCode && (
                   <button onClick={copyCode} className="btn btn-outline" style={{ fontSize: 12 }}>
-                    {copied ? '✓ Copied!' : '🔗 Copy Invite Code'}
+                    {copied ? t('copied') : t('copyInviteCode')}
                   </button>
                 )}
                 <button
                   onClick={leave} disabled={leaving}
                   style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 12, cursor: 'pointer', fontWeight: 600, padding: '4px 0' }}
                 >
-                  {leaving ? 'Leaving...' : isOwner ? 'Leave / Dissolve' : 'Leave group'}
+                  {leaving ? t('leaving') : isOwner ? t('leaveDissolve') : t('leaveGroup')}
                 </button>
                 {leaveError && <div style={{ fontSize: 12, color: 'var(--red)' }}>{leaveError}</div>}
               </>
@@ -343,19 +348,19 @@ export default function GroupClient({
       {joined && (
         <div className="stats-row" style={{ marginBottom: 28 }}>
           <div className="stat-box">
-            <div className="stat-label">Group Net Worth</div>
+            <div className="stat-label">{t('statNetWorth')}</div>
             <div className="stat-value">{fmt(stats.totalNetWorth)}</div>
           </div>
           <div className="stat-box">
-            <div className="stat-label">Avg Balance</div>
+            <div className="stat-label">{t('statAvgBalance')}</div>
             <div className="stat-value">{fmt(stats.avgBalance)}</div>
           </div>
           <div className="stat-box">
-            <div className="stat-label">Members</div>
+            <div className="stat-label">{t('statMembers')}</div>
             <div className="stat-value">{memberCount}{maxMembers ? ` / ${maxMembers}` : ''}</div>
           </div>
           <div className="stat-box">
-            <div className="stat-label">Your Rank</div>
+            <div className="stat-label">{t('statYourRank')}</div>
             <div className="stat-value" style={{ color: 'var(--gold)' }}>#{myRank > 0 ? myRank : '—'}</div>
           </div>
         </div>
@@ -365,9 +370,9 @@ export default function GroupClient({
       {joined ? (
         <>
           <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
-            <button style={tabStyle(activeTab === 'leaderboard')} onClick={() => setActiveTab('leaderboard')}>Leaderboard</button>
-            <button style={tabStyle(activeTab === 'members')}     onClick={() => setActiveTab('members')}>Members</button>
-            <button style={tabStyle(activeTab === 'chat')}        onClick={() => setActiveTab('chat')}>Chat</button>
+            <button style={tabStyle(activeTab === 'leaderboard')} onClick={() => setActiveTab('leaderboard')}>{t('tabLeaderboard')}</button>
+            <button style={tabStyle(activeTab === 'members')}     onClick={() => setActiveTab('members')}>{t('tabMembers')}</button>
+            <button style={tabStyle(activeTab === 'chat')}        onClick={() => setActiveTab('chat')}>{t('tabChat')}</button>
           </div>
 
           {/* Leaderboard tab */}
@@ -404,7 +409,7 @@ export default function GroupClient({
                       color: m.userId === userId ? 'var(--gold)' : 'var(--white)',
                     }}>
                       @{m.username}
-                      {m.role === 'owner' && <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 6 }}>owner</span>}
+                      {m.role === 'owner' && <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 6 }}>{t('roleOwner')}</span>}
                     </div>
                   </div>
 
@@ -412,7 +417,9 @@ export default function GroupClient({
                     <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--white)' }}>{fmt(m.balance)}</div>
                     {m.weeklyPct !== 0 && (
                       <div style={{ fontSize: 11, fontWeight: 700, color: m.weeklyPct > 0 ? 'var(--green)' : 'var(--red)' }}>
-                        {m.weeklyPct > 0 ? '+' : ''}{m.weeklyPct}% this week
+                        {m.weeklyPct > 0
+                          ? t('weeklyPctPos', { pct: m.weeklyPct })
+                          : t('weeklyPct', { pct: m.weeklyPct })}
                       </div>
                     )}
                   </div>
@@ -426,15 +433,15 @@ export default function GroupClient({
             <div>
               {isOwner && (
                 <div className="panel" style={{ marginBottom: 20 }}>
-                  <div className="panel-title">Invite Member</div>
+                  <div className="panel-title">{t('inviteMember')}</div>
                   <InvitePanel slug={slug} />
                   {inviteCode && (
                     <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-                      <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--muted)', letterSpacing: '0.08em', marginBottom: 6 }}>INVITE CODE</div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--muted)', letterSpacing: '0.08em', marginBottom: 6 }}>{t('inviteCodeLabel')}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <code style={{ fontSize: 16, fontWeight: 900, letterSpacing: '0.15em', color: 'var(--gold)' }}>{inviteCode}</code>
                         <button onClick={copyCode} className="btn btn-outline" style={{ fontSize: 11, padding: '3px 10px' }}>
-                          {copied ? 'Copied!' : 'Copy'}
+                          {copied ? t('copiedShort') : t('copy')}
                         </button>
                       </div>
                     </div>
@@ -460,7 +467,7 @@ export default function GroupClient({
                         @{m.username}
                       </Link>
                       <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                        {m.role === 'owner' ? 'Owner' : 'Member'} · joined {formatDistanceToNow(new Date(m.joinedAt), { addSuffix: true })}
+                        {m.role === 'owner' ? t('roleOwnerFull') : t('roleMember')} · {t('joinedAt', { time: formatDistanceToNow(new Date(m.joinedAt), { addSuffix: true }) })}
                       </div>
                     </div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--white)', flexShrink: 0 }}>{fmt(m.balance)}</div>
@@ -478,9 +485,8 @@ export default function GroupClient({
           )}
         </>
       ) : (
-        /* Not a member — preview only */
         <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--muted)', fontWeight: 700 }}>
-          Join this group to see the leaderboard and chat.
+          {t('joinPrompt')}
         </div>
       )}
     </div>

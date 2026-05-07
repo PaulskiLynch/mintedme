@@ -2,16 +2,18 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 
 export default function NewGroupPage() {
+  const t = useTranslations('groups.new')
   const router = useRouter()
   const [, startTransition] = useTransition()
-  const [name, setName] = useState('')
+  const [name, setName]           = useState('')
   const [description, setDescription] = useState('')
-  const [joinType, setJoinType] = useState<'open' | 'invite_only'>('open')
+  const [joinType, setJoinType]   = useState<'open' | 'invite_only'>('open')
   const [maxMembers, setMaxMembers] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [error, setError]         = useState<string | null>(null)
+  const [loading, setLoading]     = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -34,17 +36,17 @@ export default function NewGroupPage() {
 
   return (
     <div style={{ maxWidth: 500 }}>
-      <div className="page-title">Create Group</div>
-      <div className="page-sub" style={{ marginBottom: 32 }}>Start a crew, run a leaderboard.</div>
+      <div className="page-title">{t('title')}</div>
+      <div className="page-sub" style={{ marginBottom: 32 }}>{t('subtitle')}</div>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div>
           <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: 'var(--muted)', letterSpacing: '0.08em', marginBottom: 6 }}>
-            GROUP NAME *
+            {t('nameLabel')}
           </label>
           <input
             className="form-input"
-            placeholder="e.g. Car Collectors Club"
+            placeholder={t('namePlaceholder')}
             value={name}
             onChange={e => setName(e.target.value)}
             required
@@ -54,11 +56,11 @@ export default function NewGroupPage() {
 
         <div>
           <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: 'var(--muted)', letterSpacing: '0.08em', marginBottom: 6 }}>
-            DESCRIPTION
+            {t('descriptionLabel')}
           </label>
           <textarea
             className="form-input"
-            placeholder="What's this group about?"
+            placeholder={t('descriptionPlaceholder')}
             value={description}
             onChange={e => setDescription(e.target.value)}
             maxLength={280}
@@ -69,40 +71,40 @@ export default function NewGroupPage() {
 
         <div>
           <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: 'var(--muted)', letterSpacing: '0.08em', marginBottom: 10 }}>
-            MEMBERSHIP
+            {t('membershipLabel')}
           </label>
           <div style={{ display: 'flex', gap: 10 }}>
-            {(['open', 'invite_only'] as const).map(t => (
+            {(['open', 'invite_only'] as const).map(type => (
               <button
-                key={t}
+                key={type}
                 type="button"
-                onClick={() => setJoinType(t)}
+                onClick={() => setJoinType(type)}
                 style={{
-                  flex: 1, padding: '10px 0', border: `1px solid ${joinType === t ? 'var(--gold)' : 'var(--border)'}`,
-                  borderRadius: 8, background: joinType === t ? 'rgba(200,169,110,0.1)' : 'var(--bg2)',
-                  color: joinType === t ? 'var(--gold)' : 'var(--muted)',
+                  flex: 1, padding: '10px 0', border: `1px solid ${joinType === type ? 'var(--gold)' : 'var(--border)'}`,
+                  borderRadius: 8, background: joinType === type ? 'rgba(200,169,110,0.1)' : 'var(--bg2)',
+                  color: joinType === type ? 'var(--gold)' : 'var(--muted)',
                   fontWeight: 700, fontSize: 13, cursor: 'pointer',
                 }}
               >
-                {t === 'open' ? '🌐 Open' : '🔒 Invite Only'}
+                {type === 'open' ? t('open') : t('inviteOnly')}
               </button>
             ))}
           </div>
           <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
-            {joinType === 'open' ? 'Anyone can join.' : 'Members join via invite code (shown after creation).'}
+            {joinType === 'open' ? t('openNote') : t('inviteOnlyNote')}
           </div>
         </div>
 
         <div>
           <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: 'var(--muted)', letterSpacing: '0.08em', marginBottom: 6 }}>
-            MAX MEMBERS <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+            {t('maxMembersLabel')} <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>{t('maxMembersOptional')}</span>
           </label>
           <input
             className="form-input"
             type="number"
             min={2}
             max={1000}
-            placeholder="No limit"
+            placeholder={t('maxMembersPlaceholder')}
             value={maxMembers}
             onChange={e => setMaxMembers(e.target.value)}
             style={{ maxWidth: 160 }}
@@ -113,10 +115,10 @@ export default function NewGroupPage() {
 
         <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
           <button type="submit" className="btn btn-primary" disabled={loading || !name.trim()}>
-            {loading ? 'Creating...' : 'Create Group'}
+            {loading ? t('creating') : t('submit')}
           </button>
           <button type="button" className="btn btn-outline" onClick={() => router.back()}>
-            Cancel
+            {t('cancel')}
           </button>
         </div>
       </form>

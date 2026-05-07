@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
+import { getTranslations } from 'next-intl/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,7 +15,7 @@ function fmt(n: number): string {
 }
 
 export default async function LeaderboardPage() {
-  const session = await auth()
+  const [session, t] = await Promise.all([auth(), getTranslations('leaderboard')])
   if (!session?.user?.id) redirect('/login')
 
   const users = await prisma.user.findMany({
@@ -48,7 +49,7 @@ export default async function LeaderboardPage() {
     .map((u, i) => {
       const currentRank  = i + 1
       const prev         = u.previousRank
-      const rankDelta    = prev ? prev - currentRank : null  // positive = moved up
+      const rankDelta    = prev ? prev - currentRank : null
       return { ...u, currentRank, rankDelta }
     })
 
@@ -57,25 +58,27 @@ export default async function LeaderboardPage() {
   return (
     <div>
       <div style={{ marginBottom: 28 }}>
-        <div className="page-title">Leaderboard</div>
-        <div className="page-sub">Ranked by net worth · {ranked.length} players</div>
+        <div className="page-title">{t('title')}</div>
+        <div className="page-sub">{t('subtitle', { n: ranked.length })}</div>
       </div>
 
       {/* Current user callout */}
       {myRow >= 0 && (
         <div style={{ background: '#1a1500', border: '1px solid var(--gold-dim)', borderRadius: 10, padding: '12px 16px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 13 }}>
-            <span style={{ color: 'var(--muted)' }}>Your rank </span>
+            <span style={{ color: 'var(--muted)' }}>{t('yourRank')} </span>
             <span style={{ fontWeight: 900, color: 'var(--gold)', fontSize: 18 }}>#{myRow + 1}</span>
-            <span style={{ color: 'var(--muted)' }}> of {ranked.length}</span>
+            <span style={{ color: 'var(--muted)' }}> {t('of')} {ranked.length}</span>
             {ranked[myRow].rankDelta !== null && ranked[myRow].rankDelta !== 0 && (
               <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 800, color: (ranked[myRow].rankDelta ?? 0) > 0 ? 'var(--green)' : 'var(--red)' }}>
-                {(ranked[myRow].rankDelta ?? 0) > 0 ? `↑ ${ranked[myRow].rankDelta} since last move` : `↓ ${Math.abs(ranked[myRow].rankDelta ?? 0)} since last move`}
+                {(ranked[myRow].rankDelta ?? 0) > 0
+                  ? t('movedUp',   { n: ranked[myRow].rankDelta })
+                  : t('movedDown', { n: Math.abs(ranked[myRow].rankDelta ?? 0) })}
               </span>
             )}
           </div>
           <div style={{ fontSize: 13, color: 'var(--muted)' }}>
-            Net worth <span style={{ color: 'var(--white)', fontWeight: 700 }}>{fmt(ranked[myRow].netWorth)}</span>
+            {t('netWorth')} <span style={{ color: 'var(--white)', fontWeight: 700 }}>{fmt(ranked[myRow].netWorth)}</span>
           </div>
         </div>
       )}
@@ -83,8 +86,8 @@ export default async function LeaderboardPage() {
       {/* Leaderboard list */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {ranked.map((u) => {
-          const isMe = u.id === session.user.id
-          const i    = u.currentRank - 1
+          const isMe  = u.id === session.user.id
+          const i     = u.currentRank - 1
           const delta = u.rankDelta
           const moveColour = delta === null ? 'transparent'
                            : delta > 0     ? 'var(--green)'
@@ -134,11 +137,11 @@ export default async function LeaderboardPage() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   @{u.username}
-                  {isMe && <span style={{ fontSize: 10, background: 'var(--gold)', color: '#000', fontWeight: 800, padding: '1px 6px', borderRadius: 4, marginLeft: 8 }}>YOU</span>}
+                  {isMe && <span style={{ fontSize: 10, background: 'var(--gold)', color: '#000', fontWeight: 800, padding: '1px 6px', borderRadius: 4, marginLeft: 8 }}>{t('you')}</span>}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                  {u._count.ownedEditions} item{u._count.ownedEditions !== 1 ? 's' : ''}
-                  {u.isEstablished && <span style={{ marginLeft: 8, color: 'var(--green)' }}>✓ Established</span>}
+                  {t('items', { n: u._count.ownedEditions })}
+                  {u.isEstablished && <span style={{ marginLeft: 8, color: 'var(--green)' }}>{t('established')}</span>}
                 </div>
               </div>
 
@@ -148,7 +151,7 @@ export default async function LeaderboardPage() {
                   {fmt(u.netWorth)}
                 </div>
                 <div className="lb-breakdown" style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-                  {fmt(u.balance)} cash · {fmt(u.mintValue)} mint
+                  {t('breakdown', { cash: fmt(u.balance), mint: fmt(u.mintValue) })}
                 </div>
               </div>
             </Link>

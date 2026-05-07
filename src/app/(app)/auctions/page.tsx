@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/db'
 import { formatDistanceToNow } from 'date-fns'
+import { getTranslations } from 'next-intl/server'
 import { businessNetIncome, businessYieldNet } from '@/lib/business'
 
 export const dynamic = 'force-dynamic'
@@ -22,6 +23,8 @@ function fmt(n: number | string | null) {
 }
 
 export default async function AuctionsPage() {
+  const t = await getTranslations('auctions')
+
   const [auctions, settled] = await Promise.all([
     prisma.auction.findMany({
       where:   { status: 'active' },
@@ -45,17 +48,17 @@ export default async function AuctionsPage() {
 
   return (
     <div>
-      <div className="page-title">Auctions</div>
-      <div className="page-sub">Open bidding — highest bid wins at close · 3-day auctions</div>
+      <div className="page-title">{t('title')}</div>
+      <div className="page-sub">{t('subtitle')}</div>
 
       <div style={{ marginTop: 28 }}>
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--muted)', marginBottom: 14 }}>
-          LIVE NOW {auctions.length > 0 && `· ${auctions.length}`}
+          {t('liveNow')}{auctions.length > 0 && ` · ${auctions.length}`}
         </div>
 
         {auctions.length === 0 ? (
           <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--muted)', fontWeight: 700 }}>
-            No active auctions — check back soon.
+            {t('empty')}
           </div>
         ) : (
           <div className="items-grid">
@@ -82,36 +85,36 @@ export default async function AuctionsPage() {
                         <span style={{ fontSize: 10, fontWeight: 800, color: colour, flexShrink: 0, marginLeft: 6 }}>{a.rarityTier.toUpperCase()}</span>
                       </div>
 
-                      <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginBottom: 1 }}>TRUE VALUE</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginBottom: 1 }}>{t('trueValue')}</div>
                       <div style={{ fontSize: 16, fontWeight: 900, color: 'var(--white)', marginBottom: 4 }}>{fmt(benchmark)}</div>
 
-                      <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginBottom: 1 }}>CURRENT BID</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginBottom: 1 }}>{t('currentBid')}</div>
                       <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--gold)', marginBottom: 2 }}>
-                        {currentBid ? fmt(currentBid) : <span style={{ color: 'var(--muted)', fontWeight: 400 }}>No bids yet</span>}
+                        {currentBid ? fmt(currentBid) : <span style={{ color: 'var(--muted)', fontWeight: 400 }}>{t('noBids')}</span>}
                       </div>
 
                       {pct !== null && (
                         <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 4,
                           color: pct <= -20 ? 'var(--green)' : pct >= 20 ? 'var(--red)' : 'var(--muted)' }}>
-                          {pct < 0 ? `${Math.abs(pct)}% below value` : pct > 0 ? `${pct}% above value` : 'at value'}
+                          {pct < 0 ? t('belowValue', { pct: Math.abs(pct) }) : pct > 0 ? t('aboveValue', { pct }) : t('atValue')}
                         </div>
                       )}
 
                       {a.edition.item.businessRiskTier && (() => {
-                        const net   = businessNetIncome(a.edition.item.businessRiskTier, benchmark)
+                        const net    = businessNetIncome(a.edition.item.businessRiskTier, benchmark)
                         const yield_ = (businessYieldNet(a.edition.item.businessRiskTier) * 100).toFixed(1)
                         return (
                           <div style={{ background: 'var(--bg3)', borderRadius: 6, padding: '5px 8px', marginBottom: 4 }}>
                             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--green)' }}>
-                              +${net.toLocaleString()}/mo net · {yield_}% yield
+                              {t('netYield', { net: net.toLocaleString(), yield: yield_ })}
                             </div>
                           </div>
                         )
                       })()}
 
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--muted)' }}>
-                        <span>{a._count.bids} bid{a._count.bids !== 1 ? 's' : ''}</span>
-                        <span>Ends {formatDistanceToNow(a.endsAt, { addSuffix: true })}</span>
+                        <span>{t('bids', { n: a._count.bids })}</span>
+                        <span>{t('ends', { time: formatDistanceToNow(a.endsAt, { addSuffix: true }) })}</span>
                       </div>
                     </div>
                   </div>
@@ -124,7 +127,7 @@ export default async function AuctionsPage() {
 
       {settled.length > 0 && (
         <div style={{ marginTop: 40 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--muted)', marginBottom: 14 }}>RECENTLY SETTLED</div>
+          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--muted)', marginBottom: 14 }}>{t('recentlySettled')}</div>
           <div className="items-grid">
             {settled.map(a => {
               const colour    = RARITY_COLOUR[a.edition.item.rarityTier] ?? 'var(--muted)'
@@ -148,14 +151,14 @@ export default async function AuctionsPage() {
                       {pct !== null && (
                         <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 4,
                           color: pct <= -20 ? 'var(--green)' : pct >= 20 ? 'var(--red)' : 'var(--muted)' }}>
-                          {pct <= -20 ? `Steal — ${Math.abs(pct)}% below value`
-                            : pct >= 20 ? `Overpaid — ${pct}% above value`
-                            : pct < 0 ? `${Math.abs(pct)}% below value`
-                            : `${pct}% above value`}
+                          {pct <= -20 ? t('steal', { pct: Math.abs(pct) })
+                            : pct >= 20 ? t('overpaid', { pct })
+                            : pct < 0  ? t('belowValue', { pct: Math.abs(pct) })
+                            : t('aboveValue', { pct })}
                         </div>
                       )}
                       <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                        {a.currentWinner ? `Won by @${a.currentWinner.username}` : 'No winner'} · {a._count.bids} bid{a._count.bids !== 1 ? 's' : ''}
+                        {a.currentWinner ? t('wonBy', { username: a.currentWinner.username }) : t('noWinner')} · {t('bids', { n: a._count.bids })}
                       </div>
                     </div>
                   </div>

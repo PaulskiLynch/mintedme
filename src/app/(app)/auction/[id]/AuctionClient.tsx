@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { bidIncrement } from '@/lib/bidIncrement'
 
 interface ChatMessage {
@@ -66,11 +67,11 @@ function useCountdown(endsAt: string) {
   return { ms, d, h: Math.floor((s % 86400) / 3600), m: Math.floor((s % 3600) / 60), sec: s % 60, expired: ms === 0 }
 }
 
-function timeAgo(iso: string) {
+function timeAgo(iso: string, t: ReturnType<typeof useTranslations>) {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
-  if (diff < 60)   return `${diff}s ago`
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-  return `${Math.floor(diff / 3600)}h ago`
+  if (diff < 60)   return t('secsAgo', { n: diff })
+  if (diff < 3600) return t('minsAgo', { n: Math.floor(diff / 60) })
+  return t('hoursAgo', { n: Math.floor(diff / 3600) })
 }
 
 function fmt(n: number) { return '$' + n.toLocaleString() }
@@ -84,7 +85,8 @@ export default function AuctionClient({
   luckyUndervalueWin: initLucky, myBid: initMyBid,
   userId, availableBalance, userUsername, isSeller, monthlyUpkeepCost, initialMessages,
 }: Props) {
-  const router    = useRouter()
+  const router = useRouter()
+  const t      = useTranslations('auction')
 
   const [liveStatus,     setLiveStatus]     = useState(initStatus)
   const [liveCurrentBid, setLiveCurrentBid] = useState(initCurrentBid)
@@ -120,7 +122,7 @@ export default function AuctionClient({
   // Poll live state every 8s
   useEffect(() => {
     if (!isActive) return
-    const t = setInterval(async () => {
+    const timer = setInterval(async () => {
       const res = await fetch(`/api/auctions/${auctionId}/live`)
       if (!res.ok) return
       const d = await res.json()
@@ -136,18 +138,18 @@ export default function AuctionClient({
       }
       if (d.myBid) setMyBid(d.myBid)
     }, 8000)
-    return () => clearInterval(t)
+    return () => clearInterval(timer)
   }, [auctionId, isActive])
 
   // Poll chat every 5s
   useEffect(() => {
-    const t = setInterval(async () => {
+    const timer = setInterval(async () => {
       const res = await fetch(`/api/auctions/${auctionId}/chat`)
       if (!res.ok) return
       const d = await res.json()
       setMessages(d.messages)
     }, 5000)
-    return () => clearInterval(t)
+    return () => clearInterval(timer)
   }, [auctionId])
 
   useEffect(() => {
@@ -180,9 +182,7 @@ export default function AuctionClient({
     if (res.ok) {
       setMyBid({ amount: bidAmt, status: 'active' })
       setLiveCurrentBid(bidAmt)
-      setBidMsg(json.extended
-        ? `Bid placed! Auction extended +5 min (anti-snipe)`
-        : json.result === 'updated' ? 'Bid updated — funds locked' : 'Bid placed — funds locked')
+      setBidMsg(json.extended ? t('bidExtended') : json.result === 'updated' ? t('bidUpdated') : t('bidPlaced'))
       setBidAmt('')
       if (json.newEndsAt) setLiveEndsAt(json.newEndsAt)
     } else {
@@ -206,15 +206,14 @@ export default function AuctionClient({
     setChatBusy(false)
   }
 
-  // Verdict vs true value (shown after settlement)
   const verdictLine = (() => {
     if (!isSettled || !winningBid) return null
     const price = Number(winningBid)
     const pct   = Math.round(((price - benchmark) / benchmark) * 100)
-    if (pct <= -20) return { label: `Steal — ${Math.abs(pct)}% below true value`, colour: 'var(--green)' }
-    if (pct >= 20)  return { label: `Overpaid — ${pct}% above true value`, colour: 'var(--red)' }
-    if (pct < 0)    return { label: `${Math.abs(pct)}% below true value`, colour: 'var(--green)' }
-    return { label: `${pct}% above true value`, colour: 'var(--muted)' }
+    if (pct <= -20) return { label: t('verdictSteal', { pct: Math.abs(pct) }), colour: 'var(--green)' }
+    if (pct >= 20)  return { label: t('verdictOverpaid', { pct }),              colour: 'var(--red)'   }
+    if (pct < 0)    return { label: t('verdictBelow', { pct: Math.abs(pct) }),  colour: 'var(--green)' }
+    return { label: t('verdictAbove', { pct }), colour: 'var(--muted)' }
   })()
 
   const isLeading = myBid && liveCurrentBid && Number(myBid.amount) === Number(liveCurrentBid)
@@ -231,14 +230,18 @@ export default function AuctionClient({
             }
           </div>
           <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--bg3)', borderRadius: 8, fontSize: 13, color: 'var(--muted)', lineHeight: 1.6 }}>
-            <strong style={{ color: 'var(--white)' }}>Open auction.</strong>{' '}
-            Highest bid at close wins. Bidder identities are hidden until the auction ends.
-            {liveExtCount > 0 && <span style={{ color: 'var(--gold)', display: 'block', marginTop: 4 }}>
-              ⏱ Extended {liveExtCount}× by anti-snipe rule
-            </span>}
-            {isSystemAuction && <span style={{ color: 'var(--muted)', display: 'block', marginTop: 4 }}>
-              System auction — funds removed from circulation on win
-            </span>}
+            <strong style={{ color: 'var(--white)' }}>{t('description').split('.')[0]}.</strong>{' '}
+            {t('description').split('. ').slice(1).join('. ')}
+            {liveExtCount > 0 && (
+              <span style={{ color: 'var(--gold)', display: 'block', marginTop: 4 }}>
+                {t('extended', { n: liveExtCount })}
+              </span>
+            )}
+            {isSystemAuction && (
+              <span style={{ color: 'var(--muted)', display: 'block', marginTop: 4 }}>
+                {t('systemNote')}
+              </span>
+            )}
           </div>
         </div>
 
@@ -255,7 +258,7 @@ export default function AuctionClient({
             {/* Countdown */}
             {isActive ? (
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--muted)', marginBottom: 4 }}>ENDS IN</div>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--muted)', marginBottom: 4 }}>{t('endsIn')}</div>
                 <div style={{ fontSize: 30, fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: countdown.h < 1 && countdown.d === 0 ? 'var(--red)' : 'var(--white)' }}>
                   {countdown.d > 0
                     ? `${countdown.d}d ${String(countdown.h).padStart(2,'0')}h`
@@ -265,7 +268,7 @@ export default function AuctionClient({
             ) : (
               <div style={{ marginBottom: 16, padding: '8px 12px', background: isSettled ? '#1e2a15' : 'var(--bg3)', borderRadius: 6 }}>
                 <div style={{ fontWeight: 900, fontSize: 13, color: isSettled ? 'var(--green)' : 'var(--muted)' }}>
-                  {isSettled ? 'Auction settled' : 'Auction ended'}
+                  {isSettled ? t('settled') : t('ended')}
                 </div>
               </div>
             )}
@@ -273,29 +276,31 @@ export default function AuctionClient({
             {/* Current bid + true value */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
               <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: '10px 14px' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.08em', marginBottom: 4 }}>CURRENT BID</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.08em', marginBottom: 4 }}>{t('currentBidLabel')}</div>
                 {currentBidNum !== null
                   ? <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--gold)' }}>{fmt(currentBidNum)}</div>
-                  : <div style={{ fontSize: 14, color: 'var(--muted)', fontWeight: 700 }}>No bids yet</div>}
+                  : <div style={{ fontSize: 14, color: 'var(--muted)', fontWeight: 700 }}>{t('noBids')}</div>}
               </div>
               <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: '10px 14px' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.08em', marginBottom: 4 }}>TRUE VALUE</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.08em', marginBottom: 4 }}>{t('trueValue')}</div>
                 <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--white)' }}>{fmt(benchmark)}</div>
               </div>
             </div>
 
             {/* Current bid vs true value */}
             {currentBidNum !== null && (() => {
-              const pct = Math.round(((currentBidNum - benchmark) / benchmark) * 100)
+              const pct    = Math.round(((currentBidNum - benchmark) / benchmark) * 100)
               const colour = pct <= -20 ? 'var(--green)' : pct >= 20 ? 'var(--red)' : 'var(--muted)'
-              const label  = pct < 0 ? `${Math.abs(pct)}% below true value` : pct > 0 ? `${pct}% above true value` : 'at true value'
+              const label  = pct < 0
+                ? t('belowValue', { pct: Math.abs(pct) })
+                : pct > 0 ? t('aboveValue', { pct }) : t('atValue')
               return <div style={{ fontSize: 12, color: colour, fontWeight: 700, marginBottom: 12 }}>{label}</div>
             })()}
 
             {/* Stats row */}
             <div style={{ display: 'flex', gap: 16, marginBottom: 16, fontSize: 13, color: 'var(--muted)' }}>
-              <span><strong style={{ color: 'var(--white)' }}>{liveBidCount}</strong> bid{liveBidCount !== 1 ? 's' : ''}</span>
-              <span><strong style={{ color: 'var(--white)' }}>{watcherCount}</strong> watching</span>
+              <span>{t('bids', { n: liveBidCount })}</span>
+              <span>{t('watching', { n: watcherCount })}</span>
             </div>
 
             {/* Settlement result */}
@@ -304,10 +309,10 @@ export default function AuctionClient({
                 {winnerName ? (
                   <>
                     <div style={{ fontWeight: 900, fontSize: 15, marginBottom: 4 }}>
-                      Won by <Link href={`/mint/${winnerName}`} style={{ color: 'var(--gold)' }}>@{winnerName}</Link>
+                      {t('wonBy')} <Link href={`/mint/${winnerName}`} style={{ color: 'var(--gold)' }}>@{winnerName}</Link>
                     </div>
                     <div style={{ fontSize: 13, color: 'var(--muted)' }}>
-                      Winning bid: <span style={{ color: 'var(--white)', fontWeight: 700 }}>{fmt(Number(winningBid))}</span>
+                      {t('winningBidLabel')} <span style={{ color: 'var(--white)', fontWeight: 700 }}>{fmt(Number(winningBid))}</span>
                     </div>
                     {verdictLine && (
                       <div style={{ fontSize: 12, fontWeight: 700, color: verdictLine.colour, marginTop: 4 }}>
@@ -316,17 +321,17 @@ export default function AuctionClient({
                     )}
                     {lucky && (
                       <div style={{ marginTop: 6, fontSize: 11, background: '#1e2a15', padding: '3px 8px', borderRadius: 4, display: 'inline-block', color: 'var(--green)', fontWeight: 700 }}>
-                        STEAL
+                        {t('stealBadge')}
                       </div>
                     )}
                     {userUsername === winnerName && (
                       <div style={{ marginTop: 10 }}>
-                        <Link href={`/item/${editionId}`} className="btn btn-gold btn-sm">View your asset →</Link>
+                        <Link href={`/item/${editionId}`} className="btn btn-gold btn-sm">{t('viewAsset')}</Link>
                       </div>
                     )}
                   </>
                 ) : (
-                  <div style={{ color: 'var(--muted)', fontWeight: 700 }}>No bids — auction closed</div>
+                  <div style={{ color: 'var(--muted)', fontWeight: 700 }}>{t('noBidsClosed')}</div>
                 )}
               </div>
             )}
@@ -339,8 +344,8 @@ export default function AuctionClient({
                 border: `1px solid ${isLeading ? 'var(--green)' : 'var(--red)'}44`,
               }}>
                 {isLeading
-                  ? <><span style={{ color: 'var(--green)', fontWeight: 900 }}>You&rsquo;re winning</span> at {fmt(Number(myBid.amount))} · funds locked</>
-                  : <><span style={{ color: 'var(--red)', fontWeight: 900 }}>You&rsquo;ve been outbid</span> — your locked bid: {fmt(Number(myBid.amount))}</>}
+                  ? <span style={{ color: 'var(--green)', fontWeight: 900 }}>{t('youreWinning', { price: fmt(Number(myBid.amount)) })}</span>
+                  : <span style={{ color: 'var(--red)', fontWeight: 900 }}>{t('outbid', { price: fmt(Number(myBid.amount)) })}</span>}
               </div>
             )}
 
@@ -349,8 +354,10 @@ export default function AuctionClient({
               <form onSubmit={handleBid} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div>
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>
-                    {currentBidNum !== null ? `Beat current bid — min ${fmt(minRequired)}` : `Starting bid — min ${fmt(minRequired)}`}
-                    {userId && <> · Available: <strong style={{ color: 'var(--white)' }}>{fmt(available + (myBid ? Number(myBid.amount) : 0))}</strong></>}
+                    {currentBidNum !== null
+                      ? t('beatCurrentBid', { price: fmt(minRequired) })
+                      : t('startingBidHint', { price: fmt(minRequired) })}
+                    {userId && <> · {t('availableBalance', { amount: <strong key="a" style={{ color: 'var(--white)' }}>{fmt(available + (myBid ? Number(myBid.amount) : 0))}</strong> as any })}</>}
                   </div>
                   <div style={{ position: 'relative' }}>
                     <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', fontWeight: 700, pointerEvents: 'none' }}>$</span>
@@ -368,11 +375,9 @@ export default function AuctionClient({
                   </div>
                 </div>
 
-                {/* Upkeep affordability warning */}
                 {monthlyUpkeepCost > 0 && (
                   <div style={{ fontSize: 11, padding: '8px 10px', background: '#1a1800', border: '1px solid #4a3a00', borderRadius: 6, color: '#c8a832', lineHeight: 1.5 }}>
-                    ⚠ This asset costs <strong>${monthlyUpkeepCost.toLocaleString()}/month</strong> to maintain.
-                    Make sure you can cover ongoing upkeep after winning.
+                    {t('upkeepWarning', { cost: monthlyUpkeepCost.toLocaleString() })}
                   </div>
                 )}
 
@@ -382,11 +387,11 @@ export default function AuctionClient({
                   className="btn btn-gold btn-full btn-lg"
                   type="submit"
                   disabled={busy || !userId || !bidAmt || Number(bidAmt) < minRequired}>
-                  {busy ? 'Placing...' : userId ? 'Place bid' : 'Sign in to bid'}
+                  {busy ? t('placing') : userId ? t('placeBid') : t('signInToBid')}
                 </button>
                 {!userId && (
                   <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center' }}>
-                    <Link href="/login" style={{ color: 'var(--gold)' }}>Sign in</Link> to bid
+                    <Link href="/login" style={{ color: 'var(--gold)' }}>{t('signInToBid')}</Link>
                   </div>
                 )}
               </form>
@@ -395,21 +400,21 @@ export default function AuctionClient({
             {isActive && isSeller && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ fontSize: 13, color: 'var(--muted)' }}>
-                  You are the seller. Auction closes in {countdown.d > 0 ? `${countdown.d}d` : `${countdown.h}h ${countdown.m}m`}.
+                  {t('sellerClosesIn', { time: countdown.d > 0 ? `${countdown.d}d` : `${countdown.h}h ${countdown.m}m` })}
                 </div>
                 {currentBidNum !== null && (
                   <div style={{ fontSize: 12, padding: '8px 10px', background: 'var(--bg3)', borderRadius: 6, lineHeight: 1.6 }}>
-                    Current bid: <strong>{fmt(currentBidNum)}</strong><br />
-                    <span style={{ color: 'var(--muted)' }}>5% platform fee: <span style={{ color: 'var(--red)' }}>−{fmt(Math.round(currentBidNum * 0.05))}</span></span><br />
-                    <span>You&apos;d receive: <strong style={{ color: 'var(--green)' }}>{fmt(Math.round(currentBidNum * 0.95))}</strong></span>
+                    {t('currentBidValue', { price: <strong key="p">{fmt(currentBidNum)}</strong> as any })}<br />
+                    <span style={{ color: 'var(--muted)' }}>{t('platformFee', { fee: <span key="f" style={{ color: 'var(--red)' }}>{fmt(Math.round(currentBidNum * 0.05))}</span> as any })}</span><br />
+                    <span>{t('youReceive', { amount: <strong key="r" style={{ color: 'var(--green)' }}>{fmt(Math.round(currentBidNum * 0.95))}</strong> as any })}</span>
                   </div>
                 )}
-                <button className="btn btn-danger btn-full" onClick={settle} disabled={busy}>End auction early</button>
+                <button className="btn btn-danger btn-full" onClick={settle} disabled={busy}>{t('endEarly')}</button>
               </div>
             )}
 
             <div style={{ marginTop: 16 }}>
-              <Link href={`/item/${editionId}`} style={{ fontSize: 12, color: 'var(--muted)' }}>← View item page</Link>
+              <Link href={`/item/${editionId}`} style={{ fontSize: 12, color: 'var(--muted)' }}>{t('viewItemPage')}</Link>
             </div>
           </div>
         </div>
@@ -418,18 +423,18 @@ export default function AuctionClient({
       {/* Bid Room chat */}
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-          <div style={{ fontWeight: 900, fontSize: 15 }}>Bid Room</div>
+          <div style={{ fontWeight: 900, fontSize: 15 }}>{t('bidRoom')}</div>
           {isActive && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--green)', animation: 'pulse 2s infinite' }} />
-              <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 700 }}>LIVE</span>
+              <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 700 }}>{t('live')}</span>
             </div>
           )}
         </div>
 
         <div ref={chatRef} style={{ height: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
           {messages.length === 0 ? (
-            <div style={{ color: 'var(--muted)', fontSize: 13, padding: '20px 0' }}>No messages yet.</div>
+            <div style={{ color: 'var(--muted)', fontSize: 13, padding: '20px 0' }}>{t('noMessages')}</div>
           ) : (
             messages.map(msg => (
               <div key={msg.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
@@ -442,7 +447,7 @@ export default function AuctionClient({
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
                     <Link href={`/mint/${msg.user.username}`} style={{ fontWeight: 700, fontSize: 12, color: 'var(--gold)' }}>@{msg.user.username}</Link>
-                    <span style={{ fontSize: 10, color: 'var(--muted)' }}>{timeAgo(msg.createdAt)}</span>
+                    <span style={{ fontSize: 10, color: 'var(--muted)' }}>{timeAgo(msg.createdAt, t)}</span>
                   </div>
                   <div style={{ fontSize: 13, color: 'var(--white)', marginTop: 2, wordBreak: 'break-word' }}>{msg.message}</div>
                 </div>
@@ -453,12 +458,12 @@ export default function AuctionClient({
 
         {userId ? (
           <form onSubmit={handleChat} style={{ display: 'flex', gap: 8 }}>
-            <input className="form-input" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Say something..." maxLength={500} style={{ flex: 1 }} />
-            <button className="btn btn-gold" type="submit" disabled={chatBusy || !chatInput.trim()} style={{ flexShrink: 0 }}>Send</button>
+            <input className="form-input" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder={t('chatPlaceholder')} maxLength={500} style={{ flex: 1 }} />
+            <button className="btn btn-gold" type="submit" disabled={chatBusy || !chatInput.trim()} style={{ flexShrink: 0 }}>{t('send')}</button>
           </form>
         ) : (
           <div style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center' }}>
-            <Link href="/login" style={{ color: 'var(--gold)' }}>Sign in</Link> to join the conversation
+            <Link href="/login" style={{ color: 'var(--gold)' }}>{t('signInToChat')}</Link>{t('signInToChatSuffix')}
           </div>
         )}
       </div>
