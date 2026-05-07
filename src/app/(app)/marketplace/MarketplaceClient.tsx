@@ -41,6 +41,8 @@ interface Props {
   currentSort: string
   query: string
   userId: string | null
+  scarcityOn: boolean
+  membersNeeded: number
 }
 
 const BIZ_TIER_STYLES: Record<string, { bg: string; label: string; icon: string }> = {
@@ -89,7 +91,7 @@ function scarcityLine(editions: Edition[], totalSupply: number): { text: string;
   return null
 }
 
-function MarketplaceCard({ item, userId }: { item: Item; userId: string | null }) {
+function MarketplaceCard({ item, userId, scarcityOn, membersNeeded }: { item: Item; userId: string | null; scarcityOn: boolean; membersNeeded: number }) {
   const router = useRouter()
   const [hovered, setHovered] = useState(false)
 
@@ -101,6 +103,7 @@ function MarketplaceCard({ item, userId }: { item: Item; userId: string | null }
   const lastSold       = listedEdition?.lastSalePrice ?? item.editions.find(e => e.lastSalePrice)?.lastSalePrice ?? null
   const trend          = trendSignal(item.editions, item.benchmarkPrice)
   const scarcity       = scarcityLine(item.editions, item.totalSupply)
+  const soldOut        = scarcityOn && availableCount === 0 && item.editions.some(e => e.currentOwnerId)
 
   const href = editionId ? `/item/${editionId}` : '#'
 
@@ -195,10 +198,12 @@ function MarketplaceCard({ item, userId }: { item: Item; userId: string | null }
             ? <span style={{ color: colour, fontWeight: 700 }}>Live auction</span>
             : (item.rarityTier === 'Custom' || item.rarityTier === 'Banger')
             ? <span style={{ color: colour, fontWeight: 700 }}>1 of 1 · Unique edition</span>
+            : soldOut
+            ? <span style={{ color: 'var(--red)', fontWeight: 700 }}>SOLD OUT · {membersNeeded} more members needed</span>
             : scarcity
             ? <span style={{ color: scarcity.urgent ? 'var(--red)' : 'var(--muted)', fontWeight: scarcity.urgent ? 700 : 400 }}>{scarcity.text}</span>
             : availableCount > 0
-            ? `${availableCount} of ${item.totalSupply} available from MilliBux`
+            ? <span style={{ color: 'var(--green)', fontWeight: 700 }}>1 available · Get it first</span>
             : 'Secondary market only'}
         </div>
 
@@ -241,7 +246,7 @@ function MarketplaceCard({ item, userId }: { item: Item; userId: string | null }
   )
 }
 
-export default function MarketplaceClient({ items, categories, currentCategory, currentSort, query, userId }: Props) {
+export default function MarketplaceClient({ items, categories, currentCategory, currentSort, query, userId, scarcityOn, membersNeeded }: Props) {
   const router = useRouter()
   const [q, setQ] = useState(query)
   const [, startTransition] = useTransition()
@@ -293,7 +298,7 @@ export default function MarketplaceClient({ items, categories, currentCategory, 
       ) : (
         <div className="items-grid">
           {items.map(item => (
-            <MarketplaceCard key={item.id} item={item} userId={userId} />
+            <MarketplaceCard key={item.id} item={item} userId={userId} scarcityOn={scarcityOn} membersNeeded={membersNeeded} />
           ))}
         </div>
       )}

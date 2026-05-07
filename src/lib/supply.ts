@@ -1,4 +1,10 @@
+export function scarcityThreshold(): number {
+  return parseInt(process.env.SCARCITY_THRESHOLD ?? '0')
+}
+
 export function maxEditions(rarityTier: string, userCount: number): number {
+  const threshold = scarcityThreshold()
+  if (threshold > 0 && userCount < threshold) return 1
   if (rarityTier === 'Custom' || rarityTier === 'Banger') return 1
   const active = Math.max(userCount, 1000)
   const config: Record<string, [number, number]> = {

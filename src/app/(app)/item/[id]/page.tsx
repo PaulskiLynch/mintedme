@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
-import { maxEditions } from '@/lib/supply'
+import { maxEditions, scarcityThreshold } from '@/lib/supply'
 import { monthlyUpkeep, upkeepDaysRemaining } from '@/lib/upkeep'
 import { businessGrossIncome, businessUpkeepCost, businessNetIncome, businessIncomeDaysRemaining, TIER_LABELS } from '@/lib/business'
 import { PROPERTY_TIER_DEFS, monthlyPropertyUpkeep, monthlyPropertyAppreciation, monthlyPropertyNet } from '@/lib/property'
@@ -71,9 +71,12 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
     prisma.user.count(),
     prisma.itemEdition.count({ where: { itemId: item.id } }),
   ])
+  const threshold        = scarcityThreshold()
   const allowedEditions  = Math.min(item.totalSupply, maxEditions(item.rarityTier, userCount))
   const supplyLocked     = !!edition.currentOwnerId && mintedCount >= allowedEditions
   const availableNow     = Math.max(0, allowedEditions - claimedCount)
+  const scarcityActive   = threshold > 0 && userCount < threshold
+  const membersNeeded    = scarcityActive ? threshold - userCount : 0
   const upkeep           = monthlyUpkeep(item.rarityTier, Number(item.benchmarkPrice))
   const daysUntilCharge  = upkeepDaysRemaining(
     edition.lastUpkeepAt ?? null,
@@ -262,6 +265,8 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
               availableNow={availableNow}
               alreadyClaimed={claimedCount}
               totalEver={item.totalSupply}
+              scarcityThreshold={threshold}
+              membersNeeded={membersNeeded}
               watcherCount={wishlistCount}
               pendingOfferCount={edition.offers.length}
               trendPct={trendPct}

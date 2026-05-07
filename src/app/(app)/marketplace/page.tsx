@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { auth } from '@/auth'
+import { scarcityThreshold } from '@/lib/supply'
 import MarketplaceClient from './MarketplaceClient'
 
 export const dynamic = 'force-dynamic'
@@ -25,6 +26,10 @@ export default async function MarketplacePage({
   const orderBy = sort === 'price_asc'  ? [{ minimumBid: 'asc'  as const }]
                : sort === 'price_desc' ? [{ minimumBid: 'desc' as const }]
                :                        [{ createdAt:   'desc' as const }]
+
+  const threshold  = scarcityThreshold()
+  const userCount  = threshold > 0 ? await prisma.user.count() : 0
+  const scarcityOn = threshold > 0 && userCount < threshold
 
   const items = await prisma.item.findMany({
     where,
@@ -65,6 +70,8 @@ export default async function MarketplacePage({
       currentSort={sort ?? 'newest'}
       query={q ?? ''}
       userId={session?.user?.id ?? null}
+      scarcityOn={scarcityOn}
+      membersNeeded={scarcityOn ? threshold - userCount : 0}
     />
   )
 }

@@ -30,6 +30,8 @@ interface Props {
   availableNow:     number
   alreadyClaimed:   number
   totalEver:        number
+  scarcityThreshold: number
+  membersNeeded:    number
   watcherCount:     number
   pendingOfferCount: number
   trendPct:         number | null
@@ -64,6 +66,7 @@ export default function ItemActions({
   minimumBid, benchmarkPrice, lastSalePrice, topOffer,
   monthlyUpkeep, daysUntilCharge, supplyLocked,
   availableNow, alreadyClaimed, totalEver,
+  scarcityThreshold, membersNeeded,
   watcherCount, pendingOfferCount, trendPct,
   businessRiskTier, businessGross, businessUpkeep, businessNet, businessDaysToIncome,
   discountPrice,
@@ -105,6 +108,8 @@ export default function ItemActions({
   const isUnique   = rarityTier === 'Custom' || rarityTier === 'Banger'
   const supplyLine = isUnique
     ? '1 of 1 · Unique edition'
+    : supplyLocked && scarcityThreshold > 0
+    ? `SOLD OUT · ${membersNeeded} more members needed`
     : availableNow > 0
     ? `${availableNow} available now · ${totalEver} total ever`
     : `${totalEver} total ever`
@@ -320,8 +325,16 @@ export default function ItemActions({
         )}
 
         {supplyLocked ? (
-          <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '14px 16px', fontSize: 13, color: 'var(--muted)', textAlign: 'center', marginBottom: 12 }}>
-            Supply locked — unlocks as more users join
+          <div style={{ background: 'rgba(224,90,90,0.07)', border: '1px solid rgba(224,90,90,0.25)', borderRadius: 8, padding: '14px 16px', textAlign: 'center', marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--red)', letterSpacing: '0.06em', marginBottom: 4 }}>SOLD OUT</div>
+            {scarcityThreshold > 0 && membersNeeded > 0 ? (
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                New editions unlock at <strong style={{ color: 'var(--white)' }}>{scarcityThreshold} members</strong>
+                {' '}· <strong style={{ color: 'var(--gold)' }}>{membersNeeded} to go</strong>
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Unlocks as more members join</div>
+            )}
           </div>
         ) : discountPrice !== null ? (
           <button className="btn btn-gold btn-full btn-lg" onClick={handleBuy} disabled={busy || !userId || balance < discountPrice} style={{ marginBottom: 12 }}>
