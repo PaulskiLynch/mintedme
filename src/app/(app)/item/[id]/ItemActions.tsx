@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 
 interface Props {
   editionId:        string
@@ -76,29 +77,24 @@ export default function ItemActions({
   propertyTier, propertyDef, propertyUpkeep, propertyAppreciation, propertyNet,
   yachtType, yachtDef, yachtUpkeep,
 }: Props) {
+  const t = useTranslations('item')
   const router = useRouter()
   const [busy, setBusy]               = useState(false)
   const [error, setError]             = useState('')
 
-  // Offer state
   const [offerRaw, setOfferRaw]       = useState('')
   const [offerDisplay, setOfferDisplay] = useState('')
   const [offerNote, setOfferNote]     = useState('')
   const [showNote, setShowNote]       = useState(false)
   const [offerSent, setOfferSent]     = useState(false)
 
-  // Owner action state
   const [showList, setShowList]           = useState(false)
   const [showAuction, setShowAuction]     = useState(false)
   const [listPrice, setListPrice]         = useState(listedPrice ?? '')
   const [bidOption, setBidOption]         = useState<'10pct' | '25pct' | 'custom'>('10pct')
   const [customBidValue, setCustomBidValue] = useState('')
 
-  // Report state
   const [showReport, setShowReport]   = useState(false)
-  const [reportReason, setReportReason] = useState('')
-  const [reportDesc, setReportDesc]   = useState('')
-  const [reportSent, setReportSent]   = useState(false)
 
   const balance   = Number(userBalance ?? 0)
   const minBid    = Number(minimumBid ?? 0)
@@ -111,13 +107,13 @@ export default function ItemActions({
 
   const isUnique   = rarityTier === 'Custom' || rarityTier === 'Banger'
   const supplyLine = isUnique
-    ? '1 of 1 · Unique edition'
+    ? t('supply.unique')
     : supplyLocked && scarcityThreshold > 0
-    ? `SOLD OUT · ${membersNeeded} more members needed`
+    ? t('supply.soldOut', { n: membersNeeded })
     : availableNow > 0
-    ? `${availableNow} available now · ${totalEver} total ever`
-    : `${totalEver} total ever`
-  const claimedLine = isUnique ? null : alreadyClaimed > 0 ? `${alreadyClaimed} already claimed` : null
+    ? t('supply.available', { available: availableNow, total: totalEver })
+    : t('supply.totalOnly', { total: totalEver })
+  const claimedLine = isUnique ? null : alreadyClaimed > 0 ? t('supply.claimed', { n: alreadyClaimed }) : null
 
   async function handleBuy() {
     if (!userId) { router.push('/login'); return }
@@ -176,14 +172,7 @@ export default function ItemActions({
     if (res.ok) { router.push(`/auction/${json.auctionId}`) } else { setError(json.error || 'Failed'); setBusy(false) }
   }
 
-  async function handleReport(e: React.FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    await fetch('/api/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ editionId, reason: reportReason, description: reportDesc }) })
-    setReportSent(true); setBusy(false)
-  }
-
-  if (isFrozen) return <div style={{ color: 'var(--red)', fontWeight: 700, fontSize: 13 }}>This item is frozen.</div>
+  if (isFrozen) return <div style={{ color: 'var(--red)', fontWeight: 700, fontSize: 13 }}>{t('frozen')}</div>
 
   // ── Owner view ────────────────────────────────────────────────────────────────
   if (isOwner) {
@@ -195,21 +184,21 @@ export default function ItemActions({
         {claimedLine && <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>{claimedLine}</div>}
 
         {isInAuction ? (
-          <div style={{ fontSize: 13, color: 'var(--gold)', fontWeight: 700, marginBottom: 12 }}>Live auction in progress</div>
+          <div style={{ fontSize: 13, color: 'var(--gold)', fontWeight: 700, marginBottom: 12 }}>{t('owner.liveAuction')}</div>
         ) : isListed ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 4 }}>
-              Listed at <span style={{ color: 'var(--gold)', fontWeight: 700 }}>${Number(listedPrice).toLocaleString()}</span>
+              {t('owner.listedAt', { price: <span style={{ color: 'var(--gold)', fontWeight: 700 }}>${Number(listedPrice).toLocaleString()}</span> as any })}
             </div>
-            <button className="btn btn-danger btn-full" onClick={handleDelist} disabled={busy}>Remove listing</button>
+            <button className="btn btn-danger btn-full" onClick={handleDelist} disabled={busy}>{t('owner.removeListing')}</button>
           </div>
         ) : (
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-gold" style={{ flex: 1 }} onClick={() => setShowList(true)} disabled={busy}>
-              List for sale
+              {t('owner.listForSale')}
             </button>
             <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowAuction(true)} disabled={busy}>
-              Start auction
+              {t('owner.startAuction')}
             </button>
           </div>
         )}
@@ -223,42 +212,41 @@ export default function ItemActions({
           <YachtPanel def={yachtDef} upkeep={yachtUpkeep} />
         ) : monthlyUpkeep > 0 && (() => {
           const overdue = daysUntilCharge < 0
+          const n = Math.abs(daysUntilCharge)
           return (
             <div style={{ marginTop: 16, padding: '12px 14px', borderRadius: 8, background: overdue ? '#2a1010' : 'var(--bg3)', border: `1px solid ${overdue ? 'var(--red)44' : 'transparent'}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--red)', letterSpacing: '0.06em' }}>COST OF OWNERSHIP</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--red)', letterSpacing: '0.06em' }}>{t('owner.costHeader')}</span>
                 <span style={{ fontSize: 15, fontWeight: 900, color: overdue ? 'var(--red)' : 'var(--gold)' }}>
                   ${monthlyUpkeep.toLocaleString()}
                 </span>
               </div>
               <div style={{ fontSize: 11, color: overdue ? 'var(--red)' : 'var(--muted)', marginTop: 4 }}>
-                {overdue
-                  ? `Overdue by ${Math.abs(daysUntilCharge)} day${Math.abs(daysUntilCharge) !== 1 ? 's' : ''}`
-                  : `Next charge in ${daysUntilCharge} day${daysUntilCharge !== 1 ? 's' : ''}`}
+                {overdue ? t('owner.overdue', { n }) : t('owner.nextCharge', { n: daysUntilCharge })}
               </div>
             </div>
           )
         })()}
 
         <button onClick={() => setShowReport(true)} style={{ marginTop: 16, background: 'none', border: 'none', color: 'var(--muted)', fontSize: 12, cursor: 'pointer', padding: 0 }}>
-          Report this item
+          {t('owner.report')}
         </button>
 
         {/* List modal */}
         {showList && (
           <div className="overlay" onClick={e => { if (e.target === e.currentTarget) setShowList(false) }}>
             <div className="modal">
-              <div className="modal-title">List for sale</div>
+              <div className="modal-title">{t('listModal.title')}</div>
               <div className="modal-sub">{itemName}</div>
               <form onSubmit={handleList}>
                 <div className="form-group">
-                  <label className="form-label">Listing price (USD)</label>
+                  <label className="form-label">{t('listModal.priceLabel')}</label>
                   <input className="form-input" type="number" min="1" value={listPrice} onChange={e => setListPrice(e.target.value)} required autoFocus />
                 </div>
                 {error && <div className="form-error">{error}</div>}
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn btn-gold" type="submit" disabled={busy}>{busy ? 'Listing...' : 'List item'}</button>
-                  <button className="btn btn-ghost" type="button" onClick={() => setShowList(false)}>Cancel</button>
+                  <button className="btn btn-gold" type="submit" disabled={busy}>{busy ? t('listModal.submitting') : t('listModal.submit')}</button>
+                  <button className="btn btn-ghost" type="button" onClick={() => setShowList(false)}>{t('listModal.cancel')}</button>
                 </div>
               </form>
             </div>
@@ -273,16 +261,16 @@ export default function ItemActions({
           return (
             <div className="overlay" onClick={e => { if (e.target === e.currentTarget) setShowAuction(false) }}>
               <div className="modal">
-                <div className="modal-title">Start Auction</div>
-                <div className="modal-sub">{itemName} · 3-day auction</div>
+                <div className="modal-title">{t('auctionModal.title')}</div>
+                <div className="modal-sub">{t('auctionModal.subtitle', { item: itemName })}</div>
                 <form onSubmit={handleStartAuction}>
                   <div className="form-group">
-                    <label className="form-label">Starting bid</label>
+                    <label className="form-label">{t('auctionModal.bidLabel')}</label>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {[
-                        { key: '10pct', label: `10% of true value`, value: `$${bid10.toLocaleString()}` },
-                        { key: '25pct', label: `25% of true value`, value: `$${bid25.toLocaleString()}` },
-                        { key: 'custom', label: 'Custom amount', value: '' },
+                        { key: '10pct', label: t('auctionModal.bid10pct'), value: `$${bid10.toLocaleString()}` },
+                        { key: '25pct', label: t('auctionModal.bid25pct'), value: `$${bid25.toLocaleString()}` },
+                        { key: 'custom', label: t('auctionModal.bidCustom'), value: '' },
                       ].map(opt => (
                         <label key={opt.key} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '8px 12px', borderRadius: 6, background: bidOption === opt.key ? 'var(--bg3)' : 'transparent', border: `1px solid ${bidOption === opt.key ? 'var(--gold-dim)' : 'transparent'}` }}>
                           <input type="radio" name="bidOption" value={opt.key} checked={bidOption === opt.key} onChange={() => setBidOption(opt.key as typeof bidOption)} />
@@ -291,14 +279,14 @@ export default function ItemActions({
                         </label>
                       ))}
                       {bidOption === 'custom' && (
-                        <input className="form-input" type="number" min="1" value={customBidValue} onChange={e => setCustomBidValue(e.target.value)} placeholder="Enter amount" autoFocus required />
+                        <input className="form-input" type="number" min="1" value={customBidValue} onChange={e => setCustomBidValue(e.target.value)} placeholder={t('auctionModal.bidPlaceholder')} autoFocus required />
                       )}
                     </div>
                   </div>
                   {error && <div className="form-error">{error}</div>}
                   <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                    <button className="btn btn-gold" type="submit" disabled={busy || !canSubmit}>{busy ? 'Starting...' : 'Start 3-day auction'}</button>
-                    <button className="btn btn-ghost" type="button" onClick={() => setShowAuction(false)}>Cancel</button>
+                    <button className="btn btn-gold" type="submit" disabled={busy || !canSubmit}>{busy ? t('auctionModal.submitting') : t('auctionModal.submit')}</button>
+                    <button className="btn btn-ghost" type="button" onClick={() => setShowAuction(false)}>{t('auctionModal.cancel')}</button>
                   </div>
                 </form>
               </div>
@@ -325,36 +313,35 @@ export default function ItemActions({
 
         {discountPrice !== null && (
           <div style={{ marginBottom: 12, padding: '10px 14px', background: '#0d2010', border: '1px solid #1a4020', borderRadius: 8 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)', marginBottom: 2 }}>🎉 Your suggestion made it in!</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>You get 50% off as the suggester</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)', marginBottom: 2 }}>{t('buy.suggestionDiscount')}</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>{t('buy.suggestionDiscountSub')}</div>
           </div>
         )}
 
         {supplyLocked ? (
           <div style={{ background: 'rgba(224,90,90,0.07)', border: '1px solid rgba(224,90,90,0.25)', borderRadius: 8, padding: '14px 16px', textAlign: 'center', marginBottom: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--red)', letterSpacing: '0.06em', marginBottom: 4 }}>SOLD OUT</div>
+            <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--red)', letterSpacing: '0.06em', marginBottom: 4 }}>{t('soldOut.header')}</div>
             {scarcityThreshold > 0 && membersNeeded > 0 ? (
               <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                New editions unlock at <strong style={{ color: 'var(--white)' }}>{scarcityThreshold} members</strong>
-                {' '}· <strong style={{ color: 'var(--gold)' }}>{membersNeeded} to go</strong>
+                {t('soldOut.unlockAt', { threshold: scarcityThreshold, n: membersNeeded })}
               </div>
             ) : (
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Unlocks as more members join</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>{t('soldOut.unlockSoon')}</div>
             )}
           </div>
         ) : discountPrice !== null ? (
           <button className="btn btn-gold btn-full btn-lg" onClick={handleBuy} disabled={busy || !userId || balance < discountPrice} style={{ marginBottom: 12 }}>
-            {busy ? 'Buying...' : `Claim at $${discountPrice.toLocaleString()} (50% off)`}
+            {busy ? t('buy.buying') : t('buy.claim', { price: `$${discountPrice.toLocaleString()}` })}
           </button>
         ) : (
           <button className="btn btn-gold btn-full btn-lg" onClick={handleBuy} disabled={busy || !userId || balance < benchmark} style={{ marginBottom: 12 }}>
-            {busy ? 'Buying...' : `Buy now — $${benchmark.toLocaleString()}`}
+            {busy ? t('buy.buying') : t('buy.buyNow', { price: `$${benchmark.toLocaleString()}` })}
           </button>
         )}
 
-        {!userId && <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginBottom: 12 }}>Sign in to buy</div>}
+        {!userId && <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginBottom: 12 }}>{t('buy.signIn')}</div>}
         {userId && (discountPrice ?? benchmark) > 0 && balance < (discountPrice ?? benchmark) && !supplyLocked && (
-          <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 12 }}>Insufficient balance (you have ${balance.toLocaleString()})</div>
+          <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 12 }}>{t('buy.insufficientBalance', { amount: `$${balance.toLocaleString()}` })}</div>
         )}
 
         <PriceContext benchmark={benchmark} lastSalePrice={lastSalePrice} topOffer={topOffer} trendPct={trendPct} demand={demand} />
@@ -369,7 +356,7 @@ export default function ItemActions({
         }
 
         <button onClick={() => setShowReport(true)} style={{ marginTop: 12, background: 'none', border: 'none', color: 'var(--muted)', fontSize: 12, cursor: 'pointer', padding: 0 }}>
-          Report this item
+          {t('owner.report')}
         </button>
 
         {showReport && <ReportModal editionId={editionId} onClose={() => setShowReport(false)} />}
@@ -390,23 +377,23 @@ export default function ItemActions({
       {claimedLine && <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>{claimedLine}</div>}
       {!claimedLine && <div style={{ marginBottom: 12 }} />}
 
-      {/* Offer sent confirmation */}
       {offerSent && (
         <div style={{ marginBottom: 16, padding: '12px 16px', background: '#0d2010', border: '1px solid #1a4020', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 16 }}>✓</span>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--green)' }}>Offer sent!</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--green)' }}>{t('offer.sent')}</div>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 1 }}>
-              The owner will be notified. Check your <a href="/inbox" style={{ color: 'var(--green)' }}>inbox</a> for their response.
+              {t('offer.sentSub').split('inbox').map((part, i) =>
+                i === 0 ? part : <><a href="/inbox" style={{ color: 'var(--green)' }}>inbox</a>{part}</>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Offer form */}
       {!isInAuction && !offerSent && (
         <form onSubmit={handleOffer} style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--muted)', letterSpacing: '0.08em', marginBottom: 8 }}>MAKE OFFER</div>
+          <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--muted)', letterSpacing: '0.08em', marginBottom: 8 }}>{t('offer.header')}</div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
             <div style={{ position: 'relative', flex: 1 }}>
               <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', fontSize: 15, fontWeight: 700, pointerEvents: 'none' }}>$</span>
@@ -426,48 +413,44 @@ export default function ItemActions({
               />
             </div>
             <button className="btn btn-gold" type="submit" disabled={busy || !offerRaw || !userId}>
-              {busy ? '...' : 'Offer'}
+              {busy ? '...' : t('offer.submit')}
             </button>
           </div>
           {minBid > 0 && (
             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 5, display: 'flex', justifyContent: 'space-between' }}>
-              <span>min ${minBid.toLocaleString()}</span>
+              <span>{t('offer.min', { price: `$${minBid.toLocaleString()}` })}</span>
               <button type="button" onClick={() => setShowNote(n => !n)} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 11, cursor: 'pointer', padding: 0 }}>
-                {showNote ? 'hide note' : '+ add note'}
+                {showNote ? t('offer.hideNote') : t('offer.addNote')}
               </button>
             </div>
           )}
           {showNote && (
-            <input className="form-input" style={{ marginTop: 8 }} type="text" value={offerNote} onChange={e => setOfferNote(e.target.value)} placeholder="Message to owner (optional)" maxLength={200} />
+            <input className="form-input" style={{ marginTop: 8 }} type="text" value={offerNote} onChange={e => setOfferNote(e.target.value)} placeholder={t('offer.notePlaceholder')} maxLength={200} />
           )}
-          {!userId && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>Sign in to make offers</div>}
-          {userId && balance < minBid && <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 6 }}>Insufficient balance (you have ${balance.toLocaleString()})</div>}
+          {!userId && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>{t('offer.signIn')}</div>}
+          {userId && balance < minBid && <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 6 }}>{t('offer.insufficientBalance', { amount: `$${balance.toLocaleString()}` })}</div>}
         </form>
       )}
 
-      {/* Buy now */}
       {isListed && listedPrice && !isInAuction && (
         <button className="btn btn-outline btn-full" onClick={handleBuy} disabled={busy || !userId || balance < buyPrice} style={{ marginBottom: 16, fontSize: 13 }}>
-          {busy ? 'Buying...' : `or Buy Now at $${buyPrice.toLocaleString()} →`}
+          {busy ? t('buy.buying') : t('buy.buyNowListed', { price: `$${buyPrice.toLocaleString()}` })}
         </button>
       )}
 
-      {/* Price context */}
       <PriceContext benchmark={benchmark} lastSalePrice={lastSalePrice} topOffer={topOffer} trendPct={trendPct} demand={demand} />
 
-      {/* Owner context */}
       {ownerUsername && (
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 14 }}>
-          <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--muted)', letterSpacing: '0.08em', marginBottom: 8 }}>OWNER</div>
+          <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--muted)', letterSpacing: '0.08em', marginBottom: 8 }}>{t('secondary.owner')}</div>
           <Link href={`/mint/${ownerUsername}`} style={{ fontWeight: 700, color: 'var(--white)', fontSize: 14 }}>@{ownerUsername}</Link>
           <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {activeStr && <div style={{ fontSize: 12, color: 'var(--muted)' }}>Active {activeStr}</div>}
-            {ownerRareCount > 0 && <div style={{ fontSize: 12, color: 'var(--muted)' }}>Also owns {ownerRareCount} Exotic+ car{ownerRareCount !== 1 ? 's' : ''}</div>}
+            {activeStr && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{t('secondary.active', { time: activeStr })}</div>}
+            {ownerRareCount > 0 && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{t('secondary.alsoOwns', { n: ownerRareCount })}</div>}
           </div>
         </div>
       )}
 
-      {/* Property / Business / Yacht / Car upkeep — context for potential buyers */}
       {propertyDef ? (
         <PropertyPanel def={propertyDef} upkeep={propertyUpkeep} appreciation={propertyAppreciation} net={propertyNet} />
       ) : businessRiskTier ? (
@@ -477,15 +460,14 @@ export default function ItemActions({
       ) : monthlyUpkeep > 0 && (
         <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-            <span style={{ fontWeight: 700, color: 'var(--red)' }}>Cost of Ownership</span>
+            <span style={{ fontWeight: 700, color: 'var(--red)' }}>{t('secondary.costOfOwnership')}</span>
             <span style={{ fontWeight: 700, color: 'var(--red)' }}>−${monthlyUpkeep.toLocaleString()}</span>
           </div>
         </div>
       )}
 
-      {/* Report */}
       <button onClick={() => setShowReport(true)} style={{ marginTop: 16, background: 'none', border: 'none', color: 'var(--muted)', fontSize: 12, cursor: 'pointer', padding: 0, display: 'block' }}>
-        Report this item
+        {t('owner.report')}
       </button>
 
       {showReport && <ReportModal editionId={editionId} onClose={() => setShowReport(false)} />}
@@ -494,9 +476,10 @@ export default function ItemActions({
 }
 
 function UrgencyBar({ watcherCount, pendingOfferCount }: { watcherCount: number; pendingOfferCount: number }) {
+  const t = useTranslations('item')
   const signals: string[] = []
-  if (watcherCount > 0) signals.push(`🔥 ${watcherCount} player${watcherCount !== 1 ? 's' : ''} watching`)
-  if (pendingOfferCount > 0) signals.push(`📋 ${pendingOfferCount} offer${pendingOfferCount !== 1 ? 's' : ''} pending`)
+  if (watcherCount > 0)      signals.push(t('urgency.watching', { n: watcherCount }))
+  if (pendingOfferCount > 0) signals.push(t('urgency.offers',   { n: pendingOfferCount }))
   if (signals.length === 0) return null
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -516,41 +499,43 @@ function PriceContext({ benchmark, lastSalePrice, topOffer, trendPct, demand }: 
   trendPct: number | null
   demand: string
 }) {
+  const t = useTranslations('item')
   const trendColour = trendPct == null ? 'var(--muted)'
                     : trendPct > 0 ? 'var(--green)'
                     : trendPct < 0 ? 'var(--red)'
                     : 'var(--muted)'
   const trendLabel = trendPct == null ? null
-                   : trendPct > 0 ? `↑ +${trendPct.toFixed(1)}% vs last sale`
-                   : trendPct < 0 ? `↓ ${trendPct.toFixed(1)}% vs last sale`
-                   : '→ Stable'
+                   : trendPct > 0 ? t('priceContext.trendUp',   { pct: trendPct.toFixed(1) })
+                   : trendPct < 0 ? t('priceContext.trendDown', { pct: trendPct.toFixed(1) })
+                   : t('priceContext.trendStable')
 
   const demandColour = demand === 'High' ? 'var(--green)' : demand === 'Medium' ? 'var(--gold)' : 'var(--muted)'
+  const demandLabel  = t(`demandLevel.${demand}` as any)
 
   return (
     <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 14 }}>
-      <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--muted)', letterSpacing: '0.08em', marginBottom: 10 }}>PRICE CONTEXT</div>
+      <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--muted)', letterSpacing: '0.08em', marginBottom: 10 }}>{t('priceContext.header')}</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-          <span style={{ color: 'var(--muted)' }}>True value</span>
+          <span style={{ color: 'var(--muted)' }}>{t('priceContext.trueValue')}</span>
           <div style={{ textAlign: 'right' }}>
             <span style={{ fontWeight: 700 }}>${benchmark.toLocaleString()}</span>
             {trendLabel && <div style={{ fontSize: 11, color: trendColour, marginTop: 1 }}>{trendLabel}</div>}
           </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-          <span style={{ color: 'var(--muted)' }}>Demand</span>
-          <span style={{ fontWeight: 700, color: demandColour }}>{demand}</span>
+          <span style={{ color: 'var(--muted)' }}>{t('priceContext.demand')}</span>
+          <span style={{ fontWeight: 700, color: demandColour }}>{demandLabel}</span>
         </div>
         {lastSalePrice && (
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-            <span style={{ color: 'var(--muted)' }}>Last sold</span>
+            <span style={{ color: 'var(--muted)' }}>{t('priceContext.lastSold')}</span>
             <span style={{ fontWeight: 700, color: 'var(--gold)' }}>${Number(lastSalePrice).toLocaleString()}</span>
           </div>
         )}
         {topOffer && (
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-            <span style={{ color: 'var(--muted)' }}>Highest offer</span>
+            <span style={{ color: 'var(--muted)' }}>{t('priceContext.highestOffer')}</span>
             <span style={{ fontWeight: 700, color: 'var(--green)' }}>${Number(topOffer).toLocaleString()}</span>
           </div>
         )}
@@ -562,25 +547,26 @@ function PriceContext({ benchmark, lastSalePrice, topOffer, trendPct, demand }: 
 function BusinessIncomePanel({ gross, upkeep, net, daysToIncome }: {
   gross: number; upkeep: number; net: number; daysToIncome: number
 }) {
+  const t = useTranslations('item')
   return (
     <div style={{ marginTop: 16, padding: '14px 16px', borderRadius: 8, background: 'var(--bg3)', border: '1px solid #2a3a2a' }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.08em', marginBottom: 10 }}>MONTHLY INCOME</div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.08em', marginBottom: 10 }}>{t('business.header')}</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-          <span style={{ color: 'var(--muted)' }}>Gross income</span>
+          <span style={{ color: 'var(--muted)' }}>{t('business.grossIncome')}</span>
           <span style={{ fontWeight: 700, color: 'var(--green)' }}>+${gross.toLocaleString()}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-          <span style={{ color: 'var(--muted)' }}>Upkeep</span>
+          <span style={{ color: 'var(--muted)' }}>{t('business.upkeep')}</span>
           <span style={{ fontWeight: 700, color: 'var(--red)' }}>−${upkeep.toLocaleString()}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, borderTop: '1px solid var(--border)', paddingTop: 6, marginTop: 2 }}>
-          <span style={{ fontWeight: 700 }}>Net profit</span>
+          <span style={{ fontWeight: 700 }}>{t('business.netProfit')}</span>
           <span style={{ fontWeight: 900, color: 'var(--gold)' }}>+${net.toLocaleString()}/mo</span>
         </div>
       </div>
       <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
-        {daysToIncome === 0 ? 'Payout due today' : `Next payout in ${daysToIncome} day${daysToIncome !== 1 ? 's' : ''}`}
+        {daysToIncome === 0 ? t('business.payoutToday') : t('business.nextPayout', { n: daysToIncome })}
       </div>
     </div>
   )
@@ -592,42 +578,43 @@ function PropertyPanel({ def, upkeep, appreciation, net }: {
   appreciation: number
   net: number
 }) {
+  const t = useTranslations('item')
   const isRentFree = upkeep === 0 && appreciation === 0
   if (isRentFree) {
     return (
       <div style={{ marginTop: 16, padding: '14px 16px', borderRadius: 8, background: 'var(--bg3)', border: '1px solid var(--border)' }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.08em', marginBottom: 8 }}>{def.emoji} {def.label.toUpperCase()}</div>
         <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.5 }}>
-          Free to own. No upkeep, no appreciation — but at least you have a roof over your head.<br />
-          <span style={{ color: '#888', fontStyle: 'italic' }}>Prestige: {def.prestige}</span>
+          {t('property.rentFreeNote')}<br />
+          <span style={{ color: '#888', fontStyle: 'italic' }}>{t('property.rentFreePrestige', { value: def.prestige })}</span>
         </div>
       </div>
     )
   }
   return (
     <div style={{ marginTop: 16, padding: '14px 16px', borderRadius: 8, background: 'var(--bg3)', border: '1px solid var(--border)' }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.08em', marginBottom: 10 }}>{def.emoji} PROPERTY ECONOMICS</div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.08em', marginBottom: 10 }}>{def.emoji} {t('property.header')}</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-          <span style={{ color: 'var(--muted)' }}>Monthly appreciation</span>
+          <span style={{ color: 'var(--muted)' }}>{t('property.appreciation')}</span>
           <span style={{ fontWeight: 700, color: 'var(--green)' }}>+${appreciation.toLocaleString()}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-          <span style={{ fontWeight: 700, color: 'var(--red)' }}>Cost of Ownership</span>
+          <span style={{ fontWeight: 700, color: 'var(--red)' }}>{t('property.costOfOwnership')}</span>
           <span style={{ fontWeight: 700, color: 'var(--red)' }}>−${upkeep.toLocaleString()}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, borderTop: '1px solid var(--border)', paddingTop: 6, marginTop: 2 }}>
-          <span style={{ fontWeight: 700 }}>Net / month</span>
+          <span style={{ fontWeight: 700 }}>{t('property.netMonth')}</span>
           <span style={{ fontWeight: 900, color: net >= 0 ? 'var(--green)' : 'var(--red)' }}>
             {net >= 0 ? '+' : '−'}${Math.abs(net).toLocaleString()}
           </span>
         </div>
       </div>
       <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
-        Appreciation grows the asset's value, not your cash balance. Sell to realise gains.
+        {t('property.appreciationNote')}
       </div>
       <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-        Prestige: <span style={{ color: 'var(--gold)', fontWeight: 700 }}>{def.prestige}</span>
+        {t('property.prestige', { value: <span style={{ color: 'var(--gold)', fontWeight: 700 }}>{def.prestige}</span> as any })}
       </div>
     </div>
   )
@@ -637,27 +624,29 @@ function YachtPanel({ def, upkeep }: {
   def: { label: string; emoji: string; prestige: string }
   upkeep: number
 }) {
+  const t = useTranslations('item')
   return (
     <div style={{ marginTop: 16, padding: '14px 16px', borderRadius: 8, background: 'var(--bg3)', border: '1px solid var(--border)' }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.08em', marginBottom: 10 }}>{def.emoji} COST OF OWNERSHIP</div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.08em', marginBottom: 10 }}>{def.emoji} {t('yacht.header')}</div>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-        <span style={{ color: 'var(--muted)', fontWeight: 700 }}>Monthly upkeep</span>
+        <span style={{ color: 'var(--muted)', fontWeight: 700 }}>{t('yacht.monthlyUpkeep')}</span>
         <span style={{ fontWeight: 700, color: upkeep > 0 ? 'var(--red)' : 'var(--muted)' }}>
-          {upkeep > 0 ? `−$${upkeep.toLocaleString()}` : 'Free to maintain'}
+          {upkeep > 0 ? `−$${upkeep.toLocaleString()}` : t('yacht.freeMaintain')}
         </span>
       </div>
       <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
-        Prestige: <span style={{ color: 'var(--gold)', fontWeight: 700 }}>{def.prestige}</span>
+        {t('yacht.prestige', { value: <span style={{ color: 'var(--gold)', fontWeight: 700 }}>{def.prestige}</span> as any })}
       </div>
     </div>
   )
 }
 
 function ReportModal({ editionId, onClose }: { editionId: string; onClose: () => void }) {
-  const [reason, setReason]   = useState('')
-  const [desc, setDesc]       = useState('')
-  const [sent, setSent]       = useState(false)
-  const [busy, setBusy]       = useState(false)
+  const t = useTranslations('item')
+  const [reason, setReason] = useState('')
+  const [desc, setDesc]     = useState('')
+  const [sent, setSent]     = useState(false)
+  const [busy, setBusy]     = useState(false)
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -669,31 +658,31 @@ function ReportModal({ editionId, onClose }: { editionId: string; onClose: () =>
   return (
     <div className="overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="modal">
-        <div className="modal-title">Report this item</div>
+        <div className="modal-title">{t('report.title')}</div>
         {sent ? (
           <div>
-            <p style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 16 }}>Thanks — our team will review it shortly.</p>
-            <button className="btn btn-outline" onClick={onClose}>Close</button>
+            <p style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 16 }}>{t('report.thanks')}</p>
+            <button className="btn btn-outline" onClick={onClose}>{t('report.close')}</button>
           </div>
         ) : (
           <form onSubmit={submit}>
             <div className="form-group">
-              <label className="form-label">Reason</label>
+              <label className="form-label">{t('report.reasonLabel')}</label>
               <select className="form-input" value={reason} onChange={e => setReason(e.target.value)} required>
-                <option value="">Select a reason</option>
-                <option value="copyright">Copyright / real brand</option>
-                <option value="inappropriate">Inappropriate content</option>
-                <option value="fake">Fake or misleading listing</option>
-                <option value="other">Other</option>
+                <option value="">{t('report.reasonPlaceholder')}</option>
+                <option value="copyright">{t('report.reasonCopyright')}</option>
+                <option value="inappropriate">{t('report.reasonInappropriate')}</option>
+                <option value="fake">{t('report.reasonFake')}</option>
+                <option value="other">{t('report.reasonOther')}</option>
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label">Details (optional)</label>
-              <input className="form-input" type="text" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Describe the issue..." maxLength={500} />
+              <label className="form-label">{t('report.detailsLabel')}</label>
+              <input className="form-input" type="text" value={desc} onChange={e => setDesc(e.target.value)} placeholder={t('report.detailsPlaceholder')} maxLength={500} />
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn btn-danger" type="submit" disabled={busy || !reason}>{busy ? 'Sending...' : 'Submit report'}</button>
-              <button className="btn btn-ghost" type="button" onClick={onClose}>Cancel</button>
+              <button className="btn btn-danger" type="submit" disabled={busy || !reason}>{busy ? t('report.submitting') : t('report.submit')}</button>
+              <button className="btn btn-ghost" type="button" onClick={onClose}>{t('report.cancel')}</button>
             </div>
           </form>
         )}

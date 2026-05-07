@@ -223,5 +223,181 @@
       "browseCategory": "Browse {category} →",
       "browseAll":      "Browse Market →"
     }
+  },
+  "inbox": {
+    "title":         "Inbox",
+    "subtitle":      "Your offers",
+    "pending":       "{n} pending",
+    "tabs": {
+      "received": "Received",
+      "sent":     "Sent"
+    },
+    "emptyReceived": "No offers received yet.",
+    "emptySent":     "No offers sent yet.",
+    "yourMove":      "YOUR MOVE",
+    "waiting":       "waiting…",
+    "expires":       "Expires {time}",
+    "from":          "from @{username}",
+    "offer": {
+      "yourOffer":   "Your offer",
+      "theyOffered": "@{username} offered",
+      "yourCounter": "Your counter",
+      "counterOffer":"Counter offer"
+    },
+    "actions": {
+      "accept":  "Accept {amount}",
+      "counter": "Counter",
+      "decline": "Decline"
+    },
+    "status": {
+      "pending":   "PENDING",
+      "countered": "COUNTERED",
+      "accepted":  "ACCEPTED",
+      "declined":  "DECLINED",
+      "expired":   "EXPIRED"
+    },
+    "counterModal": {
+      "title":              "Send counter offer",
+      "subtitle":           "{item} · buyer offered {amount}",
+      "amountLabel":        "Your counter amount",
+      "messageLabel":       "Message (optional)",
+      "messagePlaceholder": "e.g. Best I can do at this price",
+      "send":               "Send counter",
+      "sending":            "Sending…",
+      "cancel":             "Cancel"
+    }
+  },
+  "item": {
+    "frozen": "This item is frozen.",
+    "supply": {
+      "unique":    "1 of 1 · Unique edition",
+      "soldOut":   "SOLD OUT · {n} more members needed",
+      "available": "{available} available now · {total} total ever",
+      "totalOnly": "{total} total ever",
+      "claimed":   "{n} already claimed"
+    },
+    "owner": {
+      "liveAuction":  "Live auction in progress",
+      "listedAt":     "Listed at {price}",
+      "removeListing":"Remove listing",
+      "listForSale":  "List for sale",
+      "startAuction": "Start auction",
+      "costHeader":   "COST OF OWNERSHIP",
+      "overdue":      "{n, plural, =1 {Overdue by # day} other {Overdue by # days}}",
+      "nextCharge":   "{n, plural, =1 {Next charge in # day} other {Next charge in # days}}",
+      "report":       "Report this item"
+    },
+    "listModal": {
+      "title":      "List for sale",
+      "priceLabel": "Listing price (USD)",
+      "submitting": "Listing...",
+      "submit":     "List item",
+      "cancel":     "Cancel"
+    },
+    "auctionModal": {
+      "title":          "Start Auction",
+      "subtitle":       "{item} · 3-day auction",
+      "bidLabel":       "Starting bid",
+      "bid10pct":       "10% of true value",
+      "bid25pct":       "25% of true value",
+      "bidCustom":      "Custom amount",
+      "bidPlaceholder": "Enter amount",
+      "submitting":     "Starting...",
+      "submit":         "Start 3-day auction",
+      "cancel":         "Cancel"
+    },
+    "offer": {
+      "header":              "MAKE OFFER",
+      "min":                 "min {price}",
+      "hideNote":            "hide note",
+      "addNote":             "+ add note",
+      "notePlaceholder":     "Message to owner (optional)",
+      "submit":              "Offer",
+      "signIn":              "Sign in to make offers",
+      "insufficientBalance": "Insufficient balance (you have {amount})",
+      "sent":                "Offer sent!",
+      "sentSub":             "The owner will be notified. Check your inbox for their response."
+    },
+    "buy": {
+      "buyNow":                "Buy now — {price}",
+      "buyNowListed":          "or Buy Now at {price} →",
+      "claim":                 "Claim at {price} (50% off)",
+      "buying":                "Buying...",
+      "signIn":                "Sign in to buy",
+      "insufficientBalance":   "Insufficient balance (you have {amount})",
+      "suggestionDiscount":    "🎉 Your suggestion made it in!",
+      "suggestionDiscountSub": "You get 50% off as the suggester"
+    },
+    "soldOut": {
+      "header":     "SOLD OUT",
+      "unlockAt":   "New editions unlock at {threshold} members · {n} to go",
+      "unlockSoon": "Unlocks as more members join"
+    },
+    "urgency": {
+      "watching": "{n, plural, =1 {🔥 # player watching} other {🔥 # players watching}}",
+      "offers":   "{n, plural, =1 {📋 # offer pending} other {📋 # offers pending}}"
+    },
+    "secondary": {
+      "owner":            "OWNER",
+      "active":           "Active {time}",
+      "alsoOwns":         "{n, plural, =1 {Also owns # Exotic+ car} other {Also owns # Exotic+ cars}}",
+      "costOfOwnership":  "Cost of Ownership"
+    },
+    "priceContext": {
+      "header":       "PRICE CONTEXT",
+      "trueValue":    "True value",
+      "demand":       "Demand",
+      "lastSold":     "Last sold",
+      "highestOffer": "Highest offer",
+      "trendUp":      "↑ +{pct}% vs last sale",
+      "trendDown":    "↓ {pct}% vs last sale",
+      "trendStable":  "→ Stable"
+    },
+    "demandLevel": {
+      "High":   "High",
+      "Medium": "Medium",
+      "Normal": "Normal"
+    },
+    "business": {
+      "header":      "MONTHLY INCOME",
+      "grossIncome": "Gross income",
+      "upkeep":      "Upkeep",
+      "netProfit":   "Net profit",
+      "payoutToday": "Payout due today",
+      "nextPayout":  "{n, plural, =1 {Next payout in # day} other {Next payout in # days}}"
+    },
+    "property": {
+      "header":           "PROPERTY ECONOMICS",
+      "appreciation":     "Monthly appreciation",
+      "costOfOwnership":  "Cost of Ownership",
+      "netMonth":         "Net / month",
+      "appreciationNote": "Appreciation grows the asset's value, not your cash balance. Sell to realise gains.",
+      "prestige":         "Prestige: {value}",
+      "rentFreeNote":     "Free to own. No upkeep, no appreciation — but at least you have a roof over your head.",
+      "rentFreePrestige": "Prestige: {value}"
+    },
+    "yacht": {
+      "header":        "COST OF OWNERSHIP",
+      "monthlyUpkeep": "Monthly upkeep",
+      "freeMaintain":  "Free to maintain",
+      "prestige":      "Prestige: {value}"
+    },
+    "report": {
+      "title":               "Report this item",
+      "button":              "Report this item",
+      "thanks":              "Thanks — our team will review it shortly.",
+      "close":               "Close",
+      "reasonLabel":         "Reason",
+      "reasonPlaceholder":   "Select a reason",
+      "reasonCopyright":     "Copyright / real brand",
+      "reasonInappropriate": "Inappropriate content",
+      "reasonFake":          "Fake or misleading listing",
+      "reasonOther":         "Other",
+      "detailsLabel":        "Details (optional)",
+      "detailsPlaceholder":  "Describe the issue...",
+      "submitting":          "Sending...",
+      "submit":              "Submit report",
+      "cancel":              "Cancel"
+    }
   }
 }

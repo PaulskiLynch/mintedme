@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { formatDistanceToNow } from 'date-fns'
+import { useTranslations } from 'next-intl'
 
 interface CounterOffer {
   id:        string
@@ -46,6 +47,7 @@ const STATUS_COLOUR: Record<string, string> = {
 function amt(s: string) { return `$${Number(s).toLocaleString()}` }
 
 export default function InboxClient({ buyerThreads, sellerThreads }: Props) {
+  const t = useTranslations('inbox')
   const router = useRouter()
   const [tab, setTab]       = useState<'received' | 'sent'>('received')
   const [busy, setBusy]     = useState('')
@@ -73,16 +75,24 @@ export default function InboxClient({ buyerThreads, sellerThreads }: Props) {
     router.refresh()
   }
 
-  const tabStyle = (t: typeof tab): React.CSSProperties => ({
+  const tabStyle = (v: typeof tab): React.CSSProperties => ({
     padding: '8px 18px', borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-    border: 'none', background: tab === t ? 'var(--gold)' : 'var(--bg3)',
-    color: tab === t ? '#000' : 'var(--muted)',
+    border: 'none', background: tab === v ? 'var(--gold)' : 'var(--bg3)',
+    color: tab === v ? '#000' : 'var(--muted)',
   })
 
   const btn = (bg: string, fg = '#fff'): React.CSSProperties => ({
     padding: '7px 16px', fontSize: 12, fontWeight: 700, borderRadius: 6,
     border: 'none', cursor: 'pointer', background: bg, color: fg,
   })
+
+  const statusLabel: Record<string, string> = {
+    pending:   t('status.pending'),
+    countered: t('status.countered'),
+    accepted:  t('status.accepted'),
+    declined:  t('status.declined'),
+    expired:   t('status.expired'),
+  }
 
   function OfferRow({ label, amount, message, time, highlight }: { label: string; amount: string; message?: string | null; time: string; highlight?: boolean }) {
     return (
@@ -103,15 +113,13 @@ export default function InboxClient({ buyerThreads, sellerThreads }: Props) {
   function ThreadCard({ thread, myRole }: { thread: Thread; myRole: 'buyer' | 'seller' }) {
     const { id, amount, message, status, expiresAt, createdAt, edition, counter, buyerUsername } = thread
 
-    // Determine the state of this thread
     const counterPending = counter?.status === 'pending'
     const isResolved     = ['accepted', 'declined', 'expired'].includes(counter?.status ?? status)
     const finalStatus    = counter?.status ?? status
 
-    // Who needs to act?
     const myTurn = myRole === 'seller'
-      ? status === 'pending' && !counter              // seller needs to respond to original
-      : counterPending                                 // buyer needs to respond to counter
+      ? status === 'pending' && !counter
+      : counterPending
 
     const isBusy = busy.startsWith(counter?.id ?? id) || busy.startsWith(id)
 
@@ -126,37 +134,35 @@ export default function InboxClient({ buyerThreads, sellerThreads }: Props) {
             <img src={edition.imageUrl} alt="" style={{ width: 52, height: 52, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
-            {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
               <div>
                 <Link href={`/item/${edition.id}`} style={{ fontWeight: 800, fontSize: 15, color: 'var(--white)', textDecoration: 'none' }}>
                   {edition.itemName}
                 </Link>
                 {myRole === 'seller' && buyerUsername && (
-                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 1 }}>from @{buyerUsername}</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 1 }}>{t('from', { username: buyerUsername })}</div>
                 )}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
                 {myTurn && (
                   <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--gold)', background: 'rgba(212,160,23,0.15)', padding: '2px 7px', borderRadius: 10, letterSpacing: '0.05em' }}>
-                    YOUR MOVE
+                    {t('yourMove')}
                   </span>
                 )}
                 {isResolved && (
                   <span style={{ fontSize: 11, fontWeight: 700, color: STATUS_COLOUR[finalStatus] ?? 'var(--muted)' }}>
-                    {finalStatus.toUpperCase()}
+                    {statusLabel[finalStatus] ?? finalStatus.toUpperCase()}
                   </span>
                 )}
                 {!myTurn && !isResolved && (
-                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>waiting…</span>
+                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>{t('waiting')}</span>
                 )}
               </div>
             </div>
 
-            {/* Offer thread timeline */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: myTurn ? 14 : 0 }}>
               <OfferRow
-                label={myRole === 'buyer' ? 'Your offer' : `@${buyerUsername ?? 'buyer'} offered`}
+                label={myRole === 'buyer' ? t('offer.yourOffer') : t('offer.theyOffered', { username: buyerUsername ?? 'buyer' })}
                 amount={amount}
                 message={message}
                 time={createdAt}
@@ -164,7 +170,7 @@ export default function InboxClient({ buyerThreads, sellerThreads }: Props) {
               />
               {counter && (
                 <OfferRow
-                  label={myRole === 'seller' ? 'Your counter' : 'Counter offer'}
+                  label={myRole === 'seller' ? t('offer.yourCounter') : t('offer.counterOffer')}
                   amount={counter.amount}
                   message={counter.message}
                   time={counter.createdAt}
@@ -173,20 +179,19 @@ export default function InboxClient({ buyerThreads, sellerThreads }: Props) {
               )}
             </div>
 
-            {/* Action buttons */}
             {myRole === 'seller' && status === 'pending' && !counter && (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button style={btn('var(--gold)', '#000')} disabled={isBusy}
                   onClick={() => act(id, 'accept')}>
-                  {busy === id + 'accept' ? '…' : `Accept ${amt(amount)}`}
+                  {busy === id + 'accept' ? '…' : t('actions.accept', { amount: amt(amount) })}
                 </button>
                 <button style={btn('var(--bg3)', 'var(--white)')} disabled={isBusy}
                   onClick={() => { setCounter({ offerId: id, itemName: edition.itemName, buyerOffer: amount }); setCounterAmt(''); setCounterMsg('') }}>
-                  Counter
+                  {t('actions.counter')}
                 </button>
                 <button style={btn('rgba(239,68,68,0.15)', 'var(--red)')} disabled={isBusy}
                   onClick={() => act(id, 'decline')}>
-                  {busy === id + 'decline' ? '…' : 'Decline'}
+                  {busy === id + 'decline' ? '…' : t('actions.decline')}
                 </button>
               </div>
             )}
@@ -195,19 +200,18 @@ export default function InboxClient({ buyerThreads, sellerThreads }: Props) {
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button style={btn('var(--gold)', '#000')} disabled={isBusy}
                   onClick={() => act(counter.id, 'accept')}>
-                  {busy === counter.id + 'accept' ? '…' : `Accept ${amt(counter.amount)}`}
+                  {busy === counter.id + 'accept' ? '…' : t('actions.accept', { amount: amt(counter.amount) })}
                 </button>
                 <button style={btn('rgba(239,68,68,0.15)', 'var(--red)')} disabled={isBusy}
                   onClick={() => act(counter.id, 'decline')}>
-                  {busy === counter.id + 'decline' ? '…' : 'Decline'}
+                  {busy === counter.id + 'decline' ? '…' : t('actions.decline')}
                 </button>
               </div>
             )}
 
-            {/* Expiry hint */}
             {myTurn && (
               <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
-                Expires {formatDistanceToNow(new Date(counter?.expiresAt ?? expiresAt), { addSuffix: true })}
+                {t('expires', { time: formatDistanceToNow(new Date(counter?.expiresAt ?? expiresAt), { addSuffix: true }) })}
               </div>
             )}
           </div>
@@ -223,60 +227,59 @@ export default function InboxClient({ buyerThreads, sellerThreads }: Props) {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 24 }}>
         <div>
-          <div className="page-title">Inbox</div>
-          <div className="page-sub">Your offers</div>
+          <div className="page-title">{t('title')}</div>
+          <div className="page-sub">{t('subtitle')}</div>
         </div>
         {pendingReceived > 0 && (
           <span style={{ background: 'var(--gold)', color: '#000', fontWeight: 800, fontSize: 12, padding: '3px 10px', borderRadius: 20 }}>
-            {pendingReceived} pending
+            {t('pending', { n: pendingReceived })}
           </span>
         )}
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
         <button style={tabStyle('received')} onClick={() => setTab('received')}>
-          Received{pendingReceived > 0 ? ` (${pendingReceived})` : ` (${received.length})`}
+          {t('tabs.received')}{pendingReceived > 0 ? ` (${pendingReceived})` : ` (${received.length})`}
         </button>
         <button style={tabStyle('sent')} onClick={() => setTab('sent')}>
-          Sent ({sent.length})
+          {t('tabs.sent')} ({sent.length})
         </button>
       </div>
 
       {tab === 'received' && (
         received.length === 0
-          ? <div style={{ color: 'var(--muted)', padding: '40px 0', textAlign: 'center', fontWeight: 700 }}>No offers received yet.</div>
-          : received.map(t => <ThreadCard key={t.id} thread={t} myRole="seller" />)
+          ? <div style={{ color: 'var(--muted)', padding: '40px 0', textAlign: 'center', fontWeight: 700 }}>{t('emptyReceived')}</div>
+          : received.map(thread => <ThreadCard key={thread.id} thread={thread} myRole="seller" />)
       )}
 
       {tab === 'sent' && (
         sent.length === 0
-          ? <div style={{ color: 'var(--muted)', padding: '40px 0', textAlign: 'center', fontWeight: 700 }}>No offers sent yet.</div>
-          : sent.map(t => <ThreadCard key={t.id} thread={t} myRole="buyer" />)
+          ? <div style={{ color: 'var(--muted)', padding: '40px 0', textAlign: 'center', fontWeight: 700 }}>{t('emptySent')}</div>
+          : sent.map(thread => <ThreadCard key={thread.id} thread={thread} myRole="buyer" />)
       )}
 
-      {/* Counter modal */}
       {counter && (
         <div className="overlay" onClick={e => { if (e.target === e.currentTarget) setCounter(null) }}>
           <div className="modal">
-            <div className="modal-title">Send counter offer</div>
-            <div className="modal-sub">{counter.itemName} · buyer offered {amt(counter.buyerOffer)}</div>
+            <div className="modal-title">{t('counterModal.title')}</div>
+            <div className="modal-sub">{t('counterModal.subtitle', { item: counter.itemName, amount: amt(counter.buyerOffer) })}</div>
             <div className="form-group">
-              <label className="form-label">Your counter amount</label>
+              <label className="form-label">{t('counterModal.amountLabel')}</label>
               <input className="form-input" type="number" min="1"
                 value={counterAmt} onChange={e => setCounterAmt(e.target.value)} autoFocus />
             </div>
             <div className="form-group">
-              <label className="form-label">Message (optional)</label>
+              <label className="form-label">{t('counterModal.messageLabel')}</label>
               <input className="form-input" type="text" maxLength={200}
                 value={counterMsg} onChange={e => setCounterMsg(e.target.value)}
-                placeholder="e.g. Best I can do at this price" />
+                placeholder={t('counterModal.messagePlaceholder')} />
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn btn-gold" disabled={!!busy || !counterAmt}
                 onClick={() => act(counter.offerId, 'counter', { counterAmount: Number(counterAmt), message: counterMsg || undefined })}>
-                {busy ? 'Sending…' : 'Send counter'}
+                {busy ? t('counterModal.sending') : t('counterModal.send')}
               </button>
-              <button className="btn btn-ghost" onClick={() => setCounter(null)}>Cancel</button>
+              <button className="btn btn-ghost" onClick={() => setCounter(null)}>{t('counterModal.cancel')}</button>
             </div>
           </div>
         </div>

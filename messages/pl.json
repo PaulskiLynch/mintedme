@@ -223,5 +223,181 @@
       "browseCategory": "Przeglądaj {category} →",
       "browseAll":      "Przeglądaj rynek →"
     }
+  },
+  "inbox": {
+    "title":         "Skrzynka",
+    "subtitle":      "Twoje oferty",
+    "pending":       "{n} oczekujące",
+    "tabs": {
+      "received": "Otrzymane",
+      "sent":     "Wysłane"
+    },
+    "emptyReceived": "Brak otrzymanych ofert.",
+    "emptySent":     "Brak wysłanych ofert.",
+    "yourMove":      "TWÓJ RUCH",
+    "waiting":       "czeka…",
+    "expires":       "Wygasa {time}",
+    "from":          "od @{username}",
+    "offer": {
+      "yourOffer":   "Twoja oferta",
+      "theyOffered": "@{username} oferuje",
+      "yourCounter": "Twoja kontroferta",
+      "counterOffer":"Kontroferta"
+    },
+    "actions": {
+      "accept":  "Akceptuj {amount}",
+      "counter": "Kontruj",
+      "decline": "Odrzuć"
+    },
+    "status": {
+      "pending":   "OCZEKUJE",
+      "countered": "KONTROFERTA",
+      "accepted":  "ZAAKCEPTOWANE",
+      "declined":  "ODRZUCONE",
+      "expired":   "WYGASŁE"
+    },
+    "counterModal": {
+      "title":              "Wyślij kontrofertę",
+      "subtitle":           "{item} · kupujący oferuje {amount}",
+      "amountLabel":        "Twoja kwota kontroferty",
+      "messageLabel":       "Wiadomość (opcjonalnie)",
+      "messagePlaceholder": "np. To moja ostateczna cena",
+      "send":               "Wyślij kontrofertę",
+      "sending":            "Wysyłanie…",
+      "cancel":             "Anuluj"
+    }
+  },
+  "item": {
+    "frozen": "Ten przedmiot jest zablokowany.",
+    "supply": {
+      "unique":    "1 z 1 · Unikalna edycja",
+      "soldOut":   "WYPRZEDANE · potrzeba {n} więcej graczy",
+      "available": "{available} dostępnych teraz · {total} łącznie",
+      "totalOnly": "{total} łącznie",
+      "claimed":   "{n} już zajęte"
+    },
+    "owner": {
+      "liveAuction":  "Aukcja w toku",
+      "listedAt":     "Wystawiono za {price}",
+      "removeListing":"Usuń ofertę",
+      "listForSale":  "Wystaw na sprzedaż",
+      "startAuction": "Rozpocznij aukcję",
+      "costHeader":   "KOSZT POSIADANIA",
+      "overdue":      "{n, plural, =1 {Zaległe o # dzień} other {Zaległe o # dni}}",
+      "nextCharge":   "{n, plural, =1 {Następna opłata za # dzień} other {Następna opłata za # dni}}",
+      "report":       "Zgłoś ten przedmiot"
+    },
+    "listModal": {
+      "title":      "Wystaw na sprzedaż",
+      "priceLabel": "Cena wywoławcza (USD)",
+      "submitting": "Wystawianie...",
+      "submit":     "Wystaw",
+      "cancel":     "Anuluj"
+    },
+    "auctionModal": {
+      "title":          "Rozpocznij aukcję",
+      "subtitle":       "{item} · aukcja 3-dniowa",
+      "bidLabel":       "Cena startowa",
+      "bid10pct":       "10% wartości",
+      "bid25pct":       "25% wartości",
+      "bidCustom":      "Własna kwota",
+      "bidPlaceholder": "Wpisz kwotę",
+      "submitting":     "Uruchamianie...",
+      "submit":         "Rozpocznij aukcję 3-dniową",
+      "cancel":         "Anuluj"
+    },
+    "offer": {
+      "header":              "ZŁÓŻ OFERTĘ",
+      "min":                 "min {price}",
+      "hideNote":            "ukryj notatkę",
+      "addNote":             "+ dodaj notatkę",
+      "notePlaceholder":     "Wiadomość do właściciela (opcjonalnie)",
+      "submit":              "Oferta",
+      "signIn":              "Zaloguj się, aby składać oferty",
+      "insufficientBalance": "Niewystarczające saldo (masz {amount})",
+      "sent":                "Oferta wysłana!",
+      "sentSub":             "Właściciel zostanie powiadomiony. Sprawdź skrzynkę po odpowiedź."
+    },
+    "buy": {
+      "buyNow":                "Kup teraz — {price}",
+      "buyNowListed":          "lub Kup teraz za {price} →",
+      "claim":                 "Odbierz za {price} (50% taniej)",
+      "buying":                "Kupowanie...",
+      "signIn":                "Zaloguj się, aby kupić",
+      "insufficientBalance":   "Niewystarczające saldo (masz {amount})",
+      "suggestionDiscount":    "🎉 Twoja sugestia trafiła do gry!",
+      "suggestionDiscountSub": "Dostajesz 50% zniżki jako sugerujący"
+    },
+    "soldOut": {
+      "header":     "WYPRZEDANE",
+      "unlockAt":   "Nowe edycje od {threshold} graczy · {n} brakuje",
+      "unlockSoon": "Odblokuje się gdy dołączy więcej graczy"
+    },
+    "urgency": {
+      "watching": "{n, plural, =1 {🔥 # gracz obserwuje} other {🔥 # graczy obserwuje}}",
+      "offers":   "{n, plural, =1 {📋 # oferta oczekuje} other {📋 # ofert oczekuje}}"
+    },
+    "secondary": {
+      "owner":           "WŁAŚCICIEL",
+      "active":          "Aktywny {time}",
+      "alsoOwns":        "{n, plural, =1 {Ma też # auto Exotic+} other {Ma też # aut Exotic+}}",
+      "costOfOwnership": "Koszt posiadania"
+    },
+    "priceContext": {
+      "header":       "KONTEKST CENOWY",
+      "trueValue":    "Prawdziwa wartość",
+      "demand":       "Popyt",
+      "lastSold":     "Ostatnio sprzedane",
+      "highestOffer": "Najwyższa oferta",
+      "trendUp":      "↑ +{pct}% vs ostatnia sprzedaż",
+      "trendDown":    "↓ {pct}% vs ostatnia sprzedaż",
+      "trendStable":  "→ Stabilny"
+    },
+    "demandLevel": {
+      "High":   "Wysoki",
+      "Medium": "Średni",
+      "Normal": "Normalny"
+    },
+    "business": {
+      "header":      "MIESIĘCZNY DOCHÓD",
+      "grossIncome": "Przychód brutto",
+      "upkeep":      "Utrzymanie",
+      "netProfit":   "Zysk netto",
+      "payoutToday": "Wypłata dziś",
+      "nextPayout":  "{n, plural, =1 {Następna wypłata za # dzień} other {Następna wypłata za # dni}}"
+    },
+    "property": {
+      "header":           "EKONOMIA NIERUCHOMOŚCI",
+      "appreciation":     "Miesięczna aprecjacja",
+      "costOfOwnership":  "Koszt posiadania",
+      "netMonth":         "Netto / miesiąc",
+      "appreciationNote": "Aprecjacja zwiększa wartość aktywu, nie saldo. Sprzedaj, by zrealizować zyski.",
+      "prestige":         "Prestiż: {value}",
+      "rentFreeNote":     "Bezpłatne. Brak utrzymania, brak aprecjacji — ale przynajmniej masz dach nad głową.",
+      "rentFreePrestige": "Prestiż: {value}"
+    },
+    "yacht": {
+      "header":        "KOSZT POSIADANIA",
+      "monthlyUpkeep": "Miesięczne utrzymanie",
+      "freeMaintain":  "Bezpłatne utrzymanie",
+      "prestige":      "Prestiż: {value}"
+    },
+    "report": {
+      "title":               "Zgłoś ten przedmiot",
+      "button":              "Zgłoś ten przedmiot",
+      "thanks":              "Dziękujemy — nasz zespół sprawdzi to wkrótce.",
+      "close":               "Zamknij",
+      "reasonLabel":         "Powód",
+      "reasonPlaceholder":   "Wybierz powód",
+      "reasonCopyright":     "Prawa autorskie / prawdziwa marka",
+      "reasonInappropriate": "Nieodpowiednia zawartość",
+      "reasonFake":          "Fałszywa lub wprowadzająca w błąd oferta",
+      "reasonOther":         "Inne",
+      "detailsLabel":        "Szczegóły (opcjonalnie)",
+      "detailsPlaceholder":  "Opisz problem...",
+      "submitting":          "Wysyłanie...",
+      "submit":              "Wyślij zgłoszenie",
+      "cancel":              "Anuluj"
+    }
   }
 }
