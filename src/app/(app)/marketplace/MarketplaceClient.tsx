@@ -276,22 +276,28 @@ export default function MarketplaceClient({ items, categories, currentCategory, 
         </div>
       </form>
 
-      <div className="pill-row">
-        {categories.map(c => (
-          <button key={c} className={`pill${currentCategory === c ? ' active' : ''}`} onClick={() => nav({ category: c, sort: currentSort, q })}>
-            {c}
-          </button>
-        ))}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
+        <select
+          value={currentCategory}
+          onChange={e => nav({ category: e.target.value, sort: currentSort, q })}
+          className="form-input"
+          style={{ maxWidth: 180, fontWeight: 700 }}
+        >
+          {categories.map(c => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>Sort:</span>
+          {[['newest', 'Newest'], ['price_asc', 'Price ↑'], ['price_desc', 'Price ↓']].map(([v, l]) => (
+            <button key={v} className={`pill btn-sm${currentSort === v ? ' active' : ''}`} onClick={() => nav({ category: currentCategory, sort: v, q })}>
+              {l}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24, alignItems: 'center' }}>
-        <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>SORT:</span>
-        {[['newest', 'Newest'], ['price_asc', 'Price ↑'], ['price_desc', 'Price ↓']].map(([v, l]) => (
-          <button key={v} className={`pill btn-sm${currentSort === v ? ' active' : ''}`} onClick={() => nav({ category: currentCategory, sort: v, q })}>
-            {l}
-          </button>
-        ))}
-      </div>
 
       {items.length === 0 ? (
         <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--muted)', fontWeight: 700 }}>No assets found.</div>

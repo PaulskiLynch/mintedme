@@ -5,7 +5,13 @@ import MarketplaceClient from './MarketplaceClient'
 
 export const dynamic = 'force-dynamic'
 
-const CATEGORIES = ['All', 'Cars', 'Aircraft', 'Businesses', 'Properties']
+const CATEGORY_LABELS: Record<string, string> = {
+  cars:       'Cars',
+  aircraft:   'Aircraft',
+  businesses: 'Businesses',
+  properties: 'Properties',
+  yachts:     'Yachts',
+}
 
 export default async function MarketplacePage({
   searchParams,
@@ -26,6 +32,17 @@ export default async function MarketplacePage({
   const orderBy = sort === 'price_asc'  ? [{ minimumBid: 'asc'  as const }]
                : sort === 'price_desc' ? [{ minimumBid: 'desc' as const }]
                :                        [{ createdAt:   'desc' as const }]
+
+  // Build category list dynamically from DB
+  const rawCats = await prisma.item.findMany({
+    where:    { isApproved: true, isFrozen: false, itemStatus: 'active' },
+    select:   { category: true },
+    distinct: ['category'],
+    orderBy:  { category: 'asc' },
+  })
+  const categories = ['All', ...rawCats.map((r: { category: string }) =>
+    CATEGORY_LABELS[r.category] ?? (r.category.charAt(0).toUpperCase() + r.category.slice(1))
+  )]
 
   const threshold  = scarcityThreshold()
   const userCount  = threshold > 0 ? await prisma.user.count() : 0
@@ -65,7 +82,7 @@ export default async function MarketplacePage({
           lastSaleDate:  e.lastSaleDate?.toISOString() ?? null,
         })),
       }))}
-      categories={CATEGORIES}
+      categories={categories}
       currentCategory={category ?? 'All'}
       currentSort={sort ?? 'newest'}
       query={q ?? ''}
