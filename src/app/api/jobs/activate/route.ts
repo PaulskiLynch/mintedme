@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
-import { JOB_BY_CODE, slotsForJob } from '@/lib/jobs'
+import { JOB_BY_CODE, isJobActive } from '@/lib/jobs'
 
-const DURATION_MS = 3 * 24 * 60 * 60 * 1000
+const DURATION_MS = 48 * 60 * 60 * 1000 // 48 hours
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -27,20 +27,17 @@ export async function POST(req: NextRequest) {
       const existingJob = await tx.jobHolding.findUnique({ where: { userId } })
       if (existingJob) throw new Error('Quit your current job before bidding')
 
-      // Only one active auction bid at a time — unless updating bid on same job
       const conflictBid = await tx.jobBid.findFirst({
         where: { userId, jobAuction: { status: 'active', jobCode: { not: jobCode } } },
       })
       if (conflictBid) throw new Error('Withdraw your current bid on another job first')
 
-      const [activeUsers, heldCount] = await Promise.all([
-        tx.user.count(),
-        tx.jobHolding.count({ where: { jobCode } }),
-      ])
-      const totalSlots = slotsForJob(jobDef.baseSlotsPerThousand, activeUsers)
-      if (heldCount >= totalSlots) throw new Error('No slots available for this role right now')
+      const userCount = await tx.user.count()
+      if (!isJobActive(jobCode, userCount)) throw new Error('This role is not available today')
 
-      // Find or create active auction for this job code
+      const heldCount = await tx.jobHolding.count({ where: { jobCode } })
+      if (heldCount >= 1) throw new Error('This role has already been filled')
+
       let auction = await tx.jobAuction.findFirst({ where: { jobCode, status: 'active' } })
       if (!auction) {
         auction = await tx.jobAuction.create({
@@ -48,7 +45,6 @@ export async function POST(req: NextRequest) {
         })
       }
 
-      // Upsert bid (user can update their salary bid)
       const bid = await tx.jobBid.upsert({
         where:  { jobAuctionId_userId: { jobAuctionId: auction.id, userId } },
         create: { jobAuctionId: auction.id, userId, salaryBid },

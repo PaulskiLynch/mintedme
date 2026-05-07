@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
-import { JOB_CATALOGUE, slotsForJob } from '@/lib/jobs'
+import { JOB_CATALOGUE, dailyShuffledJobs, activeJobCount } from '@/lib/jobs'
 
 export async function GET() {
   const session = await auth()
@@ -28,18 +28,19 @@ export async function GET() {
 
   const holderMap  = Object.fromEntries(holdings.map(h => [h.jobCode, h._count.jobCode]))
   const auctionMap = Object.fromEntries(auctions.map(a => [a.jobCode, a]))
+  const count      = activeJobCount(activeUsers)
+  const activeList = dailyShuffledJobs().slice(0, count)
 
-  const jobs = JOB_CATALOGUE.map(j => {
-    const auction = auctionMap[j.code]
+  const jobs = activeList.map(j => {
+    const auction   = auctionMap[j.code]
     const myBidHere = myActiveBid?.jobAuction.jobCode === j.code ? myActiveBid.salaryBid : null
     return {
-      code:        j.code,
-      title:       j.title,
-      category:    j.category,
-      minSalary:   j.minSalary,
-      maxSalary:   j.maxSalary,
-      totalSlots:  slotsForJob(j.baseSlotsPerThousand, activeUsers),
-      heldSlots:   holderMap[j.code] ?? 0,
+      code:     j.code,
+      title:    j.title,
+      category: j.category,
+      minSalary: j.minSalary,
+      maxSalary: j.maxSalary,
+      isTaken:  (holderMap[j.code] ?? 0) >= 1,
       activeAuction: auction ? {
         id:        auction.id,
         endsAt:    auction.endsAt.toISOString(),

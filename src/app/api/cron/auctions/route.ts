@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { settleAuction } from '@/lib/auction'
 import { monthlyUpkeep, UPKEEP_CYCLE_DAYS } from '@/lib/upkeep'
-import { JOB_BY_CODE, slotsForJob } from '@/lib/jobs'
+import { JOB_BY_CODE } from '@/lib/jobs'
 import { businessNetIncome } from '@/lib/business'
 import { monthlyPropertyUpkeep, monthlyPropertyAppreciation } from '@/lib/property'
 import { monthlyAircraftUpkeep } from '@/lib/aircraft'
@@ -279,7 +279,7 @@ export async function GET(req: NextRequest) {
 
     let awarded = false
     for (const bid of ja.bids) {
-      if (heldCount >= slotsForJob(jobDef.baseSlotsPerThousand, activeUsers)) break
+      if (heldCount >= 1) break
       const [user, existingJob] = await Promise.all([
         prisma.user.findUnique({ where: { id: bid.userId }, select: { isFrozen: true } }),
         prisma.jobHolding.findUnique({ where: { userId: bid.userId } }),

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
-import { JOB_BY_CODE, slotsForJob, randomSalary } from '@/lib/jobs'
+import { JOB_BY_CODE, isJobActive, randomSalary } from '@/lib/jobs'
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -20,21 +20,18 @@ export async function POST(req: NextRequest) {
       const existing = await tx.jobHolding.findUnique({ where: { userId } })
       if (existing) throw new Error('You already hold a job — quit first')
 
-      const [activeUsers, heldCount] = await Promise.all([
-        tx.user.count(),
-        tx.jobHolding.count({ where: { jobCode } }),
-      ])
+      const userCount = await tx.user.count()
+      if (!isJobActive(jobCode, userCount)) throw new Error('This role is not available today')
 
-      const totalSlots = slotsForJob(jobDef.baseSlotsPerThousand, activeUsers)
-      if (heldCount >= totalSlots) throw new Error('No slots available for this role right now')
+      const heldCount = await tx.jobHolding.count({ where: { jobCode } })
+      if (heldCount >= 1) throw new Error('This role has already been filled')
 
-      const salary = randomSalary(jobDef)
-
+      const salary  = randomSalary(jobDef)
       const holding = await tx.jobHolding.create({
         data: { userId, jobCode, monthlySalary: salary },
       })
 
-      return { holding, salary, totalSlots }
+      return { holding, salary }
     })
 
     return NextResponse.json({ ok: true, ...result })
