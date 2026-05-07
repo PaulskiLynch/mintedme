@@ -17,6 +17,7 @@ const NAV = [
   { href: '/marketplace',   label: 'Market',         icon: '◈' },
   { href: '/auctions',      label: 'Auctions',       icon: '⏱' },
   { href: '/jobs',          label: 'Jobs',           icon: '◑' },
+  { href: '/groups',        label: 'Groups',         icon: '◍' },
   { href: '/leaderboard',   label: 'Leaderboard',    icon: '▲' },
   { href: '/mint',          label: 'My Mint',        icon: '◆' },
   { href: '/inbox',         label: 'Inbox',          icon: '✉' },
@@ -34,6 +35,7 @@ const MOBILE_NAV_PRIMARY = [
 
 const MOBILE_NAV_MORE = [
   { href: '/auctions',      label: 'Auctions',      icon: '⏱' },
+  { href: '/groups',        label: 'Groups',         icon: '◍' },
   { href: '/leaderboard',   label: 'Leaderboard',   icon: '▲' },
   { href: '/inbox',         label: 'Inbox',          icon: '✉' },
   { href: '/notifications', label: 'Notifications', icon: '🔔' },

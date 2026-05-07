@@ -56,6 +56,8 @@ model User {
   jobBids            JobBid[]
   wonJobAuctions     JobAuction[]       @relation("JobAuctionWinner")
   adminLogs          AdminLog[]
+  groupMemberships   GroupMember[]
+  createdGroups      Group[]            @relation("GroupCreator")
 
   @@map("users")
 }
@@ -481,4 +483,35 @@ model AdminLog {
   @@index([targetType, targetId])
   @@index([createdAt])
   @@map("admin_logs")
+}
+
+model Group {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String?
+  createdById String
+  joinType    String   @default("open") // open | invite_only
+  inviteCode  String?  @unique
+  maxMembers  Int?
+  createdAt   DateTime @default(now())
+
+  createdBy User          @relation("GroupCreator", fields: [createdById], references: [id])
+  members   GroupMember[]
+
+  @@index([createdById])
+  @@map("groups")
+}
+
+model GroupMember {
+  groupId  String
+  userId   String
+  role     String   @default("member") // owner | admin | member
+  joinedAt DateTime @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, userId])
+  @@map("group_members")
 }

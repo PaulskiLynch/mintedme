@@ -37,15 +37,19 @@ export default async function MintProfilePage({ params }: { params: Promise<{ us
   const isAdmin  = session?.user?.isAdmin ?? false
   const viewerId = session?.user?.id ?? null
 
-  const [followerCount, followingCount, followRecord] = await Promise.all([
+  const [followerCount, followingCount, followRecord, reverseFollowRecord] = await Promise.all([
     prisma.follow.count({ where: { followingId: user.id } }),
     prisma.follow.count({ where: { followerId:  user.id } }),
     viewerId && !isOwn
       ? prisma.follow.findUnique({ where: { followerId_followingId: { followerId: viewerId, followingId: user.id } } })
       : null,
+    viewerId && !isOwn
+      ? prisma.follow.findUnique({ where: { followerId_followingId: { followerId: user.id, followingId: viewerId } } })
+      : null,
   ])
 
   const isFollowing = !!followRecord
+  const isMutual    = isFollowing && !!reverseFollowRecord
 
   // Income calculations
   const monthlyJobIncome = user.job?.monthlySalary ?? 0
@@ -86,6 +90,7 @@ export default async function MintProfilePage({ params }: { params: Promise<{ us
           <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
             {user.isEstablished && <span style={{ fontSize: 11, background: '#1e2a15', color: 'var(--green)', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>ESTABLISHED TRADER</span>}
             {user._count.createdItems > 0 && <span style={{ fontSize: 11, background: '#1e1a0a', color: 'var(--gold)', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>CREATOR</span>}
+            {isMutual && <span style={{ fontSize: 11, background: 'rgba(100,160,220,0.12)', color: '#7ab8e8', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>🤝 Mutual</span>}
           </div>
 
           {/* Follow counts */}
