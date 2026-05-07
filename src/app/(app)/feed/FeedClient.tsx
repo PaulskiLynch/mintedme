@@ -214,7 +214,7 @@ function BiggestMoveToday({ events }: { events: FeedEvent[] }) {
   const verdict = verdictLine(top)
 
   return (
-    <div style={{ marginBottom: 20, background: 'linear-gradient(135deg, #1a1400, #2a2000)', border: '1px solid var(--gold)', borderRadius: 12, padding: '14px 16px' }}>
+    <div style={{ background: 'linear-gradient(135deg, #1a1400, #2a2000)', border: '1px solid var(--gold)', borderRadius: 12, padding: '14px 16px' }}>
       <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--gold)', letterSpacing: '0.1em', marginBottom: 8 }}>🔥 BIGGEST MOVE TODAY</div>
       <div style={{ fontSize: 14, lineHeight: 1.5 }}>
         <Link href={`/mint/${top.user!.username}`} style={{ fontWeight: 700 }}>@{top.user!.username}</Link>
@@ -727,13 +727,14 @@ export default function FeedClient({
                 #{myRank} of {totalPlayers}
               </span>
             )}
+            <Link href="/notifications" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 8, background: 'var(--bg3)', border: '1px solid var(--border)', fontSize: 16, textDecoration: 'none' }}>🔔</Link>
             <button className="theme-toggle" onClick={() => setDarkMode(p => !p)}>{darkMode ? '☀' : '🌙'}</button>
             <button className="feed-drawer-btn" onClick={() => setRightOpen(p => !p)}>◉</button>
           </div>
         </div>
 
         {/* Category filter */}
-        <div className="interest-chips" style={{ marginBottom: 20 }}>
+        <div className="interest-chips" style={{ marginBottom: 24 }}>
           <button className={`chip${!filter ? ' active' : ''}`} onClick={() => setFilter(null)}>All</button>
           {ALL_CATEGORIES.map(cat => (
             <button key={cat} className={`chip${filter === cat.toLowerCase() ? ' active' : ''}`}
@@ -742,9 +743,6 @@ export default function FeedClient({
             </button>
           ))}
         </div>
-
-        {/* Biggest Move Today */}
-        <BiggestMoveToday events={visibleEvents} />
 
         {/* Feed */}
         {filteredEvents.length === 0 ? (
@@ -774,19 +772,45 @@ export default function FeedClient({
           <button onClick={() => setRightOpen(false)} style={{ alignSelf: 'flex-end', background: 'none', border: 'none', color: 'var(--muted)', fontSize: 20, cursor: 'pointer', marginBottom: 8 }}>✕</button>
         )}
 
-        {/* Profile */}
+        {/* Biggest Move Today — pinned top slot */}
+        <BiggestMoveToday events={visibleEvents} />
+
+        {/* Profile + Class stats merged */}
         <Module title="Profile" collapsed={!!collapsed['profile']} onToggle={() => toggleSection('profile')}>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
-            <Avatar avatarUrl={userProfile.avatarUrl} username={userProfile.username} size={48} />
+            <Avatar avatarUrl={userProfile.avatarUrl} username={userProfile.username} size={44} />
             <div>
               <div style={{ fontWeight: 700 }}>@{userProfile.username}</div>
               {userProfile.tagline && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{userProfile.tagline}</div>}
               {myRank > 0 && <div style={{ fontSize: 11, color: 'var(--gold)', marginTop: 3 }}>Rank #{myRank} of {totalPlayers}</div>}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             <Link href={`/mint/${userProfile.username}`} className="btn btn-ghost btn-sm" style={{ flex: 1, textAlign: 'center' }}>My Mint</Link>
             <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={() => { setShowQuickSell(true); setRightOpen(false) }}>Quick Sell</button>
+          </div>
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+              <span style={{ color: 'var(--muted)' }}>Players online</span>
+              <span style={{ fontWeight: 700 }}>
+                <span className="status-dot online" style={{ marginRight: 4 }} />
+                {classStats.onlineCount} / {totalPlayers}
+              </span>
+            </div>
+            {classStats.topPlayerUsername && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: 'var(--muted)' }}>#1 player</span>
+                <Link href={`/mint/${classStats.topPlayerUsername}`} style={{ fontWeight: 700, color: 'var(--gold)' }}>
+                  @{classStats.topPlayerUsername}
+                </Link>
+              </div>
+            )}
+            {classStats.hotCategory && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: 'var(--muted)' }}>Hot today</span>
+                <span style={{ fontWeight: 700, textTransform: 'capitalize' }}>🔥 {classStats.hotCategory}</span>
+              </div>
+            )}
           </div>
         </Module>
 
@@ -844,43 +868,6 @@ export default function FeedClient({
             </Module>
           )
         })()}
-
-        {/* Class / Leaderboard */}
-        <Module title="Class" collapsed={!!collapsed['class']} onToggle={() => toggleSection('class')}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-            <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: '10px 12px' }}>
-              <div style={{ color: 'var(--muted)', fontSize: 10, textTransform: 'uppercase', marginBottom: 2 }}>Players</div>
-              <div style={{ fontWeight: 900, fontSize: 22, color: 'var(--white)' }}>{totalPlayers}</div>
-            </div>
-            <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: '10px 12px' }}>
-              <div style={{ color: 'var(--muted)', fontSize: 10, textTransform: 'uppercase', marginBottom: 2 }}>Online</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span className="status-dot online" />
-                <span style={{ fontWeight: 900, fontSize: 22, color: 'var(--green)' }}>{classStats.onlineCount}</span>
-              </div>
-            </div>
-          </div>
-          {classStats.topPlayerUsername && (
-            <div style={{ fontSize: 12, display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ color: 'var(--muted)' }}>#1 player</span>
-              <Link href={`/mint/${classStats.topPlayerUsername}`} style={{ fontWeight: 700, color: 'var(--gold)' }}>
-                @{classStats.topPlayerUsername}
-              </Link>
-            </div>
-          )}
-          {myRank > 0 && (
-            <div style={{ fontSize: 12, display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ color: 'var(--muted)' }}>Your rank</span>
-              <span style={{ fontWeight: 700 }}>#{myRank}</span>
-            </div>
-          )}
-          {classStats.hotCategory && (
-            <div style={{ fontSize: 12, display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--muted)' }}>Hot today</span>
-              <span style={{ fontWeight: 700, textTransform: 'capitalize' }}>🔥 {classStats.hotCategory}</span>
-            </div>
-          )}
-        </Module>
 
         {/* Live Auctions */}
         <Module title="Live Auctions" collapsed={!!collapsed['auctions']} onToggle={() => toggleSection('auctions')}>

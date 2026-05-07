@@ -625,12 +625,11 @@ textarea.form-input { resize: vertical; min-height: 80px; }
   .stat-box  { min-width: calc(50% - 4px); padding: 12px 14px; }
   .stat-value { font-size: 18px; }
 
-  /* ── Category / interest chips: horizontal scroll row ── */
+  /* ── Category tabs: horizontal scroll on mobile ── */
   .interest-chips {
     flex-wrap: nowrap;
     overflow-x: auto;
-    padding-bottom: 6px;
-    gap: 6px;
+    gap: 0;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
   }
@@ -815,22 +814,30 @@ body.light {
 
 .feed-module-body { padding: 4px 14px 14px; }
 
-/* ── Chips ───────────────────────────────────────────── */
-.interest-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+/* ── Category tabs (underline style) ─────────────────── */
+.interest-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+}
 
 .chip {
-  padding: 5px 12px;
-  border-radius: 20px;
-  border: 1px solid var(--border);
+  padding: 6px 14px;
+  border-radius: 0;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  background: var(--bg2);
+  background: transparent;
   color: var(--muted);
-  transition: all 0.15s;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
 }
-.chip:hover { border-color: var(--gold); color: var(--gold); }
-.chip.active { background: rgba(200,169,110,0.15); border-color: var(--gold); color: var(--gold); }
+.chip:hover { color: var(--white); background: transparent; }
+.chip.active { background: transparent; border-bottom-color: var(--gold); color: var(--gold); }
 
 /* ── Status dot ──────────────────────────────────────── */
 .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
