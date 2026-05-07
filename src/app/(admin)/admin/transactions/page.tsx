@@ -42,7 +42,8 @@ export default async function AdminTransactionsPage({
   const take    = 50
   const skip    = (pageNum - 1) * take
 
-  const where: Parameters<typeof prisma.transaction.findMany>[0]['where'] = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const where: any = {
     ...(type ? { type } : {}),
     ...(q ? {
       OR: [
