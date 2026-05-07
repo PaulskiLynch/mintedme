@@ -16,7 +16,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const items = await prisma.item.findMany({
     where: {
       name: { contains: q, mode: 'insensitive' },
-      isActive: true,
     },
     select: {
       id:       true,
