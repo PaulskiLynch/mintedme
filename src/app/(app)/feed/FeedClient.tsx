@@ -799,11 +799,6 @@ export default function FeedClient({
             <div style={{ fontSize: 13, color: 'var(--muted)' }}>What&apos;s happening in the economy</div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {myRank > 0 && (
-              <span style={{ fontSize: 12, fontWeight: 700, background: 'var(--bg3)', borderRadius: 6, padding: '4px 10px', color: 'var(--gold)' }}>
-                #{myRank} of {totalPlayers}
-              </span>
-            )}
             <Link href="/notifications" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 8, background: 'var(--bg3)', border: '1px solid var(--border)', fontSize: 16, textDecoration: 'none' }}>🔔</Link>
             <button className="theme-toggle" onClick={() => setDarkMode(p => !p)}>{darkMode ? '☀' : '🌙'}</button>
             <button className="feed-drawer-btn" onClick={() => setRightOpen(p => !p)}>◉</button>
