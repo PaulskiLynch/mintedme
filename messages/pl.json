@@ -1,0 +1,75 @@
+{
+  "auth": {
+    "brand": {
+      "tagline": "Wirtualny rynek, gdzie kolekcjonerzy rywalizują",
+      "description": "Kupuj, sprzedawaj i handluj rzadkimi cyfrowymi kolekcjami. Każdy ruch się liczy.",
+      "features": {
+        "collectibles": { "label": "Rzadkie kolekcje",         "sub": "Auta, samoloty, nieruchomości i więcej" },
+        "trading":      { "label": "Handel na otwartym rynku", "sub": "Oferty, aukcje, szybki zakup"           },
+        "leaderboard":  { "label": "Ranking bogaczy",          "sub": "Walcz o pierwsze miejsce"              }
+      },
+      "startingStat":  "startowe saldo dla każdego nowego kolekcjonera",
+      "startingStat2": "startowe saldo, twoje po rejestracji"
+    },
+    "login": {
+      "title":      "Witaj z powrotem",
+      "subtitle":   "Zaloguj się do swojego Minta",
+      "email":      "Email",
+      "password":   "Hasło",
+      "submit":     "Zaloguj się →",
+      "submitting": "Logowanie…",
+      "error":      "Nieprawidłowy email lub hasło.",
+      "footer":     "Nie masz konta?",
+      "footerLink": "Zdobądź swój $1M →"
+    },
+    "signup": {
+      "title":               "Zdobądź $1 000 000",
+      "subtitle":            "Zbuduj swój wymarzony Mint",
+      "inviteCode":          "Kod zaproszenia",
+      "inviteCodePlaceholder": "Wpisz swój kod zaproszenia",
+      "username":            "Nazwa użytkownika",
+      "email":               "Email",
+      "password":            "Hasło",
+      "submit":              "Zdobądź $1 000 000 →",
+      "submitting":          "Tworzenie twojego Minta…",
+      "footer":              "Masz już Minta?",
+      "footerLink":          "Zaloguj się"
+    }
+  },
+  "onboarding": {
+    "added":       "Dodano do twojego Minta",
+    "question":    "Co zrobisz z milionem?",
+    "subtitle":    "To będzie twoje motto w Mincie. Powiedz światu.",
+    "placeholder": "np. Kolekcjonuję tylko czarne auta.",
+    "submit":      "Przejdź do Rynku →",
+    "submitting":  "Konfigurowanie twojego Minta...",
+    "tags": {
+      "collector":  "Kolekcjoner",
+      "hustler":    "Kombinator",
+      "yacht":      "Maniak jachtów",
+      "art":        "Snob sztuki",
+      "car":        "Obsesja na punkcie aut",
+      "fashion":    "Moda przede wszystkim",
+      "realEstate": "Magnat nieruchomości",
+      "watch":      "Nerd zegarków"
+    }
+  },
+  "nav": {
+    "feed":          "Aktualności",
+    "market":        "Rynek",
+    "auctions":      "Aukcje",
+    "jobs":          "Zawody",
+    "groups":        "Grupy",
+    "leaderboard":   "Ranking",
+    "myMint":        "Mój Mint",
+    "mint":          "Mint",
+    "inbox":         "Skrzynka",
+    "notifications": "Powiadomienia",
+    "suggest":       "Sugestia",
+    "admin":         "Admin",
+    "wallet":        "Portfel",
+    "settings":      "Ustawienia",
+    "more":          "Więcej",
+    "signOut":       "wyloguj ↩"
+  }
+}

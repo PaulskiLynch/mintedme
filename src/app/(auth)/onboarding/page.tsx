@@ -2,13 +2,25 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-
-const TAGS = ['Collector', 'Hustler', 'Yacht degenerate', 'Art snob', 'Car obsessed', 'Fashion first', 'Real estate mogul', 'Watch nerd']
+import { useTranslations } from 'next-intl'
 
 export default function OnboardingPage() {
   const router = useRouter()
+  const t = useTranslations('onboarding')
+
   const [tagline, setTagline] = useState('')
   const [saving, setSaving]   = useState(false)
+
+  const TAGS = [
+    t('tags.collector'),
+    t('tags.hustler'),
+    t('tags.yacht'),
+    t('tags.art'),
+    t('tags.car'),
+    t('tags.fashion'),
+    t('tags.realEstate'),
+    t('tags.watch'),
+  ]
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -26,16 +38,16 @@ export default function OnboardingPage() {
       <div className="onboard-box">
         <div className="onboard-million">$1,000,000</div>
         <div style={{ fontSize: 13, color: 'var(--gold)', fontWeight: 700, marginBottom: 24 }}>
-          Added to your Mint
+          {t('added')}
         </div>
-        <h2 className="onboard-h2">What will a million make you?</h2>
-        <p className="onboard-sub">This becomes your Mint tagline. Tell the world.</p>
+        <h2 className="onboard-h2">{t('question')}</h2>
+        <p className="onboard-sub">{t('subtitle')}</p>
 
         <form onSubmit={handleSubmit}>
           <input
             className="form-input"
             style={{ textAlign: 'center', fontSize: 17, padding: '14px 16px' }}
-            placeholder="e.g. I only collect black cars."
+            placeholder={t('placeholder')}
             value={tagline}
             onChange={e => setTagline(e.target.value)}
             maxLength={140}
@@ -43,14 +55,14 @@ export default function OnboardingPage() {
           />
 
           <div className="onboard-tags">
-            {TAGS.map(t => (
+            {TAGS.map(tag => (
               <button
-                key={t}
+                key={tag}
                 type="button"
-                className={`onboard-tag${tagline === t ? ' selected' : ''}`}
-                onClick={() => setTagline(t)}
+                className={`onboard-tag${tagline === tag ? ' selected' : ''}`}
+                onClick={() => setTagline(tag)}
               >
-                {t}
+                {tag}
               </button>
             ))}
           </div>
@@ -61,7 +73,7 @@ export default function OnboardingPage() {
             disabled={saving}
             style={{ marginTop: 32, padding: '14px 0', fontSize: 16 }}
           >
-            {saving ? 'Setting up your Mint...' : 'Take me to the Marketplace →'}
+            {saving ? t('submitting') : t('submit')}
           </button>
         </form>
       </div>

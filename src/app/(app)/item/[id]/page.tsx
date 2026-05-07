@@ -6,6 +6,7 @@ import { maxEditions, scarcityThreshold } from '@/lib/supply'
 import { monthlyUpkeep, upkeepDaysRemaining } from '@/lib/upkeep'
 import { businessGrossIncome, businessUpkeepCost, businessNetIncome, businessIncomeDaysRemaining, TIER_LABELS } from '@/lib/business'
 import { PROPERTY_TIER_DEFS, monthlyPropertyUpkeep, monthlyPropertyAppreciation, monthlyPropertyNet } from '@/lib/property'
+import { YACHT_TYPE_DEFS, monthlyYachtUpkeep } from '@/lib/yachts'
 import ItemActions from './ItemActions'
 import WishlistButton from './WishlistButton'
 
@@ -100,6 +101,10 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
   const pUpkeep    = pTier ? monthlyPropertyUpkeep(pTier, Number(item.benchmarkPrice))    : 0
   const pAppreciation = pTier ? monthlyPropertyAppreciation(pTier, Number(item.benchmarkPrice)) : 0
   const pNet       = pTier ? monthlyPropertyNet(pTier, Number(item.benchmarkPrice))       : 0
+
+  const yTier      = item.yachtType ?? null
+  const yDef       = yTier ? YACHT_TYPE_DEFS[yTier as keyof typeof YACHT_TYPE_DEFS] ?? null : null
+  const yUpkeep    = yTier ? monthlyYachtUpkeep(yTier, Number(item.benchmarkPrice)) : 0
 
   const activeAuction = edition.isInAuction
     ? await prisma.auction.findFirst({
@@ -205,6 +210,11 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
                   {pDef.emoji} {pDef.label}
                 </span>
               )}
+              {yDef && (
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', background: 'var(--bg3)', borderRadius: 4, padding: '2px 7px', letterSpacing: '0.05em' }}>
+                  {yDef.emoji} {yDef.label}
+                </span>
+              )}
             </div>
             <h1 style={{ fontSize: 22, fontWeight: 900, marginBottom: 4 }}>{item.name}</h1>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>
@@ -281,6 +291,9 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
               propertyUpkeep={pUpkeep}
               propertyAppreciation={pAppreciation}
               propertyNet={pNet}
+              yachtType={yTier}
+              yachtDef={yDef ? { label: yDef.label, emoji: yDef.emoji, prestige: yDef.prestige } : null}
+              yachtUpkeep={yUpkeep}
             />
 
             {!isOwner && (

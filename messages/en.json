@@ -1,0 +1,75 @@
+{
+  "auth": {
+    "brand": {
+      "tagline": "The virtual marketplace where collectors compete",
+      "description": "Buy, sell, and trade rare digital collectibles. Every move counts.",
+      "features": {
+        "collectibles": { "label": "Rare collectibles",    "sub": "Cars, aircraft, property & more" },
+        "trading":      { "label": "Open market trading",  "sub": "Offers, auctions, instant buy"   },
+        "leaderboard":  { "label": "Wealth leaderboard",   "sub": "Compete for the top spot"        }
+      },
+      "startingStat":  "starting balance for every new collector",
+      "startingStat2": "starting balance, yours on sign-up"
+    },
+    "login": {
+      "title":       "Welcome back",
+      "subtitle":    "Sign in to your Mint",
+      "email":       "Email",
+      "password":    "Password",
+      "submit":      "Sign in →",
+      "submitting":  "Signing in…",
+      "error":       "Invalid email or password.",
+      "footer":      "No account?",
+      "footerLink":  "Claim your $1M →"
+    },
+    "signup": {
+      "title":               "Claim your $1,000,000",
+      "subtitle":            "Build your fantasy Mint",
+      "inviteCode":          "Invite code",
+      "inviteCodePlaceholder": "Enter your invite code",
+      "username":            "Username",
+      "email":               "Email",
+      "password":            "Password",
+      "submit":              "Get $1,000,000 →",
+      "submitting":          "Creating your Mint…",
+      "footer":              "Already have a Mint?",
+      "footerLink":          "Sign in"
+    }
+  },
+  "onboarding": {
+    "added":      "Added to your Mint",
+    "question":   "What will a million make you?",
+    "subtitle":   "This becomes your Mint tagline. Tell the world.",
+    "placeholder":"e.g. I only collect black cars.",
+    "submit":     "Take me to the Marketplace →",
+    "submitting": "Setting up your Mint...",
+    "tags": {
+      "collector":  "Collector",
+      "hustler":    "Hustler",
+      "yacht":      "Yacht degenerate",
+      "art":        "Art snob",
+      "car":        "Car obsessed",
+      "fashion":    "Fashion first",
+      "realEstate": "Real estate mogul",
+      "watch":      "Watch nerd"
+    }
+  },
+  "nav": {
+    "feed":          "Feed",
+    "market":        "Market",
+    "auctions":      "Auctions",
+    "jobs":          "Jobs",
+    "groups":        "Groups",
+    "leaderboard":   "Leaderboard",
+    "myMint":        "My Mint",
+    "mint":          "Mint",
+    "inbox":         "Inbox",
+    "notifications": "Notifications",
+    "suggest":       "Suggest",
+    "admin":         "Admin",
+    "wallet":        "Wallet",
+    "settings":      "Settings",
+    "more":          "More",
+    "signOut":       "out ↩"
+  }
+}

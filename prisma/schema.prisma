@@ -128,6 +128,7 @@ model Item {
   propertyTier     String?                            // rent_free | apartment | townhouse | villa | mansion | penthouse | private_island
   lastAppreciatedAt DateTime?                         // last time this property's benchmarkPrice was increased
   aircraftType     String?                            // prop_plane | light_jet | private_jet | … (see lib/aircraft.ts)
+  yachtType        String?                            // luxury_yacht | superyacht | mega_yacht | … (see lib/yachts.ts)
   creatorId        String?
   isOfficial       Boolean  @default(true)
   isApproved       Boolean  @default(true)

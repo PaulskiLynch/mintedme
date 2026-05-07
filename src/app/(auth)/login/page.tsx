@@ -4,15 +4,13 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-
-const FEATURES = [
-  { icon: '◆', label: 'Rare collectibles',  sub: 'Cars, aircraft, property & more' },
-  { icon: '↗', label: 'Open market trading', sub: 'Offers, auctions, instant buy'   },
-  { icon: '★', label: 'Wealth leaderboard',  sub: 'Compete for the top spot'        },
-]
+import { useTranslations } from 'next-intl'
 
 export default function LoginPage() {
   const router = useRouter()
+  const t  = useTranslations('auth')
+  const tb = useTranslations('auth.brand')
+
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]       = useState('')
@@ -26,10 +24,16 @@ export default function LoginPage() {
     if (res?.ok) {
       router.push('/feed')
     } else {
-      setError('Invalid email or password.')
+      setError(t('login.error'))
       setLoading(false)
     }
   }
+
+  const FEATURES = [
+    { icon: '◆', label: tb('features.collectibles.label'), sub: tb('features.collectibles.sub') },
+    { icon: '↗', label: tb('features.trading.label'),      sub: tb('features.trading.sub')      },
+    { icon: '★', label: tb('features.leaderboard.label'),  sub: tb('features.leaderboard.sub')  },
+  ]
 
   return (
     <div className="auth-split">
@@ -40,10 +44,10 @@ export default function LoginPage() {
             MILLIBUX
           </div>
           <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--white)', lineHeight: 1.25, marginBottom: 14 }}>
-            The virtual marketplace<br />where collectors compete
+            {tb('tagline')}
           </div>
           <div style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 44 }}>
-            Buy, sell, and trade rare digital collectibles.<br />Every move counts.
+            {tb('description')}
           </div>
 
           <div className="auth-brand-features" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -67,7 +71,7 @@ export default function LoginPage() {
 
           <div className="auth-brand-stat" style={{ marginTop: 52, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
             <div style={{ fontSize: 32, fontWeight: 900, color: 'var(--gold)', letterSpacing: '-0.01em' }}>$1,000,000</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>starting balance for every new collector</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>{tb('startingStat')}</div>
           </div>
         </div>
       </div>
@@ -76,32 +80,32 @@ export default function LoginPage() {
       <div className="auth-form-panel">
         <div className="auth-form-inner">
           <div style={{ marginBottom: 32 }}>
-            <div className="auth-title">Welcome back</div>
-            <div className="auth-sub">Sign in to your Mint</div>
+            <div className="auth-title">{t('login.title')}</div>
+            <div className="auth-sub">{t('login.subtitle')}</div>
           </div>
 
           {error && <div className="form-error">{error}</div>}
 
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label className="form-label">Email</label>
+              <label className="form-label">{t('login.email')}</label>
               <input className="form-input" type="email" value={email}
                 onChange={e => setEmail(e.target.value)} required autoFocus />
             </div>
             <div className="form-group">
-              <label className="form-label">Password</label>
+              <label className="form-label">{t('login.password')}</label>
               <input className="form-input" type="password" value={password}
                 onChange={e => setPassword(e.target.value)} required />
             </div>
             <button className="btn btn-gold btn-full" type="submit" disabled={loading}
               style={{ marginTop: 8, fontSize: 15, padding: '13px 0' }}>
-              {loading ? 'Signing in…' : 'Sign in →'}
+              {loading ? t('login.submitting') : t('login.submit')}
             </button>
           </form>
 
           <div className="auth-footer">
-            No account?{' '}
-            <Link href="/signup">Claim your $1M →</Link>
+            {t('login.footer')}{' '}
+            <Link href="/signup">{t('login.footerLink')}</Link>
           </div>
         </div>
       </div>

@@ -46,6 +46,9 @@ interface Props {
   propertyUpkeep:   number
   propertyAppreciation: number
   propertyNet:      number
+  yachtType:        string | null
+  yachtDef:         { label: string; emoji: string; prestige: string } | null
+  yachtUpkeep:      number
 }
 
 function timeAgo(iso: string | null): string | null {
@@ -71,6 +74,7 @@ export default function ItemActions({
   businessRiskTier, businessGross, businessUpkeep, businessNet, businessDaysToIncome,
   discountPrice,
   propertyTier, propertyDef, propertyUpkeep, propertyAppreciation, propertyNet,
+  yachtType, yachtDef, yachtUpkeep,
 }: Props) {
   const router = useRouter()
   const [busy, setBusy]               = useState(false)
@@ -210,11 +214,13 @@ export default function ItemActions({
           </div>
         )}
 
-        {/* Property / Business / Car panel — owner view */}
+        {/* Property / Business / Yacht / Car panel — owner view */}
         {propertyDef ? (
           <PropertyPanel def={propertyDef} upkeep={propertyUpkeep} appreciation={propertyAppreciation} net={propertyNet} />
         ) : businessRiskTier ? (
           <BusinessIncomePanel gross={businessGross} upkeep={businessUpkeep} net={businessNet} daysToIncome={businessDaysToIncome} />
+        ) : yachtDef ? (
+          <YachtPanel def={yachtDef} upkeep={yachtUpkeep} />
         ) : monthlyUpkeep > 0 && (() => {
           const overdue = daysUntilCharge < 0
           return (
@@ -357,6 +363,8 @@ export default function ItemActions({
           ? <PropertyPanel def={propertyDef} upkeep={propertyUpkeep} appreciation={propertyAppreciation} net={propertyNet} />
           : businessRiskTier
           ? <BusinessIncomePanel gross={businessGross} upkeep={businessUpkeep} net={businessNet} daysToIncome={businessDaysToIncome} />
+          : yachtDef
+          ? <YachtPanel def={yachtDef} upkeep={yachtUpkeep} />
           : null
         }
 
@@ -459,11 +467,13 @@ export default function ItemActions({
         </div>
       )}
 
-      {/* Property / Business / Car upkeep — context for potential buyers */}
+      {/* Property / Business / Yacht / Car upkeep — context for potential buyers */}
       {propertyDef ? (
         <PropertyPanel def={propertyDef} upkeep={propertyUpkeep} appreciation={propertyAppreciation} net={propertyNet} />
       ) : businessRiskTier ? (
         <BusinessIncomePanel gross={businessGross} upkeep={businessUpkeep} net={businessNet} daysToIncome={businessDaysToIncome} />
+      ) : yachtDef ? (
+        <YachtPanel def={yachtDef} upkeep={yachtUpkeep} />
       ) : monthlyUpkeep > 0 && (
         <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
@@ -617,6 +627,26 @@ function PropertyPanel({ def, upkeep, appreciation, net }: {
         Appreciation grows the asset's value, not your cash balance. Sell to realise gains.
       </div>
       <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+        Prestige: <span style={{ color: 'var(--gold)', fontWeight: 700 }}>{def.prestige}</span>
+      </div>
+    </div>
+  )
+}
+
+function YachtPanel({ def, upkeep }: {
+  def: { label: string; emoji: string; prestige: string }
+  upkeep: number
+}) {
+  return (
+    <div style={{ marginTop: 16, padding: '14px 16px', borderRadius: 8, background: 'var(--bg3)', border: '1px solid var(--border)' }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.08em', marginBottom: 10 }}>{def.emoji} COST OF OWNERSHIP</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+        <span style={{ color: 'var(--muted)', fontWeight: 700 }}>Monthly upkeep</span>
+        <span style={{ fontWeight: 700, color: upkeep > 0 ? 'var(--red)' : 'var(--muted)' }}>
+          {upkeep > 0 ? `−$${upkeep.toLocaleString()}` : 'Free to maintain'}
+        </span>
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
         Prestige: <span style={{ color: 'var(--gold)', fontWeight: 700 }}>{def.prestige}</span>
       </div>
     </div>
