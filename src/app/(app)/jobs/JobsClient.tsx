@@ -11,7 +11,7 @@ interface ActiveAuction {
 }
 
 interface JobRow {
-  code: string; title: string; category: string; iconIndex: number
+  code: string; title: string; description: string; category: string; iconIndex: number
   minSalary: number; maxSalary: number
   isTaken: boolean
   activeAuction: ActiveAuction | null
@@ -201,6 +201,9 @@ export default function JobsClient({ jobs, myJob, myJobTitle, myJobIconIndex, us
                     {isBidding && <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 900 }}>{t('biddingBadge')}</span>}
                     {taken     && <span style={{ fontSize: 11, color: 'var(--red)',   fontWeight: 900 }}>{t('takenBadge')}</span>}
                   </div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2, fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {job.description}
+                  </div>
                   <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <span>${job.minSalary.toLocaleString()} – ${job.maxSalary.toLocaleString()}{t('perMonth')}</span>
                     <span style={{ color: 'var(--border)' }}>·</span>
@@ -248,12 +251,15 @@ export default function JobsClient({ jobs, myJob, myJobTitle, myJobIconIndex, us
       {modal && (
         <div className="overlay" onClick={e => { if (e.target === e.currentTarget) setModal(null) }}>
           <div className="modal">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
               <Image src={`/jobs/job${modal.iconIndex}.png`} alt="" width={52} height={52} style={{ borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
               <div>
-                <div className="modal-title" style={{ margin: 0 }}>{modal.activeAuction ? t('placeBid') : t('startAuction')}</div>
-                <div className="modal-sub" style={{ margin: 0 }}>{modal.title} · {modal.category}</div>
+                <div className="modal-title" style={{ margin: 0 }}>{modal.title}</div>
+                <div className="modal-sub" style={{ margin: 0 }}>{modal.category}</div>
               </div>
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--muted)', fontStyle: 'italic', marginBottom: 20, lineHeight: 1.5 }}>
+              {modal.description}
             </div>
 
             <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: '12px 14px', marginBottom: 20 }}>

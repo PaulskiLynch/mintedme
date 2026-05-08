@@ -40,10 +40,11 @@ export default async function JobsPage() {
     const auction   = auctionMap[j.code]
     const myBidHere = myActiveBid?.jobAuction.jobCode === j.code ? myActiveBid.salaryBid : null
     return {
-      code:      j.code,
-      title:     j.title,
-      category:  j.category,
-      iconIndex: JOB_ICON_INDEX.get(j.code) ?? 1,
+      code:        j.code,
+      title:       j.title,
+      description: j.description,
+      category:    j.category,
+      iconIndex:   JOB_ICON_INDEX.get(j.code) ?? 1,
       minSalary: j.minSalary,
       maxSalary: j.maxSalary,
       isTaken:   (holderMap[j.code] ?? 0) >= 1,
