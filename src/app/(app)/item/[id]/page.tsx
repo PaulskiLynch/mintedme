@@ -227,12 +227,12 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
               <div className="item-price-big">${Number(edition.listedPrice).toLocaleString()}</div>
             ) : edition.lastSalePrice ? (
               <div>
-                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginBottom: 2 }}>LAST SOLD</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginBottom: 2 }}>LAST SALE</div>
                 <div className="item-price-big">${Number(edition.lastSalePrice).toLocaleString()}</div>
               </div>
             ) : (
               <div>
-                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginBottom: 2 }}>TRUE VALUE</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginBottom: 2 }}>FLOOR PRICE</div>
                 <div className="item-price-big">${Number(item.benchmarkPrice).toLocaleString()}</div>
               </div>
             )}
