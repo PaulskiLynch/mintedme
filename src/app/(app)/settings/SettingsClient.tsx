@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 
 interface Props {
   username:  string
@@ -10,9 +11,9 @@ interface Props {
 }
 
 export default function SettingsClient({ username, tagline, avatarUrl }: Props) {
+  const t      = useTranslations('settings')
   const router = useRouter()
 
-  // Profile state
   const [uname,  setUname]  = useState(username)
   const [tag,    setTag]    = useState(tagline ?? '')
   const [avatar, setAvatar] = useState(avatarUrl ?? '')
@@ -20,13 +21,12 @@ export default function SettingsClient({ username, tagline, avatarUrl }: Props) 
   const [error,  setError]  = useState('')
   const [saved,  setSaved]  = useState(false)
 
-  // Password state
-  const [curPw,    setCurPw]    = useState('')
-  const [newPw,    setNewPw]    = useState('')
-  const [confirmPw,setConfirmPw]= useState('')
-  const [pwBusy,   setPwBusy]   = useState(false)
-  const [pwError,  setPwError]  = useState('')
-  const [pwSaved,  setPwSaved]  = useState(false)
+  const [curPw,     setCurPw]     = useState('')
+  const [newPw,     setNewPw]     = useState('')
+  const [confirmPw, setConfirmPw] = useState('')
+  const [pwBusy,    setPwBusy]    = useState(false)
+  const [pwError,   setPwError]   = useState('')
+  const [pwSaved,   setPwSaved]   = useState(false)
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -45,7 +45,7 @@ export default function SettingsClient({ username, tagline, avatarUrl }: Props) 
   async function handlePassword(e: React.FormEvent) {
     e.preventDefault()
     setPwError(''); setPwSaved(false)
-    if (newPw !== confirmPw) { setPwError('New passwords do not match'); return }
+    if (newPw !== confirmPw) { setPwError(t('passwordMismatch')); return }
     setPwBusy(true)
     const res = await fetch('/api/me/password', {
       method:  'PATCH',
@@ -63,11 +63,11 @@ export default function SettingsClient({ username, tagline, avatarUrl }: Props) 
 
       {/* Profile */}
       <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.05em' }}>PROFILE</div>
+        <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.05em' }}>{t('profileSection')}</div>
 
         {saved && (
           <div style={{ background: '#1e2a15', border: '1px solid var(--green)', borderRadius: 8, padding: '10px 14px', color: 'var(--green)', fontSize: 13 }}>
-            Profile saved.
+            {t('profileSaved')}
           </div>
         )}
 
@@ -80,13 +80,13 @@ export default function SettingsClient({ username, tagline, avatarUrl }: Props) 
             }
           </div>
           <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-            <label className="form-label">Avatar URL</label>
+            <label className="form-label">{t('avatarUrlLabel')}</label>
             <input className="form-input" value={avatar} onChange={e => setAvatar(e.target.value)} placeholder="https://..." />
           </div>
         </div>
 
         <div className="form-group">
-          <label className="form-label">Username</label>
+          <label className="form-label">{t('usernameLabel')}</label>
           <input
             className="form-input"
             value={uname}
@@ -97,16 +97,16 @@ export default function SettingsClient({ username, tagline, avatarUrl }: Props) 
             pattern="[a-zA-Z0-9_]+"
             required
           />
-          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>Letters, numbers and underscores only</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>{t('usernameHint')}</div>
         </div>
 
         <div className="form-group">
-          <label className="form-label">Tagline</label>
+          <label className="form-label">{t('taglineLabel')}</label>
           <input
             className="form-input"
             value={tag}
             onChange={e => setTag(e.target.value)}
-            placeholder="e.g. Connoisseur of rare things"
+            placeholder={t('taglinePlaceholder')}
             maxLength={120}
           />
         </div>
@@ -114,7 +114,7 @@ export default function SettingsClient({ username, tagline, avatarUrl }: Props) 
         {error && <div className="form-error">{error}</div>}
 
         <button className="btn btn-gold" type="submit" disabled={busy || !uname}>
-          {busy ? 'Saving...' : 'Save profile'}
+          {busy ? t('saving') : t('saveProfile')}
         </button>
       </form>
 
@@ -123,31 +123,31 @@ export default function SettingsClient({ username, tagline, avatarUrl }: Props) 
 
       {/* Change password */}
       <form onSubmit={handlePassword} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.05em' }}>CHANGE PASSWORD</div>
+        <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.05em' }}>{t('passwordSection')}</div>
 
         {pwSaved && (
           <div style={{ background: '#1e2a15', border: '1px solid var(--green)', borderRadius: 8, padding: '10px 14px', color: 'var(--green)', fontSize: 13 }}>
-            Password updated.
+            {t('passwordSaved')}
           </div>
         )}
 
         <div className="form-group">
-          <label className="form-label">Current password</label>
+          <label className="form-label">{t('currentPassword')}</label>
           <input className="form-input" type="password" value={curPw} onChange={e => setCurPw(e.target.value)} required />
         </div>
         <div className="form-group">
-          <label className="form-label">New password</label>
+          <label className="form-label">{t('newPassword')}</label>
           <input className="form-input" type="password" value={newPw} onChange={e => setNewPw(e.target.value)} required minLength={8} />
         </div>
         <div className="form-group">
-          <label className="form-label">Confirm new password</label>
+          <label className="form-label">{t('confirmPassword')}</label>
           <input className="form-input" type="password" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} required minLength={8} />
         </div>
 
         {pwError && <div className="form-error">{pwError}</div>}
 
         <button className="btn btn-outline" type="submit" disabled={pwBusy || !curPw || !newPw || !confirmPw}>
-          {pwBusy ? 'Updating...' : 'Update password'}
+          {pwBusy ? t('updating') : t('updatePassword')}
         </button>
       </form>
 

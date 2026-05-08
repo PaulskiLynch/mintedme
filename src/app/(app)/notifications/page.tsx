@@ -1,12 +1,13 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
+import { getTranslations } from 'next-intl/server'
 import NotificationsClient from './NotificationsClient'
 
 export const dynamic = 'force-dynamic'
 
 export default async function NotificationsPage() {
-  const session = await auth()
+  const [session, t] = await Promise.all([auth(), getTranslations('notifications')])
   if (!session?.user?.id) redirect('/login')
 
   // Fetch first so we capture unread state before marking
@@ -29,11 +30,11 @@ export default async function NotificationsPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 24 }}>
         <div>
-          <div className="page-title">Notifications</div>
+          <div className="page-title">{t('title')}</div>
           <div className="page-sub">
             {unreadCount > 0
-              ? `${unreadCount} new · ${notifications.length} total`
-              : `${notifications.length} total`}
+              ? t('subtitleNew', { n: unreadCount, total: notifications.length })
+              : t('subtitleAll', { total: notifications.length })}
           </div>
         </div>
       </div>

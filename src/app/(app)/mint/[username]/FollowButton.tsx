@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 
 interface Props {
   targetUserId:    string
@@ -11,7 +12,8 @@ interface Props {
 }
 
 export default function FollowButton({ targetUserId, initialFollowing, initialCount, userId }: Props) {
-  const router   = useRouter()
+  const t      = useTranslations('mint')
+  const router = useRouter()
   const [following, setFollowing] = useState(initialFollowing)
   const [count,     setCount]     = useState(initialCount)
   const [busy,      setBusy]      = useState(false)
@@ -39,10 +41,10 @@ export default function FollowButton({ targetUserId, initialFollowing, initialCo
         className={following ? 'btn btn-outline btn-sm' : 'btn btn-gold btn-sm'}
         style={{ minWidth: 90 }}
       >
-        {busy ? '…' : following ? 'Following' : 'Follow'}
+        {busy ? '…' : following ? t('followingBtn') : t('follow')}
       </button>
       <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-        {count.toLocaleString()} follower{count !== 1 ? 's' : ''}
+        {t('followerCount', { n: count })}
       </span>
     </div>
   )

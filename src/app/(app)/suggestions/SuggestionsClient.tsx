@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 
 interface LinkedItem {
@@ -23,21 +24,22 @@ interface Submission {
   linkedItem:  LinkedItem | null
 }
 
-const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }> = {
-  pending:  { label: 'Under review',  color: 'var(--gold)',   bg: '#2a1f00' },
-  approved: { label: 'Approved!',     color: 'var(--green)',  bg: '#0d2010' },
-  rejected: { label: 'Not selected',  color: 'var(--muted)',  bg: 'var(--bg3)' },
+const STATUS_COLOUR: Record<string, { color: string; bg: string }> = {
+  pending:  { color: 'var(--gold)',   bg: '#2a1f00' },
+  approved: { color: 'var(--green)',  bg: '#0d2010' },
+  rejected: { color: 'var(--muted)', bg: 'var(--bg3)' },
 }
 
 export default function SuggestionsClient({ submissions: initial }: { submissions: Submission[] }) {
+  const t      = useTranslations('suggestions')
   const router = useRouter()
-  const [subs, setSubs]       = useState(initial)
+  const [subs, setSubs]         = useState(initial)
   const [showForm, setShowForm] = useState(false)
-  const [name, setName]       = useState('')
+  const [name, setName]         = useState('')
   const [category, setCategory] = useState('cars')
   const [description, setDescription] = useState('')
-  const [busy, setBusy]       = useState(false)
-  const [error, setError]     = useState('')
+  const [busy, setBusy]         = useState(false)
+  const [error, setError]       = useState('')
 
   const pending = subs.filter(s => s.status === 'pending').length
 
@@ -74,45 +76,45 @@ export default function SuggestionsClient({ submissions: initial }: { submission
           disabled={pending >= 3}
           style={{ marginBottom: 28 }}
         >
-          + Submit a suggestion
+          {t('submitBtn')}
         </button>
       ) : (
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: 24, marginBottom: 28 }}>
-          <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 4 }}>New suggestion</div>
-          <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>
-            Describe the item you'd like to see. Our team reviews all suggestions.
-          </div>
+          <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 4 }}>{t('formTitle')}</div>
+          <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>{t('formSubtitle')}</div>
           <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.06em', marginBottom: 6 }}>CATEGORY</label>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.06em', marginBottom: 6 }}>{t('categoryLabel')}</label>
               <select
                 className="form-input"
                 value={category}
                 onChange={e => setCategory(e.target.value)}
               >
-                <option value="cars">Cars</option>
-                <option value="businesses">Businesses</option>
+                <option value="cars">{t('categoryCars')}</option>
+                <option value="businesses">{t('categoryBiz')}</option>
               </select>
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.06em', marginBottom: 6 }}>PRODUCT NAME</label>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.06em', marginBottom: 6 }}>{t('nameLabel')}</label>
               <input
                 className="form-input"
                 value={name}
                 onChange={e => setName(e.target.value)}
-                placeholder="e.g. Ferrari F40, Rooftop Bar chain, Sneaker store..."
+                placeholder={t('namePlaceholder')}
                 required
                 autoFocus
                 maxLength={100}
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.06em', marginBottom: 6 }}>DETAILS <span style={{ fontWeight: 400, color: 'var(--muted)' }}>(optional)</span></label>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.06em', marginBottom: 6 }}>
+                {t('detailsLabel')} <span style={{ fontWeight: 400, color: 'var(--muted)' }}>{t('detailsOptional')}</span>
+              </label>
               <textarea
                 className="form-input"
                 value={description}
                 onChange={e => setDescription(e.target.value)}
-                placeholder="Any extra details — era, style, why you think it'd be popular..."
+                placeholder={t('detailsPlaceholder')}
                 rows={3}
                 maxLength={500}
                 style={{ resize: 'vertical' }}
@@ -120,8 +122,8 @@ export default function SuggestionsClient({ submissions: initial }: { submission
             </div>
             {error && <div className="form-error">{error}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn btn-gold" type="submit" disabled={busy}>{busy ? '...' : 'Submit suggestion'}</button>
-              <button className="btn btn-ghost" type="button" onClick={() => { setShowForm(false); setError('') }}>Cancel</button>
+              <button className="btn btn-gold" type="submit" disabled={busy}>{busy ? '...' : t('submit')}</button>
+              <button className="btn btn-ghost" type="button" onClick={() => { setShowForm(false); setError('') }}>{t('cancel')}</button>
             </div>
           </form>
         </div>
@@ -129,19 +131,23 @@ export default function SuggestionsClient({ submissions: initial }: { submission
 
       {pending >= 3 && !showForm && (
         <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>
-          You have 3 pending suggestions — wait for one to be reviewed before submitting more.
+          {t('maxPending')}
         </div>
       )}
 
       {/* Submission history */}
       {subs.length === 0 ? (
         <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--muted)', fontWeight: 700 }}>
-          No suggestions yet. Submit one above!
+          {t('empty')}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {subs.map(s => {
-            const st = STATUS_STYLE[s.status] ?? STATUS_STYLE.pending
+            const st = STATUS_COLOUR[s.status] ?? STATUS_COLOUR.pending
+            const STATUS_KEY: Record<string, 'statusPending' | 'statusApproved' | 'statusRejected'> = {
+              pending: 'statusPending', approved: 'statusApproved', rejected: 'statusRejected',
+            }
+            const statusLabel = STATUS_KEY[s.status] ? t(STATUS_KEY[s.status]) : s.status
             const discountPrice = s.linkedItem
               ? Math.round(Number(s.linkedItem.benchmarkPrice) * 0.5)
               : null
@@ -159,13 +165,13 @@ export default function SuggestionsClient({ submissions: initial }: { submission
                     </div>
                   </div>
                   <span style={{ fontSize: 11, fontWeight: 800, color: st.color, background: st.bg, padding: '3px 10px', borderRadius: 20, flexShrink: 0 }}>
-                    {st.label.toUpperCase()}
+                    {statusLabel.toUpperCase()}
                   </span>
                 </div>
 
                 {s.adminNotes && (
                   <div style={{ marginTop: 10, fontSize: 12, color: 'var(--muted)', borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-                    Note: {s.adminNotes}
+                    {t('adminNote', { note: s.adminNotes })}
                   </div>
                 )}
 
@@ -173,20 +179,19 @@ export default function SuggestionsClient({ submissions: initial }: { submission
                 {s.status === 'approved' && s.linkedItem && discountPrice !== null && (
                   <div style={{ marginTop: 12, padding: '12px 14px', background: '#0d2010', border: '1px solid #1a4020', borderRadius: 8 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)', marginBottom: 6 }}>
-                      Your suggestion made it in!
+                      {t('approvedTitle')}
                     </div>
                     {s.discountUsed ? (
-                      <div style={{ fontSize: 13, color: 'var(--muted)' }}>Discount used — enjoy your {s.linkedItem.name}!</div>
+                      <div style={{ fontSize: 13, color: 'var(--muted)' }}>{t('discountUsed', { name: s.linkedItem.name })}</div>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
                         <div style={{ fontSize: 13 }}>
-                          Buy <strong>{s.linkedItem.name}</strong> at{' '}
-                          <span style={{ color: 'var(--green)', fontWeight: 900 }}>${discountPrice.toLocaleString()}</span>
+                          {t('discountCta', { name: s.linkedItem.name, price: `$${discountPrice.toLocaleString()}` })}
                           <span style={{ color: 'var(--muted)', fontSize: 11, marginLeft: 6 }}>
-                            (50% off ${Math.round(Number(s.linkedItem.benchmarkPrice)).toLocaleString()})
+                            {t('discountOff', { original: Math.round(Number(s.linkedItem.benchmarkPrice)).toLocaleString() })}
                           </span>
                         </div>
-                        <Link href={`/item/${s.linkedItem.id}`} className="btn btn-gold btn-sm">Claim discount →</Link>
+                        <Link href={`/item/${s.linkedItem.id}`} className="btn btn-gold btn-sm">{t('claimDiscount')}</Link>
                       </div>
                     )}
                   </div>
@@ -197,7 +202,7 @@ export default function SuggestionsClient({ submissions: initial }: { submission
                     onClick={() => withdraw(s.id)}
                     style={{ marginTop: 10, background: 'none', border: 'none', color: 'var(--muted)', fontSize: 12, cursor: 'pointer', padding: 0 }}
                   >
-                    Withdraw suggestion
+                    {t('withdraw')}
                   </button>
                 )}
               </div>

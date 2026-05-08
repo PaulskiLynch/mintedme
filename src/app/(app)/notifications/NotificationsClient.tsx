@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { formatDistanceToNow } from 'date-fns'
 
 interface Notification {
@@ -29,9 +30,10 @@ const TYPE_ICON: Record<string, string> = {
 }
 
 export default function NotificationsClient({ initial }: Props) {
+  const t = useTranslations('notifications')
   const [items, setItems] = useState(initial)
 
-  const newItems    = items.filter(n => !n.isRead)
+  const newItems     = items.filter(n => !n.isRead)
   const earlierItems = items.filter(n => n.isRead)
 
   async function deleteOne(id: string) {
@@ -47,7 +49,7 @@ export default function NotificationsClient({ initial }: Props) {
   if (items.length === 0) {
     return (
       <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--muted)', fontWeight: 700 }}>
-        Nothing yet. Make a move.
+        {t('empty')}
       </div>
     )
   }
@@ -55,11 +57,11 @@ export default function NotificationsClient({ initial }: Props) {
   return (
     <div>
       {newItems.length > 0 && (
-        <Section label={`New (${newItems.length})`} items={newItems} onDelete={deleteOne} isNew />
+        <Section label={t('newSection', { n: newItems.length })} items={newItems} onDelete={deleteOne} isNew />
       )}
       {earlierItems.length > 0 && (
         <Section
-          label="Earlier"
+          label={t('earlierSection')}
           items={earlierItems}
           onDelete={deleteOne}
           isNew={false}
@@ -71,7 +73,7 @@ export default function NotificationsClient({ initial }: Props) {
           onClick={clearAll}
           style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: 8, padding: '7px 18px', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: '0.04em' }}
         >
-          Clear all
+          {t('clearAll')}
         </button>
       </div>
     </div>
@@ -87,6 +89,7 @@ function Section({
   isNew:    boolean
   style?:   React.CSSProperties
 }) {
+  const t = useTranslations('notifications')
   return (
     <div style={style}>
       <div style={{ fontSize: 11, fontWeight: 900, color: isNew ? 'var(--gold)' : 'var(--muted)', letterSpacing: '0.1em', marginBottom: 10 }}>
@@ -94,7 +97,7 @@ function Section({
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {items.map(n => (
-          <NotificationRow key={n.id} n={n} isNew={isNew} onDelete={onDelete} />
+          <NotificationRow key={n.id} n={n} isNew={isNew} onDelete={onDelete} dismissLabel={t('dismiss')} viewLabel={t('view')} />
         ))}
       </div>
     </div>
@@ -102,16 +105,18 @@ function Section({
 }
 
 function NotificationRow({
-  n, isNew, onDelete,
+  n, isNew, onDelete, dismissLabel, viewLabel,
 }: {
-  n:        Notification
-  isNew:    boolean
-  onDelete: (id: string) => void
+  n:            Notification
+  isNew:        boolean
+  onDelete:     (id: string) => void
+  dismissLabel: string
+  viewLabel:    string
 }) {
-  const [offsetX, setOffsetX]     = useState(0)
-  const [swiping, setSwiping]     = useState(false)
-  const [deleting, setDeleting]   = useState(false)
-  const touchStartX               = useRef<number | null>(null)
+  const [offsetX, setOffsetX]   = useState(0)
+  const [swiping, setSwiping]   = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const touchStartX             = useRef<number | null>(null)
 
   function onTouchStart(e: React.TouchEvent) {
     touchStartX.current = e.touches[0].clientX
@@ -184,11 +189,10 @@ function NotificationRow({
             className="btn btn-gold btn-sm"
             style={{ flexShrink: 0, fontSize: 12, padding: '5px 12px' }}
           >
-            View →
+            {viewLabel}
           </Link>
         )}
 
-        {/* Desktop delete — always visible, unobtrusive */}
         <button
           onClick={() => { setDeleting(true); onDelete(n.id) }}
           style={{
@@ -199,7 +203,7 @@ function NotificationRow({
           }}
           onMouseEnter={e => (e.currentTarget.style.color = 'var(--red)')}
           onMouseLeave={e => (e.currentTarget.style.color = 'var(--border)')}
-          title="Dismiss"
+          title={dismissLabel}
         >
           ×
         </button>
