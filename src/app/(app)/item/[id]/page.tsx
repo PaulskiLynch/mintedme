@@ -4,7 +4,8 @@ import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
 import { maxEditions, scarcityThreshold } from '@/lib/supply'
 import { monthlyUpkeep, upkeepDaysRemaining } from '@/lib/upkeep'
-import { businessGrossIncome, businessUpkeepCost, businessNetIncome, businessIncomeDaysRemaining, TIER_LABELS } from '@/lib/business'
+import { businessGrossIncome, businessUpkeepCost, businessNetIncome, businessIncomeDaysRemaining, TIER_LABELS, BUSINESS_BY_CODE } from '@/lib/business'
+import { getLocale } from 'next-intl/server'
 import { PROPERTY_TIER_DEFS, monthlyPropertyUpkeep, monthlyPropertyAppreciation, monthlyPropertyNet } from '@/lib/property'
 import { YACHT_TYPE_DEFS, monthlyYachtUpkeep } from '@/lib/yachts'
 import ItemActions from './ItemActions'
@@ -90,7 +91,11 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
     ? Number((((Number(item.benchmarkPrice) - Number(edition.lastSalePrice)) / Number(edition.lastSalePrice)) * 100).toFixed(1))
     : null
 
-  const bTier = item.businessRiskTier ?? null
+  const locale  = await getLocale()
+  const bTier   = item.businessRiskTier ?? null
+  const bTypeDef = item.businessType ? BUSINESS_BY_CODE[item.businessType] ?? null : null
+  const bTag    = bTypeDef ? (locale === 'pl' ? bTypeDef.tagPl        : bTypeDef.tag)         : null
+  const bDesc   = bTypeDef ? (locale === 'pl' ? bTypeDef.descriptionPl : bTypeDef.description) : null
   const bGross  = bTier ? businessGrossIncome(bTier, Number(item.benchmarkPrice))  : 0
   const bUpkeep = bTier ? businessUpkeepCost(bTier, Number(item.benchmarkPrice))   : 0
   const bNet    = bTier ? businessNetIncome(bTier, Number(item.benchmarkPrice))     : 0
@@ -144,8 +149,10 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
               : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)' }}>No image</div>
             }
           </div>
-          {item.description && (
-            <p style={{ marginTop: 16, color: 'var(--muted)', fontSize: 14, lineHeight: 1.6 }}>{item.description}</p>
+          {(bDesc || item.description) && (
+            <p style={{ marginTop: 16, color: 'var(--muted)', fontSize: 14, lineHeight: 1.6 }}>
+              {bDesc ?? item.description}
+            </p>
           )}
 
           {/* Performance stats */}
@@ -217,6 +224,9 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
               )}
             </div>
             <h1 style={{ fontSize: 22, fontWeight: 900, marginBottom: 4 }}>{item.name}</h1>
+            {bTag && (
+              <div style={{ fontSize: 13, color: 'var(--gold)', fontStyle: 'italic', marginBottom: 6, lineHeight: 1.4 }}>{bTag}</div>
+            )}
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>
               {(item.rarityTier === 'Custom' || item.rarityTier === 'Banger')
                 ? '1 of 1 · Unique edition'
