@@ -25,6 +25,7 @@ const FLOW_META: Record<string, { flow: 'in' | 'out' | 'debt' | 'neutral' }> = {
   admin_adjustment:  { flow: 'neutral'},
   offer_accept:      { flow: 'in'    },
   starting_bonus:    { flow: 'in'    },
+  commission:        { flow: 'in'    },
 }
 
 const FLOW_COLOUR = { in: 'var(--green)', out: 'var(--red)', debt: '#e08030', neutral: 'var(--gold)' }

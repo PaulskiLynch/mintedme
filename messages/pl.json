@@ -653,7 +653,8 @@
       "liquidation_credit": "Nadwyżka z likwidacji",
       "admin_adjustment":   "Korekta administratora",
       "offer_accept":       "Zaakceptowana oferta",
-      "starting_bonus":     "Bonus startowy"
+      "starting_bonus":     "Bonus startowy",
+      "commission":         "Prowizja"
     }
   },
   "notifications": {

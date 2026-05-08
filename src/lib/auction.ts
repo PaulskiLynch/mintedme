@@ -1,5 +1,10 @@
 import { prisma } from './db'
+import { JOB_BY_CODE, benefitMatchesItem, commissionMatchesTransaction, calcCommission, type ItemForJob } from './jobs'
 export { bidIncrement } from './bidIncrement'
+
+const commissionJobCodes = Object.values(JOB_BY_CODE)
+  .filter(j => j.commissionRate > 0)
+  .map(j => j.code)
 
 const STEAL_THRESHOLD    = 0.80   // price < 80% of benchmark
 const OVERPAID_THRESHOLD = 1.20   // price > 120% of benchmark
@@ -74,7 +79,22 @@ export async function settleAuction(auctionId: string) {
           description: `Auction won: ${auction.edition.item.name} — $${price.toLocaleString()}` },
       })
 
+      // Resolve item descriptor for commission / fee_reduction matching
+      const auctionEditionItem = await tx.itemEdition.findUnique({
+        where: { id: auction.editionId },
+        select: { item: { select: { aircraftType: true, yachtType: true, propertyTier: true, businessRiskTier: true } } },
+      })
+      const itemForJob: ItemForJob = {
+        category:         '',
+        aircraftType:     auctionEditionItem?.item.aircraftType     ?? null,
+        yachtType:        auctionEditionItem?.item.yachtType        ?? null,
+        propertyTier:     auctionEditionItem?.item.propertyTier     ?? null,
+        businessRiskTier: auctionEditionItem?.item.businessRiskTier ?? null,
+      }
+
       // Pay seller / clear debt / burn (system auction)
+      let sellerProceeds = 0
+      let effectiveFeeRate = PLATFORM_FEE_RATE
       if (auction.liquidationUserId) {
         const debtor      = await tx.user.findUnique({ where: { id: auction.liquidationUserId }, select: { debtAmount: true } })
         const debt        = Number(debtor?.debtAmount ?? 0)
@@ -103,13 +123,21 @@ export async function settleAuction(auctionId: string) {
           },
         })
       } else if (auction.sellerId && !auction.isSystemAuction) {
-        const fee      = Math.round(price * PLATFORM_FEE_RATE)
-        const proceeds = price - fee
-        await tx.user.update({ where: { id: auction.sellerId }, data: { balance: { increment: proceeds } } })
+        // Check seller's job for fee_reduction benefit on Auctions
+        const sellerJob = await tx.jobHolding.findUnique({ where: { userId: auction.sellerId } })
+        if (sellerJob) {
+          const sellerJobDef = JOB_BY_CODE[sellerJob.jobCode]
+          if (sellerJobDef?.benefitType === 'fee_reduction' && sellerJobDef.benefitTarget === 'Auctions') {
+            effectiveFeeRate = Math.max(0, PLATFORM_FEE_RATE * (1 - sellerJobDef.benefitValue))
+          }
+        }
+        const fee      = Math.round(price * effectiveFeeRate)
+        sellerProceeds = price - fee
+        await tx.user.update({ where: { id: auction.sellerId }, data: { balance: { increment: sellerProceeds } } })
         await tx.transaction.create({
-          data: { toUserId: auction.sellerId, editionId: auction.editionId, amount: proceeds,
+          data: { toUserId: auction.sellerId, editionId: auction.editionId, amount: sellerProceeds,
             type: 'auction_settlement_credit',
-            description: `Auction sale (5% fee deducted): ${auction.edition.item.name}` },
+            description: `Auction sale (${Math.round(effectiveFeeRate * 100)}% fee deducted): ${auction.edition.item.name}` },
         })
       }
 
@@ -154,16 +182,35 @@ export async function settleAuction(auctionId: string) {
         },
       })
       if (auction.sellerId && !auction.isSystemAuction) {
-        const proceeds = Math.round(price * (1 - PLATFORM_FEE_RATE))
-        const fee      = price - proceeds
+        const fee = price - sellerProceeds
         await tx.notification.create({
           data: {
             userId:    auction.sellerId,
             type:      'item_sold',
-            message:   `Your ${auction.edition.item.name} sold for $${price.toLocaleString()} — you received $${proceeds.toLocaleString()} after $${fee.toLocaleString()} platform fee.`,
+            message:   `Your ${auction.edition.item.name} sold for $${price.toLocaleString()} — you received $${sellerProceeds.toLocaleString()} after $${fee.toLocaleString()} platform fee.`,
             actionUrl: '/wallet',
           },
         })
+      }
+
+      // Pay commissions to eligible job holders
+      if (commissionJobCodes.length > 0) {
+        const commHolders = await tx.jobHolding.findMany({
+          where: { jobCode: { in: commissionJobCodes } },
+          select: { userId: true, jobCode: true, monthlySalary: true },
+        })
+        for (const holder of commHolders) {
+          if (holder.userId === winnerId || holder.userId === auction.sellerId) continue
+          const jd = JOB_BY_CODE[holder.jobCode]
+          if (!jd || !commissionMatchesTransaction(jd.commissionScope, 'auction', itemForJob)) continue
+          const commission = calcCommission(jd.commissionRate, price, holder.monthlySalary)
+          if (commission <= 0) continue
+          await tx.user.update({ where: { id: holder.userId }, data: { balance: { increment: commission } } })
+          await tx.transaction.create({
+            data: { toUserId: holder.userId, editionId: auction.editionId, amount: commission, type: 'commission',
+              description: `Commission: ${auction.edition.item.name}` },
+          })
+        }
       }
 
       return { result: 'sold' as const, winnerId, price, isSteal, isOverpaid, pctVsTrue }

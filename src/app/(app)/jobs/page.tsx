@@ -1,7 +1,7 @@
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
 import { getTranslations } from 'next-intl/server'
-import { JOB_BY_CODE, dailyShuffledJobs, activeJobCount } from '@/lib/jobs'
+import { JOB_BY_CODE, JOB_ICON_INDEX, dailyShuffledJobs, activeJobCount } from '@/lib/jobs'
 import JobsClient from './JobsClient'
 
 export const dynamic = 'force-dynamic'
@@ -40,12 +40,13 @@ export default async function JobsPage() {
     const auction   = auctionMap[j.code]
     const myBidHere = myActiveBid?.jobAuction.jobCode === j.code ? myActiveBid.salaryBid : null
     return {
-      code:     j.code,
-      title:    j.title,
-      category: j.category,
+      code:      j.code,
+      title:     j.title,
+      category:  j.category,
+      iconIndex: JOB_ICON_INDEX.get(j.code) ?? 1,
       minSalary: j.minSalary,
       maxSalary: j.maxSalary,
-      isTaken:  (holderMap[j.code] ?? 0) >= 1,
+      isTaken:   (holderMap[j.code] ?? 0) >= 1,
       activeAuction: auction ? {
         id:        auction.id,
         endsAt:    auction.endsAt.toISOString(),
@@ -56,7 +57,8 @@ export default async function JobsPage() {
     }
   })
 
-  const myJobTitle = myJob ? (JOB_BY_CODE[myJob.jobCode]?.title ?? null) : null
+  const myJobTitle     = myJob ? (JOB_BY_CODE[myJob.jobCode]?.title ?? null) : null
+  const myJobIconIndex = myJob ? (JOB_ICON_INDEX.get(myJob.jobCode) ?? null) : null
 
   const now       = new Date()
   const tomorrow  = new Date(now)
@@ -94,6 +96,7 @@ export default async function JobsPage() {
         jobs={jobs}
         myJob={myJob ? { jobCode: myJob.jobCode, monthlySalary: myJob.monthlySalary, startedAt: myJob.startedAt.toISOString(), lastPaidAt: myJob.lastPaidAt?.toISOString() ?? null } : null}
         myJobTitle={myJobTitle}
+        myJobIconIndex={myJobIconIndex}
         userId={userId}
         refreshesAt={refreshesAt}
         totalUsers={userCount}

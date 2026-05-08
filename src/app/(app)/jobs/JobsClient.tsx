@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 
@@ -10,7 +11,7 @@ interface ActiveAuction {
 }
 
 interface JobRow {
-  code: string; title: string; category: string
+  code: string; title: string; category: string; iconIndex: number
   minSalary: number; maxSalary: number
   isTaken: boolean
   activeAuction: ActiveAuction | null
@@ -21,12 +22,13 @@ interface MyJob {
 }
 
 interface Props {
-  jobs:         JobRow[]
-  myJob:        MyJob | null
-  myJobTitle:   string | null
-  userId:       string | null
-  refreshesAt:  string
-  totalUsers:   number
+  jobs:              JobRow[]
+  myJob:             MyJob | null
+  myJobTitle:        string | null
+  myJobIconIndex:    number | null
+  userId:            string | null
+  refreshesAt:       string
+  totalUsers:        number
 }
 
 function timeLeft(iso: string, t: ReturnType<typeof useTranslations>): string {
@@ -37,7 +39,7 @@ function timeLeft(iso: string, t: ReturnType<typeof useTranslations>): string {
   return t('timeDaysLeft', { d: Math.floor(h / 24), h: h % 24 })
 }
 
-export default function JobsClient({ jobs, myJob, myJobTitle, userId, refreshesAt, totalUsers }: Props) {
+export default function JobsClient({ jobs, myJob, myJobTitle, myJobIconIndex, userId, refreshesAt, totalUsers }: Props) {
   const t      = useTranslations('jobs')
   const router = useRouter()
   const [search, setSearch]     = useState('')
@@ -108,10 +110,15 @@ export default function JobsClient({ jobs, myJob, myJobTitle, userId, refreshesA
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--gold)', borderRadius: 12, padding: '18px 20px', marginBottom: 20 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.1em', marginBottom: 4 }}>{t('yourJobBadge')}</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-            <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              {myJobIconIndex && (
+                <Image src={`/jobs/job${myJobIconIndex}.png`} alt="" width={48} height={48} style={{ borderRadius: 8, objectFit: 'cover' }} />
+              )}
+              <div>
               <div style={{ fontSize: 17, fontWeight: 900 }}>{myJobTitle}</div>
               <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--gold)', marginTop: 4 }}>
                 ${myJob.monthlySalary.toLocaleString()}<span style={{ fontSize: 12, fontWeight: 400, color: 'var(--muted)' }}>{t('perMonth')}</span>
+              </div>
               </div>
             </div>
             <button onClick={quitJob} disabled={quitBusy} className="btn btn-danger btn-sm">
@@ -180,6 +187,13 @@ export default function JobsClient({ jobs, myJob, myJobTitle, userId, refreshesA
               }}
             >
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <Image
+                  src={`/jobs/job${job.iconIndex}.png`}
+                  alt=""
+                  width={40}
+                  height={40}
+                  style={{ borderRadius: 8, objectFit: 'cover', flexShrink: 0, opacity: taken && !isMine ? 0.4 : 1 }}
+                />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     {job.title}
@@ -234,8 +248,13 @@ export default function JobsClient({ jobs, myJob, myJobTitle, userId, refreshesA
       {modal && (
         <div className="overlay" onClick={e => { if (e.target === e.currentTarget) setModal(null) }}>
           <div className="modal">
-            <div className="modal-title">{modal.activeAuction ? t('placeBid') : t('startAuction')}</div>
-            <div className="modal-sub">{modal.title} · {modal.category}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <Image src={`/jobs/job${modal.iconIndex}.png`} alt="" width={52} height={52} style={{ borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
+              <div>
+                <div className="modal-title" style={{ margin: 0 }}>{modal.activeAuction ? t('placeBid') : t('startAuction')}</div>
+                <div className="modal-sub" style={{ margin: 0 }}>{modal.title} · {modal.category}</div>
+              </div>
+            </div>
 
             <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: '12px 14px', marginBottom: 20 }}>
               <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>{t('salaryRange')}</div>

@@ -653,7 +653,8 @@
       "liquidation_credit": "Liquidation surplus",
       "admin_adjustment":   "Admin adjustment",
       "offer_accept":       "Offer accepted",
-      "starting_bonus":     "Starting bonus"
+      "starting_bonus":     "Starting bonus",
+      "commission":         "Commission"
     }
   },
   "notifications": {

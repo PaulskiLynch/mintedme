@@ -4,6 +4,11 @@ import { prisma } from '@/lib/db'
 import { maxEditions } from '@/lib/supply'
 import { snapshotRanks } from '@/lib/ranks'
 import { availableBalance } from '@/lib/balance'
+import { JOB_BY_CODE, benefitMatchesItem, commissionMatchesTransaction, calcCommission, type ItemForJob } from '@/lib/jobs'
+
+const commissionJobCodes = Object.values(JOB_BY_CODE)
+  .filter(j => j.commissionRate > 0)
+  .map(j => j.code)
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -76,6 +81,25 @@ export async function POST(req: NextRequest) {
         price = Number(edition.listedPrice!)
       }
 
+      // Construct item descriptor used for job benefit / commission matching
+      const itemForJob: ItemForJob = {
+        category:         '',
+        aircraftType:     (edition.item as any).aircraftType     ?? null,
+        yachtType:        (edition.item as any).yachtType        ?? null,
+        propertyTier:     (edition.item as any).propertyTier     ?? null,
+        businessRiskTier: (edition.item as any).businessRiskTier ?? null,
+      }
+
+      // Apply buyer's job purchase_discount (does not stack with suggestion discount)
+      const buyerJob = await tx.jobHolding.findUnique({ where: { userId: buyerId } })
+      if (buyerJob) {
+        const buyerJobDef = JOB_BY_CODE[buyerJob.jobCode]
+        if (buyerJobDef?.benefitType === 'purchase_discount' &&
+            benefitMatchesItem(buyerJobDef.benefitTarget, itemForJob)) {
+          price = Math.round(price * (1 - buyerJobDef.benefitValue))
+        }
+      }
+
       const buyer = await tx.user.findUnique({ where: { id: buyerId } })
       if (!buyer) throw new Error('Buyer not found')
       if (availableBalance(buyer) < price) throw new Error('Insufficient available balance')
@@ -120,6 +144,26 @@ export async function POST(req: NextRequest) {
 
       if (sellerId) {
         await tx.notification.create({ data: { userId: sellerId, type: 'item_sold', message: `Your ${edition.item.name} sold for $${price.toLocaleString()}`, actionUrl: `/item/${editionId}` } })
+      }
+
+      // Pay commissions to eligible job holders — secondary market only
+      if (!isPrimarySale && commissionJobCodes.length > 0) {
+        const commHolders = await tx.jobHolding.findMany({
+          where: { jobCode: { in: commissionJobCodes } },
+          select: { userId: true, jobCode: true, monthlySalary: true },
+        })
+        for (const holder of commHolders) {
+          if (holder.userId === buyerId || holder.userId === sellerId) continue
+          const jd = JOB_BY_CODE[holder.jobCode]
+          if (!jd || !commissionMatchesTransaction(jd.commissionScope, 'buy', itemForJob)) continue
+          const commission = calcCommission(jd.commissionRate, price, holder.monthlySalary)
+          if (commission <= 0) continue
+          await tx.user.update({ where: { id: holder.userId }, data: { balance: { increment: commission } } })
+          await tx.transaction.create({
+            data: { toUserId: holder.userId, editionId, amount: commission, type: 'commission',
+              description: `Commission: ${edition.item.name}` },
+          })
+        }
       }
 
       return { ok: true, txnId: txn.id, editionId }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { settleAuction } from '@/lib/auction'
 import { monthlyUpkeep, UPKEEP_CYCLE_DAYS } from '@/lib/upkeep'
-import { JOB_BY_CODE } from '@/lib/jobs'
+import { JOB_BY_CODE, benefitMatchesItem, type ItemForJob } from '@/lib/jobs'
 import { businessNetIncome } from '@/lib/business'
 import { monthlyPropertyUpkeep, monthlyPropertyAppreciation } from '@/lib/property'
 import { monthlyAircraftUpkeep } from '@/lib/aircraft'
@@ -59,19 +59,41 @@ export async function GET(req: NextRequest) {
       ],
     },
     include: {
-      item:         { select: { benchmarkPrice: true, rarityTier: true, name: true, aircraftType: true } },
+      item:         { select: { benchmarkPrice: true, rarityTier: true, name: true, aircraftType: true, yachtType: true } },
       currentOwner: { select: { id: true, balance: true, lockedBalance: true } },
     },
     take: 200,
   })
 
+  // Preload job holdings for all edition owners (for upkeep_reduction benefit)
+  const dueOwnerIds = [...new Set(dueEditions.map(e => e.currentOwnerId).filter(Boolean) as string[])]
+  const dueOwnerJobRows = await prisma.jobHolding.findMany({
+    where: { userId: { in: dueOwnerIds } },
+    select: { userId: true, jobCode: true },
+  })
+  const dueOwnerJobMap = new Map(dueOwnerJobRows.map(j => [j.userId, JOB_BY_CODE[j.jobCode]]))
+
   let upkeepCharged = 0
   let upkeepDebted  = 0
   for (const edition of dueEditions) {
     if (!edition.currentOwner) continue
-    const cost = edition.item.aircraftType
+    let cost = edition.item.aircraftType
       ? monthlyAircraftUpkeep(edition.item.aircraftType, Number(edition.item.benchmarkPrice))
       : monthlyUpkeep(edition.item.rarityTier, Number(edition.item.benchmarkPrice))
+
+    const ownerJobDef = dueOwnerJobMap.get(edition.currentOwnerId!)
+    if (ownerJobDef?.benefitType === 'upkeep_reduction') {
+      const itemForJob: ItemForJob = {
+        category: '',
+        aircraftType: edition.item.aircraftType ?? null,
+        yachtType:    edition.item.yachtType    ?? null,
+        propertyTier: null,
+        businessRiskTier: null,
+      }
+      if (benefitMatchesItem(ownerJobDef.benefitTarget, itemForJob)) {
+        cost = Math.round(cost * (1 - ownerJobDef.benefitValue))
+      }
+    }
     const canPay = availableBalance(edition.currentOwner) >= cost
     try {
       await prisma.$transaction(async (tx) => {
@@ -328,11 +350,12 @@ export async function GET(req: NextRequest) {
     const jobDef = JOB_BY_CODE[holding.jobCode]
     if (!jobDef) { salarySkipped++; continue }
     try {
+      const net = Math.round(holding.monthlySalary * (1 - jobDef.taxRate))
       await prisma.$transaction(async (tx) => {
-        await tx.user.update({ where: { id: holding.userId }, data: { balance: { increment: holding.monthlySalary } } })
+        await tx.user.update({ where: { id: holding.userId }, data: { balance: { increment: net } } })
         await tx.jobHolding.update({ where: { id: holding.id }, data: { lastPaidAt: new Date() } })
         await tx.transaction.create({
-          data: { toUserId: holding.userId, amount: holding.monthlySalary, type: 'salary', description: `Monthly salary: ${jobDef.title}` },
+          data: { toUserId: holding.userId, amount: net, type: 'salary', description: `Monthly salary: ${jobDef.title}` },
         })
       })
       salaryPaid++
@@ -360,11 +383,28 @@ export async function GET(req: NextRequest) {
     take: 200,
   })
 
+  // Preload job holdings for business owners (for income_bonus benefit)
+  const bizOwnerIds = [...new Set(dueBusinessEditions.map(e => e.currentOwnerId).filter(Boolean) as string[])]
+  const bizOwnerJobRows = await prisma.jobHolding.findMany({
+    where: { userId: { in: bizOwnerIds } },
+    select: { userId: true, jobCode: true },
+  })
+  const bizOwnerJobMap = new Map(bizOwnerJobRows.map(j => [j.userId, JOB_BY_CODE[j.jobCode]]))
+
   let incomesPaid = 0
   for (const edition of dueBusinessEditions) {
     if (!edition.currentOwner || !edition.item.businessRiskTier) continue
-    const net = businessNetIncome(edition.item.businessRiskTier, Number(edition.item.benchmarkPrice))
+    let net = businessNetIncome(edition.item.businessRiskTier, Number(edition.item.benchmarkPrice))
     if (net <= 0) continue
+
+    const bizOwnerJobDef = bizOwnerJobMap.get(edition.currentOwnerId!)
+    if (bizOwnerJobDef?.benefitType === 'income_bonus') {
+      const itemForJob: ItemForJob = { category: '', businessRiskTier: edition.item.businessRiskTier }
+      if (benefitMatchesItem(bizOwnerJobDef.benefitTarget, itemForJob)) {
+        net = Math.round(net * (1 + bizOwnerJobDef.benefitValue))
+      }
+    }
+
     try {
       await prisma.$transaction(async (tx) => {
         await tx.user.update({ where: { id: edition.currentOwnerId! }, data: { balance: { increment: net } } })
@@ -398,11 +438,27 @@ export async function GET(req: NextRequest) {
     take: 500,
   })
 
+  // Preload job holdings for property owners (for upkeep_reduction benefit)
+  const propOwnerIds = [...new Set(duePropertyEditions.map(e => e.currentOwnerId).filter(Boolean) as string[])]
+  const propOwnerJobRows = await prisma.jobHolding.findMany({
+    where: { userId: { in: propOwnerIds } },
+    select: { userId: true, jobCode: true },
+  })
+  const propOwnerJobMap = new Map(propOwnerJobRows.map(j => [j.userId, JOB_BY_CODE[j.jobCode]]))
+
   let propertyUpkeepCharged = 0
   let propertyUpkeepDebted  = 0
   for (const edition of duePropertyEditions) {
     if (!edition.currentOwner || !edition.item.propertyTier) continue
-    const cost = monthlyPropertyUpkeep(edition.item.propertyTier, Number(edition.item.benchmarkPrice))
+    let cost = monthlyPropertyUpkeep(edition.item.propertyTier, Number(edition.item.benchmarkPrice))
+
+    const propOwnerJobDef = propOwnerJobMap.get(edition.currentOwnerId!)
+    if (cost > 0 && propOwnerJobDef?.benefitType === 'upkeep_reduction') {
+      const itemForJob: ItemForJob = { category: '', propertyTier: edition.item.propertyTier }
+      if (benefitMatchesItem(propOwnerJobDef.benefitTarget, itemForJob)) {
+        cost = Math.round(cost * (1 - propOwnerJobDef.benefitValue))
+      }
+    }
     if (cost === 0) {
       // rent_free — just reset the clock
       await prisma.itemEdition.update({ where: { id: edition.id }, data: { lastUpkeepAt: new Date() } })
