@@ -19,6 +19,7 @@ const NAV = [
   { href: '/marketplace',   key: 'market'        },
   { href: '/auctions',      key: 'auctions'      },
   { href: '/jobs',          key: 'jobs'          },
+  { href: '/bank',          key: 'bank'          },
   { href: '/groups',        key: 'groups'        },
   { href: '/leaderboard',   key: 'leaderboard'   },
   { href: '/mint',          key: 'myMint'        },
@@ -29,7 +30,7 @@ const NAV = [
 ] as const
 
 const NAV_ICONS: Record<string, string> = {
-  feed: '◎', market: '◈', auctions: '⏱', jobs: '◑', groups: '◍',
+  feed: '◎', market: '◈', auctions: '⏱', jobs: '◑', bank: '⬡', groups: '◍',
   leaderboard: '▲', myMint: '◆', inbox: '✉', notifications: '🔔',
   suggest: '💡', admin: '★',
 }
@@ -47,6 +48,7 @@ const MOBILE_NAV_PRIMARY_ICONS: Record<string, string> = {
 
 const MOBILE_NAV_MORE = [
   { href: '/auctions',      key: 'auctions'      },
+  { href: '/bank',          key: 'bank'          },
   { href: '/groups',        key: 'groups'        },
   { href: '/leaderboard',   key: 'leaderboard'   },
   { href: '/inbox',         key: 'inbox'         },
@@ -58,7 +60,7 @@ const MOBILE_NAV_MORE = [
 ] as const
 
 const MOBILE_NAV_MORE_ICONS: Record<string, string> = {
-  auctions: '⏱', groups: '◍', leaderboard: '▲', inbox: '✉',
+  auctions: '⏱', bank: '⬡', groups: '◍', leaderboard: '▲', inbox: '✉',
   notifications: '🔔', suggest: '💡', wallet: '◉', settings: '⚙', admin: '★',
 }
 

@@ -22,10 +22,14 @@ const FLOW_META: Record<string, { flow: 'in' | 'out' | 'debt' | 'neutral' }> = {
   salary:            { flow: 'in'    },
   business_income:   { flow: 'in'    },
   liquidation_credit:{ flow: 'in'    },
-  admin_adjustment:  { flow: 'neutral'},
-  offer_accept:      { flow: 'in'    },
-  starting_bonus:    { flow: 'in'    },
-  commission:        { flow: 'in'    },
+  admin_adjustment:         { flow: 'neutral'},
+  offer_accept:             { flow: 'in'    },
+  starting_bonus:           { flow: 'in'    },
+  commission:               { flow: 'in'    },
+  loan_drawdown:            { flow: 'in'    },
+  loan_payment:             { flow: 'out'   },
+  loan_repayment:           { flow: 'out'   },
+  loan_liquidation_credit:  { flow: 'in'    },
 }
 
 const FLOW_COLOUR = { in: 'var(--green)', out: 'var(--red)', debt: '#e08030', neutral: 'var(--gold)' }

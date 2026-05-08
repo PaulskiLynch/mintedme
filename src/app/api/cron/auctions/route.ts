@@ -7,6 +7,7 @@ import { businessNetIncome } from '@/lib/business'
 import { monthlyPropertyUpkeep, monthlyPropertyAppreciation } from '@/lib/property'
 import { monthlyAircraftUpkeep } from '@/lib/aircraft'
 import { availableBalance } from '@/lib/balance'
+import { calcMonthlyPayment, LIQUIDATION_FEE_RATE } from '@/lib/loans'
 
 const DURATION_MS        = 3 * 24 * 60 * 60 * 1000   // user auction duration
 const SYSTEM_DURATION_MS = 24 * 60 * 60 * 1000        // system auction duration (24h)
@@ -530,5 +531,94 @@ export async function GET(req: NextRequest) {
   }
   log.push(`property appreciation: ${appreciated} item${appreciated !== 1 ? 's' : ''} updated`)
 
-  return NextResponse.json({ ok: true, log, created: created.length, upkeepCharged, upkeepDebted, liquidated, propertyUpkeepCharged, propertyUpkeepDebted, appreciated, salaryPaid, incomesPaid, auctionIds: created })
+  // 8. Process monthly loan payments
+  const dueLoans = await prisma.loan.findMany({
+    where: {
+      status: 'active',
+      nextPaymentAt: { lte: new Date() },
+    },
+    include: {
+      user:    { select: { id: true, balance: true, lockedBalance: true, isFrozen: true, debtAmount: true } },
+      edition: { select: { id: true, item: { select: { name: true, benchmarkPrice: true, rarityTier: true } } } },
+    },
+    take: 200,
+  })
+
+  let loansPaid = 0; let loansDefaulted = 0; let loansLiquidated = 0
+  for (const loan of dueLoans) {
+    if (loan.user.isFrozen) continue
+    const nextPaymentAt = new Date(loan.nextPaymentAt.getTime() + CYCLE_MS)
+
+    const canPay = availableBalance(loan.user) >= loan.monthlyPayment
+    if (canPay) {
+      // Successful payment
+      const principalChunk = Math.round(loan.principal / loan.termMonths)
+      const newOutstanding  = Math.max(0, loan.outstanding - principalChunk)
+      const isLastPayment   = loan.paidMonths + 1 >= loan.termMonths
+
+      try {
+        await prisma.$transaction(async (tx) => {
+          await tx.user.update({ where: { id: loan.userId }, data: { balance: { decrement: loan.monthlyPayment } } })
+          await tx.transaction.create({
+            data: { fromUserId: loan.userId, editionId: loan.editionId, amount: loan.monthlyPayment, type: 'loan_payment',
+              description: `Loan payment (${loan.paidMonths + 1}/${loan.termMonths}): ${loan.edition.item.name}` },
+          })
+          if (isLastPayment) {
+            await tx.loan.update({ where: { id: loan.id }, data: { status: 'paid_off', outstanding: 0, paidMonths: { increment: 1 }, lastPaymentAt: new Date() } })
+            await tx.itemEdition.update({ where: { id: loan.editionId }, data: { hasActiveLoan: false, isAtRisk: false } })
+            await tx.notification.create({ data: { userId: loan.userId, type: 'loan_paid_off', message: `Loan fully repaid for ${loan.edition.item.name}. The asset is now free and clear.`, actionUrl: '/bank' } })
+          } else {
+            await tx.loan.update({ where: { id: loan.id }, data: { outstanding: newOutstanding, paidMonths: { increment: 1 }, missedPayments: 0, lastPaymentAt: new Date(), nextPaymentAt } })
+          }
+        })
+        loansPaid++
+      } catch (e) { log.push(`loan payment error ${loan.id}: ${e}`) }
+
+    } else {
+      // Missed payment
+      const newMissed = loan.missedPayments + 1
+      try {
+        if (newMissed >= 3) {
+          // Liquidation
+          const startingBid = Math.round(Number(loan.edition.item.benchmarkPrice) * 0.10)
+          await prisma.$transaction(async (tx) => {
+            await tx.loan.update({ where: { id: loan.id }, data: { missedPayments: newMissed, status: 'liquidating', nextPaymentAt } })
+            const auction = await tx.auction.create({
+              data: {
+                editionId:         loan.editionId,
+                sellerId:          null,
+                minimumBid:        startingBid,
+                benchmarkPrice:    Number(loan.edition.item.benchmarkPrice),
+                rarityTier:        loan.edition.item.rarityTier,
+                status:            'active',
+                startsAt:          new Date(),
+                endsAt:            new Date(Date.now() + DURATION_MS),
+                isSystemAuction:   false,
+                liquidationLoanId: loan.id,
+              },
+            })
+            await tx.itemEdition.update({ where: { id: loan.editionId }, data: { isInAuction: true } })
+            await tx.notification.create({ data: { userId: loan.userId, type: 'loan_liquidation', message: `Your ${loan.edition.item.name} has been listed for forced sale after 3 missed loan payments.`, actionUrl: `/auction/${auction.id}` } })
+          })
+          loansLiquidated++
+        } else if (newMissed === 2) {
+          await prisma.$transaction(async (tx) => {
+            await tx.loan.update({ where: { id: loan.id }, data: { missedPayments: newMissed, nextPaymentAt } })
+            await tx.itemEdition.update({ where: { id: loan.editionId }, data: { isAtRisk: true } })
+            await tx.notification.create({ data: { userId: loan.userId, type: 'loan_at_risk', message: `Warning: 2 missed payments on your ${loan.edition.item.name} loan. One more miss triggers forced sale.`, actionUrl: '/bank' } })
+          })
+          loansDefaulted++
+        } else {
+          await prisma.$transaction(async (tx) => {
+            await tx.loan.update({ where: { id: loan.id }, data: { missedPayments: newMissed, nextPaymentAt } })
+            await tx.notification.create({ data: { userId: loan.userId, type: 'loan_missed', message: `Missed loan payment for ${loan.edition.item.name}. $${loan.monthlyPayment.toLocaleString()} due. Two more misses triggers forced sale.`, actionUrl: '/bank' } })
+          })
+          loansDefaulted++
+        }
+      } catch (e) { log.push(`loan miss error ${loan.id}: ${e}`) }
+    }
+  }
+  log.push(`loans: paid ${loansPaid}, missed/at-risk ${loansDefaulted}, liquidated ${loansLiquidated}`)
+
+  return NextResponse.json({ ok: true, log, created: created.length, upkeepCharged, upkeepDebted, liquidated, propertyUpkeepCharged, propertyUpkeepDebted, appreciated, salaryPaid, incomesPaid, loansPaid, loansDefaulted, loansLiquidated, auctionIds: created })
 }

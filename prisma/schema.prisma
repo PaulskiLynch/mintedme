@@ -56,6 +56,7 @@ model User {
   jobBids            JobBid[]
   wonJobAuctions     JobAuction[]       @relation("JobAuctionWinner")
   adminLogs          AdminLog[]
+  loans              Loan[]
   groupMemberships        GroupMember[]
   createdGroups           Group[]                @relation("GroupCreator")
   groupMessages           GroupMessage[]
@@ -159,6 +160,10 @@ model ItemEdition {
   lastIncomeAt   DateTime?
   lastUpkeepAt   DateTime?
   createdAt      DateTime  @default(now())
+
+  hasActiveLoan Boolean  @default(false)
+  isAtRisk      Boolean  @default(false)
+  loans         Loan[]
 
   item         Item           @relation(fields: [itemId], references: [id], onDelete: Cascade)
   currentOwner User?          @relation("CurrentOwner", fields: [currentOwnerId], references: [id])
@@ -264,6 +269,7 @@ model Auction {
   isSystemAuction    Boolean  @default(false)       // true = MilliBux-owned, funds burned on win
   liquidationUserId  String?                        // set on forced-sale auctions; proceeds clear their debt
   createdAt          DateTime @default(now())
+  liquidationLoanId  String?                        // loan ID if this is a loan-default auction
 
   edition       ItemEdition      @relation(fields: [editionId],       references: [id])
   seller        User?            @relation("AuctionSeller",  fields: [sellerId],         references: [id])
@@ -582,4 +588,28 @@ model GroupChallengeRanking {
   @@unique([challengeId, userId])
   @@index([challengeId, rank])
   @@map("group_challenge_rankings")
+}
+
+model Loan {
+  id             String    @id @default(uuid())
+  userId         String
+  editionId      String
+  loanType       String    // 'starter' | 'standard'
+  assetCategory  String    // 'safe_business' | 'growth_business' | 'risky_business' | 'prestige_business' | 'property' | 'car' | 'yacht' | 'aircraft' | 'collectibles'
+  principal      Int
+  outstanding    Int
+  monthlyPayment Int
+  monthlyRate    Float
+  termMonths     Int
+  paidMonths     Int       @default(0)
+  missedPayments Int       @default(0)
+  status         String    @default("active")  // active | paid_off | liquidating | liquidated
+  startedAt      DateTime  @default(now())
+  nextPaymentAt  DateTime
+  lastPaymentAt  DateTime?
+
+  user    User        @relation(fields: [userId],    references: [id])
+  edition ItemEdition @relation(fields: [editionId], references: [id])
+
+  @@map("loans")
 }

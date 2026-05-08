@@ -30,6 +30,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
       // ── Accept ─────────────────────────────────────────────────────────────────
       if (action === 'accept') {
+        if (offer.edition.hasActiveLoan) throw new Error('Item is used as loan collateral and cannot be sold')
+
         const sellerId = offer.edition.currentOwnerId!
         const buyerId  = offer.buyerId
         const price    = Number(offer.amount)

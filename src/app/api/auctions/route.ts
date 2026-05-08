@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
       if (edition.currentOwnerId !== session.user.id) throw new Error('Not your item')
       if (edition.isInAuction)                        throw new Error('Already in auction')
       if (edition.isFrozen)                           throw new Error('Item is frozen')
+      if (edition.hasActiveLoan)                      throw new Error('Item is used as loan collateral')
 
       const benchmark  = Number(edition.item.benchmarkPrice)
       const defaultBid = Math.round(benchmark * 0.10)

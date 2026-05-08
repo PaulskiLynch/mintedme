@@ -1,5 +1,6 @@
 import { prisma } from './db'
 import { JOB_BY_CODE, benefitMatchesItem, commissionMatchesTransaction, calcCommission, type ItemForJob } from './jobs'
+import { LIQUIDATION_FEE_RATE } from './loans'
 export { bidIncrement } from './bidIncrement'
 
 const commissionJobCodes = Object.values(JOB_BY_CODE)
@@ -95,7 +96,33 @@ export async function settleAuction(auctionId: string) {
       // Pay seller / clear debt / burn (system auction)
       let sellerProceeds = 0
       let effectiveFeeRate = PLATFORM_FEE_RATE
-      if (auction.liquidationUserId) {
+      if (auction.liquidationLoanId) {
+        const loan = await tx.loan.findUnique({ where: { id: auction.liquidationLoanId } })
+        if (loan) {
+          const fee         = Math.round(price * LIQUIDATION_FEE_RATE)
+          let   net         = price - fee
+          const loanPayoff  = Math.min(net, loan.outstanding)
+          net              -= loanPayoff
+          const debtor      = await tx.user.findUnique({ where: { id: loan.userId }, select: { debtAmount: true } })
+          const debtCleared = Math.min(net, Number(debtor?.debtAmount ?? 0))
+          net              -= debtCleared
+          const surplus     = net
+
+          if (debtCleared > 0) await tx.user.update({ where: { id: loan.userId }, data: { debtAmount: { decrement: debtCleared } } })
+          if (surplus     > 0) await tx.user.update({ where: { id: loan.userId }, data: { balance:    { increment: surplus     } } })
+          await tx.loan.update({ where: { id: loan.id }, data: { status: 'liquidated', outstanding: 0 } })
+          await tx.itemEdition.update({ where: { id: loan.editionId }, data: { hasActiveLoan: false, isAtRisk: false } })
+          await tx.transaction.create({
+            data: { toUserId: loan.userId, editionId: auction.editionId, amount: price, type: 'loan_liquidation_credit',
+              description: `Loan sale: ${auction.edition.item.name} — $${loanPayoff.toLocaleString()} loan, $${fee.toLocaleString()} fee${debtCleared > 0 ? `, $${debtCleared.toLocaleString()} upkeep` : ''}${surplus > 0 ? `, $${surplus.toLocaleString()} returned` : ''}` },
+          })
+          await tx.notification.create({ data: {
+            userId: loan.userId, type: 'loan_liquidated',
+            message: `Your ${auction.edition.item.name} sold for $${price.toLocaleString()} — loan cleared${surplus > 0 ? `, $${surplus.toLocaleString()} returned to your balance` : ''}.`,
+            actionUrl: '/bank',
+          }})
+        }
+      } else if (auction.liquidationUserId) {
         const debtor      = await tx.user.findUnique({ where: { id: auction.liquidationUserId }, select: { debtAmount: true } })
         const debt        = Number(debtor?.debtAmount ?? 0)
         const debtCleared = Math.min(price, debt)
